@@ -112,11 +112,11 @@ export default function PrimarySearchAppBar() {
             onClose={handleMenuClose}
         >
             {loggedin ?
-                <><MenuItem onClick={handleMenuClose}>Profile</MenuItem>
-                    <MenuItem onClick={handleMenuClose}>My account</MenuItem></>
+                <div><MenuItem onClick={handleMenuClose}>Profile</MenuItem>
+                    <MenuItem onClick={handleMenuClose}>My account</MenuItem></div>
                 :
-                <><MenuItem onClick={handleSignInClick} >Sign in</MenuItem>
-                    <MenuItem onClick={handleSignUpClick} > Resigter</MenuItem></>
+                <div><MenuItem onClick={handleSignInClick} >Sign in</MenuItem>
+                    <MenuItem onClick={handleSignUpClick} > Resigter</MenuItem></div>
             }
 
         </Menu >
