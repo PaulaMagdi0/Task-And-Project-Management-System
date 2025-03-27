@@ -1,43 +1,56 @@
 import * as React from 'react';
 import { AppProvider } from '@toolpad/core/AppProvider';
 import { SignInPage } from '@toolpad/core/SignInPage';
-import { useTheme } from '@mui/material/styles';
-import { Container } from '@mui/material';
+import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
+import { getDesignTokens, inputsCustomizations } from './customTheme';
 
-const providers = [{ id: 'credentials', name: 'Credentials' }];
-const BRANDING = {
-    logo: (
-        <img
-            src="https://mui.com/static/logo.svg"
-            alt="MUI logo"
-            style={{ height: 24 }}
-        />
-    ),
-    title: 'MUI',
-};
+const providers = [
+    { id: 'github', name: 'GitHub' },
+    { id: 'google', name: 'Google' },
+    { id: 'credentials', name: 'Email and Password' },
+];
 
 const signIn = async (provider) => {
     const promise = new Promise((resolve) => {
         setTimeout(() => {
             console.log(`Sign in with ${provider.id}`);
-            resolve();
+            resolve({ error: 'This is a mock error message.' });
         }, 500);
     });
     return promise;
 };
 
-export default function SignIn() {
-    const theme = useTheme();
-    return (
-        <Container maxWidth="sm" sx={{ marginTop: 4 }}>
+export default function ThemeSignInPage() {
+    const { mode, setMode } = useColorScheme();
+    const calculatedMode = mode || 'light';
+    const brandingDesignTokens = getDesignTokens(calculatedMode);
 
-            <AppProvider branding={BRANDING} theme={theme}>
+    const THEME = createTheme({
+        ...brandingDesignTokens,
+        palette: {
+            ...brandingDesignTokens.palette,
+            mode: calculatedMode,
+        },
+        components: {
+            ...inputsCustomizations,
+        },
+    });
+
+    return (
+        <ThemeProvider theme={THEME}>
+            <AppProvider theme={THEME}>
                 <SignInPage
                     signIn={signIn}
                     providers={providers}
-                    slotProps={{ emailField: { autoFocus: false }, form: { noValidate: true } }}
+                    slotProps={{ form: { noValidate: true } }}
+                    sx={{
+                        '& form > .MuiStack-root': {
+                            marginTop: '2rem',
+                            rowGap: '0.5rem',
+                        },
+                    }}
                 />
             </AppProvider>
-        </Container>
+        </ThemeProvider>
     );
 }
