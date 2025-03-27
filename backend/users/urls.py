@@ -1,8 +1,8 @@
-# backend/urls.py (or your project's main urls.py)
-from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from .views import ProtectedView  # Add this import
+from .views import RegisterView   # Keep any existing imports
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('core.urls')),  # Include core app URLs
+    path('register/', RegisterView.as_view(), name='register'),
+    path('protected/', ProtectedView.as_view(), name='protected'),
 ]
