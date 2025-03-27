@@ -8,6 +8,7 @@ const providers = [
     { id: 'github', name: 'GitHub' },
     { id: 'google', name: 'Google' },
     { id: 'credentials', name: 'Email and Password' },
+
 ];
 
 const signIn = async (provider) => {
