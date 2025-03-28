@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     "apps.assignments",
     "apps.grades",
     "apps.staff_members",
+    "apps.student",
+
 
 ]
 
@@ -90,3 +92,30 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# settings.py
+
+SITE_URL = 'http://127.0.0.1:8000'
+
+# settings.py
+
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_USE_TLS = True
+# EMAIL_HOST = 'smtp.mailtrap.io'  # Mailtrap SMTP Server
+# EMAIL_HOST_USER = '67da28f2216e33'# Find this in Mailtrap settings
+# EMAIL_HOST_PASSWORD = '865177a2af916d'# Find this in Mailtrap settings
+# EMAIL_PORT = '587'
+# DEFAULT_FROM_EMAIL = 'm.nasr266@gmail.com'  # Your "from" email address
+# # efvh pzab wslt upfq
+# # EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'
+
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "m.nasr266@gmail.com"
+EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Use an App Password, NOT your Gmail password
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
