@@ -3,11 +3,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "your-secret-key"
+SECRET_KEY = "your-secret-key"  # Keep this secure in production
 
-DEBUG = True
+DEBUG = True  # Set to False in production
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]  # Restrict hosts in production
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "channels",  # WebSockets support
     "apps.accounts",
     "apps.tracks",
     "apps.courses",
@@ -24,8 +25,7 @@ INSTALLED_APPS = [
     "apps.grades",
     "apps.staff_members",
     "apps.student",
-    "channels",
-    "apps.chat",  # New chat app for WebSocket support
+    "apps.chat",
 ]
 
 MIDDLEWARE = [
@@ -43,7 +43,7 @@ ROOT_URLCONF = "project.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -57,32 +57,25 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "project.wsgi.application"
-ASGI_APPLICATION = "project.asgi.application"  # Added ASGI application for WebSockets
+ASGI_APPLICATION = "project.asgi.application"
 
+# PostgreSQL Database Configuration
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "task-project-system",  # Change this to your database name
-        "USER": "postgres",  # Your PostgreSQL username
-        "PASSWORD": "Paula",  # Your PostgreSQL password
+        "NAME": "task-project-system",
+        "USER": "postgres",
+        "PASSWORD": "Paula",  # Keep this secure
         "HOST": "localhost",
         "PORT": "5432",
     }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 LANGUAGE_CODE = "en-us"
@@ -90,30 +83,29 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+# Static & Media Files Configuration
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
+STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# settings.py
-
-SITE_URL = 'http://127.0.0.1:8000'
+SITE_URL = "http://127.0.0.1:8000"
 
 # Django Channels Configuration
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
     },
 }
 
-# settings.py
-
+# Email Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "m.nasr266@gmail.com"
-EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Use an App Password, NOT your Gmail password
+EMAIL_HOST_PASSWORD = "efvh pzab wslt upfq"  # Keep this secure
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
