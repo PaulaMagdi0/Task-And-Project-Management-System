@@ -24,8 +24,8 @@ INSTALLED_APPS = [
     "apps.grades",
     "apps.staff_members",
     "apps.student",
-
-
+    "channels",
+    "apps.chat",  # New chat app for WebSocket support
 ]
 
 MIDDLEWARE = [
@@ -57,17 +57,18 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "project.wsgi.application"
+ASGI_APPLICATION = "project.asgi.application"  # Added ASGI application for WebSockets
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",  # Change this to your database name
         "USER": "postgres",  # Your PostgreSQL username
-        "PASSWORD": "2625",  # Your PostgreSQL password
+        "PASSWORD": "Paula",  # Your PostgreSQL password
         "HOST": "localhost",
         "PORT": "5432",
     }
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -97,19 +98,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SITE_URL = 'http://127.0.0.1:8000'
 
+# Django Channels Configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
 # settings.py
-
-
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_USE_TLS = True
-# EMAIL_HOST = 'smtp.mailtrap.io'  # Mailtrap SMTP Server
-# EMAIL_HOST_USER = '67da28f2216e33'# Find this in Mailtrap settings
-# EMAIL_HOST_PASSWORD = '865177a2af916d'# Find this in Mailtrap settings
-# EMAIL_PORT = '587'
-# DEFAULT_FROM_EMAIL = 'm.nasr266@gmail.com'  # Your "from" email address
-# # efvh pzab wslt upfq
-# # EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'
-
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
@@ -118,4 +117,3 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "m.nasr266@gmail.com"
 EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Use an App Password, NOT your Gmail password
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
