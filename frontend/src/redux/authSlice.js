@@ -1,29 +1,43 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
-// Async thunk for logging in
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
-  async ({ email, password }, { rejectWithValue }) => {
+  async ({ email, password }, thunkAPI) => {
     try {
-      const response = await apiClient.post('/auth/token/', { email, password });
-      return response.data;
-    } catch (err) {
-      if (!err.response) {
-        return rejectWithValue({ error: "Network error: Cannot connect to server." });
+      const response = await apiClient.post('/auth/token/', { email: email.trim(), password });
+      const { access, refresh } = response.data;
+      
+      // Dynamically import jwt-decode and destructure the named export
+      const jwtDecodeModule = await import('jwt-decode');
+      const { jwtDecode } = jwtDecodeModule;
+      
+      if (typeof jwtDecode !== 'function') {
+        throw new Error("jwtDecode is not a function");
       }
-      return rejectWithValue(err.response.data);
+      
+      const decoded = jwtDecode(access);
+      
+      return {
+        access,
+        refresh,
+        role: decoded.role,
+        userType: decoded.userType,
+      };
+    } catch (error) {
+      return thunkAPI.rejectWithValue({
+        error: error.response?.data?.detail || error.message || 'Login failed',
+      });
     }
   }
 );
-
 
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     token: null,
     userType: null, // 'staff' or 'student'
-    role: null,     // for staff: 'supervisor', 'instructor', or 'branch_manager'
+    role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
     loading: false,
     error: null,
   },
