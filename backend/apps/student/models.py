@@ -1,9 +1,9 @@
-    from django.db import models
-    from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-    import random
-    import string
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+import random
+import string
 
-    class Student(AbstractBaseUser, PermissionsMixin):
+class Student(AbstractBaseUser, PermissionsMixin):
         email = models.EmailField(unique=True)
         username = models.CharField(max_length=100, blank=True, default='')  
         first_name = models.CharField(max_length=100)

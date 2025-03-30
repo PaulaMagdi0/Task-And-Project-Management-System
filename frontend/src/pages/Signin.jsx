@@ -1,57 +1,56 @@
-import * as React from 'react';
-import { AppProvider } from '@toolpad/core/AppProvider';
-import { SignInPage } from '@toolpad/core/SignInPage';
-import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
-import { getDesignTokens, inputsCustomizations } from './customTheme';
+// src/pages/SignIn.jsx
+import React, { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../redux/authSlice';
+import { useNavigate } from 'react-router-dom';
+import './SignIn.css';
 
-const providers = [
-    { id: 'github', name: 'GitHub' },
-    { id: 'google', name: 'Google' },
-    { id: 'credentials', name: 'Email and Password' },
+const SignIn = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { loading, error } = useSelector((state) => state.auth);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-];
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const resultAction = await dispatch(loginUser({ email, password }));
+    if (loginUser.fulfilled.match(resultAction)) {
+      const { userType, role } = resultAction.payload;
+      if (userType === 'student') {
+        alert('Hi student!');
+      } else if (userType === 'staff') {
+        alert(`Hi ${role}!`);
+      }
+      // Future: Redirect to the appropriate dashboard based on userType/role.
+    }
+  };
 
-const signIn = async (provider) => {
-    const promise = new Promise((resolve) => {
-        setTimeout(() => {
-            console.log(`Sign in with ${provider.id}`);
-            resolve({ error: 'This is a mock error message.' });
-        }, 500);
-    });
-    return promise;
+  return (
+    <div className="signin-container">
+      <form onSubmit={handleLogin}>
+        <h2>Sign In</h2>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <button type="submit" disabled={loading}>
+          {loading ? 'Logging in...' : 'Log In'}
+        </button>
+        {error && <p className="error">{error}</p>}
+      </form>
+    </div>
+  );
 };
 
-export default function ThemeSignInPage() {
-    const { mode, setMode } = useColorScheme();
-    const calculatedMode = mode || 'light';
-    const brandingDesignTokens = getDesignTokens(calculatedMode);
-
-    const THEME = createTheme({
-        ...brandingDesignTokens,
-        palette: {
-            ...brandingDesignTokens.palette,
-            mode: calculatedMode,
-        },
-        components: {
-            ...inputsCustomizations,
-        },
-    });
-
-    return (
-        <ThemeProvider theme={THEME}>
-            <AppProvider theme={THEME}>
-                <SignInPage
-                    signIn={signIn}
-                    providers={providers}
-                    slotProps={{ form: { noValidate: true } }}
-                    sx={{
-                        '& form > .MuiStack-root': {
-                            marginTop: '2rem',
-                            rowGap: '0.5rem',
-                        },
-                    }}
-                />
-            </AppProvider>
-        </ThemeProvider>
-    );
-}
+export default SignIn;

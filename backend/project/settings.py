@@ -8,6 +8,7 @@ SECRET_KEY = "your-secret-key"
 DEBUG = True
 
 ALLOWED_HOSTS = []
+AUTH_USER_MODEL = 'staff_members.StaffMember'
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -24,11 +25,14 @@ INSTALLED_APPS = [
     "apps.grades",
     "apps.staff_members",
     "apps.student",
+    "apps.custom_auth",
+      "corsheaders",
 
 
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -39,6 +43,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "project.urls"
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
 
 TEMPLATES = [
     {

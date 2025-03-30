@@ -3,9 +3,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
+import SignIn from './pages/SignIn';
 import NotFound from './pages/NotFound';
-// Future: Import StudentHome when available, e.g.,
-// import StudentHome from './pages/StudentHome';
 
 function App() {
   return (
@@ -13,8 +12,7 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
-      
-        {/* Future: <Route path="/student/home" element={<StudentHome />} /> */}
+        <Route path="/signin" element={<SignIn />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
