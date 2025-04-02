@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from .models import AssignmentSubmission
 from .serializers import AssignmentSubmissionSerializer
+from django.utils import timezone
 from django.contrib.auth.models import Group
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
@@ -16,9 +17,11 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         if user.groups.filter(name="Instructors").exists():
-            return AssignmentSubmission.objects.all()  # Instructors can view all submissions
+            # Instructors can view all submissions
+            return AssignmentSubmission.objects.all()
         else:
-            return AssignmentSubmission.objects.filter(student=user)  # Students can only see their submissions
+            # Students can only see their submissions
+            return AssignmentSubmission.objects.filter(student=user)
 
     def perform_update(self, serializer):
         """
@@ -46,12 +49,23 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Handle file submissions by students. Ensure students can submit a file or URL.
+        Handle file submissions by students. Ensure students can submit a file or URL, but not both.
         """
-        # Check if the submission is before the due date
+        user = self.request.user
         assignment = serializer.validated_data['assignment']
+
+        # Check if the submission is before the due date
         if assignment.due_date < timezone.now():
             raise PermissionDenied("You cannot submit the assignment after the due date.")
 
-        # Save the submission (either file or URL, not both)
+        # Check if the student is submitting both a file and URL, which is not allowed
+        file_submission = serializer.validated_data.get('file', None)
+        url_submission = serializer.validated_data.get('url', None)
+
+        if file_submission and url_submission:
+            raise PermissionDenied("You cannot submit both a file and a URL for the assignment.")
+        if not file_submission and not url_submission:
+            raise PermissionDenied("You must submit either a file or a URL for the assignment.")
+
+        # Save the submission
         serializer.save()

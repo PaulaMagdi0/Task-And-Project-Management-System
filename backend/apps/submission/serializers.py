@@ -7,19 +7,20 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         fields = ['id', 'student', 'course', 'assignment', 'file', 'file_url', 
                   'submission_date', 'feedback', 'mark', 'is_feedback_visible', 'is_mark_visible']
     
-    # Allow feedback and mark to be updated only by instructors
     feedback = serializers.CharField(required=False, allow_blank=True)
     mark = serializers.FloatField(required=False, allow_null=True)
     is_feedback_visible = serializers.BooleanField(required=False)
     is_mark_visible = serializers.BooleanField(required=False)
 
     def update(self, instance, validated_data):
-        # Ensure only instructors can update feedback, mark, and visibility
+        """
+        Ensure only instructors can update feedback, mark, and visibility.
+        """
         user = self.context.get('request').user
         if not user.groups.filter(name="Instructors").exists():
-            raise serializers.ValidationError("You do not have permission to add feedback and mark.")
+            raise serializers.ValidationError("Only instructors can update feedback and marks.")
 
-        # Check if feedback, mark, or visibility are provided, and if so, update the fields
+        # If provided, update feedback, mark, visibility
         feedback = validated_data.get('feedback', None)
         mark = validated_data.get('mark', None)
         is_feedback_visible = validated_data.get('is_feedback_visible', None)
@@ -38,10 +39,13 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         return instance
 
     def to_representation(self, instance):
-        """Handle the logic for feedback and mark visibility for students"""
+        """
+        Handle visibility of feedback and mark for non-students.
+        If the student is not the user and the feedback/mark is not visible, hide them.
+        """
         user = self.context.get('request').user
 
-        # If the student is not the user and feedback or mark is not visible, hide them
+        # Hide feedback/mark for non-students if not visible
         if instance.student != user:
             if not instance.is_feedback_visible:
                 instance.feedback = None
