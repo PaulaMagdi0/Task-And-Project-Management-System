@@ -14,15 +14,7 @@ class AssignmentSubmission(models.Model):
     
     # Date when the submission was made
     submission_date = models.DateTimeField(auto_now_add=True)
-    
-    # Feedback and marks for the submission
-    feedback = models.TextField(null=True, blank=True)
-    mark = models.FloatField(null=True, blank=True)  # Can store float marks
-    
-    # Flags to control visibility of feedback and mark to the student
-    is_feedback_visible = models.BooleanField(default=False)  # Controls visibility of feedback
-    is_mark_visible = models.BooleanField(default=False)  # Controls visibility of mark/score
-    
+
     class Meta:
         ordering = ['-submission_date']  # Newest submissions first
     
