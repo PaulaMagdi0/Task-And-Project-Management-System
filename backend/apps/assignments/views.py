@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Assignment
 from .serializers import AssignmentSerializer
-from .utils import upload_file_to_google_drive  # Your utility function to upload to Google Drive
+# from .utils import upload_file_to_google_drive  # Your utility function to upload to Google Drive
 from django.core.exceptions import ValidationError
 
 class AssignmentListView(generics.ListCreateAPIView):

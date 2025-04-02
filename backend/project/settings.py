@@ -18,7 +18,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "apps.accounts",
     "apps.tracks",
     "apps.courses",
     "apps.assignments",
@@ -26,7 +25,8 @@ INSTALLED_APPS = [
     "apps.staff_members",
     "apps.student",
     "apps.custom_auth",
-      "corsheaders",
+    "apps.submission",
+    "corsheaders",
 
 
 ]
