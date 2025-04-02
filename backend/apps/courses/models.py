@@ -1,33 +1,40 @@
 from django.db import models
-from apps.tracks.models import Track
-from apps.staff_members.models import StaffMember  # Updated import
+from apps.staff_members.models import StaffMember
 
 class Course(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Use string-based reference for Track model to avoid circular import
     track = models.ForeignKey(
-        Track, 
-        on_delete=models.CASCADE, 
-        null=True, 
-        blank=True  # Avoid using a static default
+        'tracks.Track',  # String-based reference
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
     )
 
+    # Foreign key to StaffMember (Instructor)
     instructor = models.ForeignKey(
         StaffMember,
         on_delete=models.SET_NULL,
-        null=True, 
-        blank=True,  # Allow courses without an instructor
+        null=True,
+        blank=True,
         related_name="courses"
     )
 
+    tracks = models.ManyToManyField(
+        'tracks.Track',  # String-based reference for Track model
+        related_name='course_tracks', 
+        blank=True
+    )
+
     class Meta:
-        unique_together = ("name", "track")  # Prevent duplicate course names in the same track
-        ordering = ["-created_at"]  # Order courses by creation date
+        unique_together = ("name", "track")
+        ordering = ["-created_at"]
+        db_table = 'courses'
 
     def save(self, *args, **kwargs):
-        # Ensure the assigned instructor has the role "instructor"
         if self.instructor and self.instructor.role != "instructor":
             raise ValueError("Assigned user must have the role 'instructor'.")
         super().save(*args, **kwargs)

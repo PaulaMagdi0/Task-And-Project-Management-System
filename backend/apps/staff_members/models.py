@@ -22,7 +22,7 @@ class StaffMember(AbstractUser):
     REQUIRED_FIELDS = ['username']  # You can adjust this as needed
 
     class Meta:
-        db_table = 'staff_members'
+        db_table = 'staff_member'
 
     def save(self, *args, **kwargs):
         if self.role not in dict(self.ROLE_CHOICES):

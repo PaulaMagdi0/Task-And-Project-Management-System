@@ -1,32 +1,34 @@
 from django.db import models
-from apps.staff_members.models import StaffMember  # Updated import
+from apps.staff_members.models import StaffMember
+from django.utils import timezone
 
 class Track(models.Model):
-    name = models.CharField(max_length=255, unique=True)  # Prevent duplicate names
+    name = models.CharField(max_length=255, unique=True)
     description = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    
+    created_at = models.DateTimeField(default=timezone.now)
     supervisor = models.ForeignKey(
-        StaffMember, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,  # Allow null in case the supervisor is removed
+        StaffMember,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="supervised_tracks"
     )
 
+    courses = models.ManyToManyField(
+        'courses.Course',  # String-based reference for Course model
+        related_name='course_tracks', 
+        blank=True
+    )
+
     class Meta:
-        ordering = ["-created_at"]  # Latest track first
+        ordering = ["-created_at"]
+        db_table = 'tracks'
 
     def save(self, *args, **kwargs):
-        # Ensure the assigned supervisor has the role "supervisor"
         if self.supervisor and self.supervisor.role != "supervisor":
             raise ValueError("Assigned user must have the role 'supervisor'.")
         super().save(*args, **kwargs)
 
     def __str__(self):
-        # Use get_full_name() for a better display if available, else fallback to username
-        if self.supervisor:
-            full_name = self.supervisor.get_full_name() or self.supervisor.username
-        else:
-            full_name = "No Supervisor"
+        full_name = self.supervisor.get_full_name() if self.supervisor else "No Supervisor"
         return f"{self.name} ({full_name})"

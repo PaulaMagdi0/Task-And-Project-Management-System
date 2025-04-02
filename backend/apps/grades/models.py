@@ -3,6 +3,7 @@ from django.utils.timezone import now
 from apps.assignments.models import Assignment
 from apps.student.models import Student  # Updated import: use the Student model now
 from apps.courses.models import Course  # Ensure course is linked properly
+from django.utils import timezone
 
 # Default function to get the first available assignment
 def get_default_assignment():
@@ -32,7 +33,9 @@ class Grade(models.Model):
         Course,
         on_delete=models.CASCADE
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField( default=timezone.now)  # Add default for migrations
+    class Meta:
+        db_table = 'grades'  
 
     def __str__(self):
         return f"{self.student.username} - {self.assignment.title}: {self.score}"
