@@ -198,15 +198,12 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
         supervisor.save()
         return supervisor
 
-
 class ExcelUploadSupervisorSerializer(serializers.Serializer):
     excel_file = serializers.FileField()
 
     def validate_excel_file(self, value):
         if not value.name.endswith(('.xlsx', '.xls')):
-            raise serializers.ValidationError(
-                _('Only Excel files are allowed (.xlsx, .xls)')
-            )
+            raise serializers.ValidationError(_('Only Excel files are allowed (.xlsx, .xls)'))
         return value
 
     def create(self, validated_data):
@@ -216,9 +213,7 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
             sheet = wb.active
         except Exception as e:
             logger.error(f"Failed to open Excel file: {e}")
-            raise serializers.ValidationError(
-                _('Failed to process the Excel file. Please check the format.')
-            )
+            raise serializers.ValidationError(_('Failed to process the Excel file. Please check the format.'))
 
         supervisors = []
         errors = []
@@ -279,6 +274,4 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
             }
         except Exception as e:
             logger.error(f'Bulk create failed: {e}')
-            raise serializers.ValidationError(
-                _('Failed to create supervisors. Please try again.')
-            )
+            raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))

@@ -1,35 +1,39 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import StaffMember
 from .serializers import StaffMemberSerializer, CreateSupervisorSerializer, ExcelUploadSupervisorSerializer
 from rest_framework.permissions import IsAuthenticated
-from .permissions import IsAdminOrBranchManager  # Custom permission class (you can create one as per your needs)
+from apps.staff_members.models import StaffMember
+from apps.staff_members.permissions import IsAdminOrBranchManager
+from rest_framework.permissions import IsAuthenticated
 
-# Existing endpoints for listing and updating staff members:
 class StaffMemberListCreateView(generics.ListCreateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer
-    permission_classes = [IsAuthenticated]  # Only authenticated users can access this view
+    # permission_classes = [IsAuthenticated]
+    permission_classes = []
 
 class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer
-    permission_classes = [IsAuthenticated]  # Only authenticated users can access this view
+    # permission_classes = [IsAuthenticated]
+    permission_classes = []
 
-# New endpoint for creating a supervisor (branch manager functionality)
 class CreateSupervisorView(generics.CreateAPIView):
     queryset = StaffMember.objects.filter(role="supervisor")
     serializer_class = CreateSupervisorSerializer
-    permission_classes = [IsAdminOrBranchManager]  # Replace with your specific permission class
+    # permission_classes = [IsAdminOrBranchManager]
+    permission_classes = []
 
-# New endpoint for bulk uploading supervisors via Excel (branch manager functionality)
 class SupervisorBulkUploadView(APIView):
-    permission_classes = [IsAdminOrBranchManager]  # Only admin or branch managers can upload supervisors
+    # permission_classes = [IsAdminOrBranchManager]
+    permission_classes = []
 
     def post(self, request, *args, **kwargs):
         serializer = ExcelUploadSupervisorSerializer(data=request.data)
         if serializer.is_valid():
-            result = serializer.save_supervisors_from_excel()
+            result = serializer.create(validated_data=serializer.validated_data)
+            if result.get("status") == "partial":
+                return Response(result, status=status.HTTP_206_PARTIAL_CONTENT)
             return Response(result, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

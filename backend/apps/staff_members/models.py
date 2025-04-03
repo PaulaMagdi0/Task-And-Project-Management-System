@@ -1,9 +1,8 @@
-# staff_members/models.py
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator  # Add this import
+
 class StaffMember(AbstractUser):
     # Ensure email is explicitly defined and unique
     email = models.EmailField(unique=True, verbose_name=_('email'))
@@ -22,13 +21,33 @@ class StaffMember(AbstractUser):
     )
     
     branch = models.ForeignKey(
-        'branch_location.Branch',  # String reference to avoid direct import
+        'branch_location.Branch',
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='staff_members',
         verbose_name=_('assigned branch')
     )
+
+    # Add related_name to avoid conflict
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name=_('groups'),
+        blank=True,
+        help_text=_('The groups this user belongs to.'),
+        related_name="staffmember_groups",  # Added unique related_name
+        related_query_name="staffmember"
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name=_('user permissions'),
+        blank=True,
+        help_text=_('Specific permissions for this user.'),
+        related_name="staffmember_permissions",  # Added unique related_name
+        related_query_name="staffmember"
+    )
+    
+    # Other fields and methods as before
 
     # Phone number validation
     phone_regex = RegexValidator(
@@ -52,28 +71,6 @@ class StaffMember(AbstractUser):
         auto_now_add=True,
         verbose_name=_('date joined')
     )
-
-    # Permission settings
-    groups = models.ManyToManyField(
-        Group,
-        verbose_name=_('groups'),
-        blank=True,
-        help_text=_('The groups this user belongs to.'),
-        related_name="staffmember_groups",
-        related_query_name="staffmember"
-    )
-    user_permissions = models.ManyToManyField(
-        Permission,
-        verbose_name=_('user permissions'),
-        blank=True,
-        help_text=_('Specific permissions for this user.'),
-        related_name="staffmember_permissions",
-        related_query_name="staffmember"
-    )
-
-    # Authentication configuration
-    USERNAME_FIELD = 'email'  # Email is now the unique identifier for authentication
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
     class Meta:
         db_table = 'staff_member'

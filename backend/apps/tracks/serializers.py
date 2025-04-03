@@ -1,25 +1,30 @@
+# apps/tracks/serializers.py
 from rest_framework import serializers
-from apps.tracks.models import Track  # ✅  Correct import from the 'tracks' app
-from apps.courses.models import Course  # ✅ Import Course model
-from apps.staff_members.models import StaffMember  # ✅ Import StaffMember model
+from apps.tracks.models import Track
 
-class TrackSerializer(serializers.ModelSerializer):
-    courses = serializers.PrimaryKeyRelatedField(
-        queryset=Course.objects.all(), many=True, required=False
-    )
-    supervisor = serializers.SerializerMethodField()  # Custom field
-
+class BaseTrackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Track
-        fields = "__all__"
+        fields = ['id', 'name', 'description', 'supervisor', 'track_type']
+class TrackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Track
+        fields = ['id', 'name', 'description', 'supervisor', 'branch', 'courses', 'track_type']
+    
+    def validate_branch(self, value):
+        """Ensure that the branch is provided"""
+        if not value:
+            raise serializers.ValidationError("Branch must be provided.")
+        return value
 
-    def get_supervisor(self, obj):
-        """Return supervisor details instead of just ID"""
-        if obj.supervisor:
-            return {
-                "id": obj.supervisor.id,
-                "name": obj.supervisor.get_full_name(),
-                "email": obj.supervisor.email,
-                "role": obj.supervisor.role,
-            }
-        return None
+    def create(self, validated_data):
+        """Create new track"""
+        track = Track.objects.create(**validated_data)
+        return track
+
+    def update(self, instance, validated_data):
+        """Update track"""
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance

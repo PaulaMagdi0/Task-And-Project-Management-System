@@ -10,6 +10,7 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
     queryset = AssignmentSubmission.objects.all()
     serializer_class = AssignmentSubmissionSerializer
     permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_queryset(self):
         """

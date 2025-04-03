@@ -1,12 +1,12 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
-from apps.staff_members.models import StaffMember  # Import StaffMember directly
+from apps.staff_members.models import StaffMember
 
 class BranchSerializer(serializers.ModelSerializer):
     manager = serializers.SerializerMethodField(read_only=True)
     manager_id = serializers.PrimaryKeyRelatedField(
-        queryset=StaffMember.objects.filter(role='branch_manager'),  # Directly set queryset here
+        queryset=StaffMember.objects.filter(role='branch_manager'),
         source='manager',
         write_only=True,
         required=False,
@@ -33,16 +33,14 @@ class BranchSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         try:
             from .models import Branch  # Import the Branch model here
-
             self.Meta.model = Branch
             super().__init__(*args, **kwargs)
-
         except ImportError:
             raise ImportError("Failed to import models. Ensure correct paths in branch_location/models.py")
 
     def get_manager(self, obj):
         """Retrieve manager details"""
-        if not obj.manager:
+        if obj.manager is None:
             return None
         return {
             'id': obj.manager.id,
@@ -77,6 +75,7 @@ class BranchSerializer(serializers.ModelSerializer):
         """Handle branch creation"""
         manager = validated_data.pop('manager', None)
 
+        # Generate a branch code if not provided
         if 'code' not in validated_data:
             validated_data['code'] = self.generate_branch_code(validated_data['name'])
 
@@ -92,9 +91,11 @@ class BranchSerializer(serializers.ModelSerializer):
         """Handle branch updates"""
         manager = validated_data.pop('manager', None)
 
+        # Update attributes
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        # Only update manager if it is not None
         if manager is not None:
             instance.manager = manager
 

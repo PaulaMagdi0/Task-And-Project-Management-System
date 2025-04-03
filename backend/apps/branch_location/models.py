@@ -3,6 +3,8 @@ from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from django.db.models import Count
+
 
 class Branch(models.Model):
     """Model representing physical branch locations"""
@@ -57,22 +59,25 @@ class Branch(models.Model):
     def clean(self):
         """Validate manager assignment and branch code"""
         if self.manager:
-            # Lazy import to prevent circular imports
             from staff_members.models import StaffMember
             
+            # Ensure manager is a valid instance of StaffMember
             if not isinstance(self.manager, StaffMember):
                 raise ValidationError(_('Invalid manager type'))
                 
+            # Ensure manager role is BRANCH_MANAGER
             if self.manager.role != StaffMember.Role.BRANCH_MANAGER:
                 raise ValidationError(
                     _('Only branch managers can be assigned as branch managers.')
                 )
                 
-            if hasattr(self.manager, 'managed_branch') and self.manager.managed_branch != self:
+            # Ensure manager is not already managing another branch
+            if self.manager.managed_branch and self.manager.managed_branch != self:
                 raise ValidationError(
-                    _('Manager must be assigned to this branch.')
+                    _('A branch manager can only manage one branch.')
                 )
         
+        # Generate or validate the branch code
         if not self.code:
             self.code = self.generate_branch_code()
         elif not self.code.isalnum():
@@ -82,7 +87,7 @@ class Branch(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to include clean validation"""
-        self.full_clean()  # Perform validation
+        self.full_clean()  # Perform validation before saving
         super().save(*args, **kwargs)
 
     def generate_branch_code(self):
@@ -100,13 +105,29 @@ class Branch(models.Model):
 
     def get_staff_count(self):
         """Returns the number of staff members assigned to this branch"""
+        # Optimizing to handle the case where reverse relation doesn't exist
         return self.staff_members.count() if hasattr(self, 'staff_members') else 0
 
     def get_active_staff(self):
         """Returns queryset of active staff at this branch"""
+        # Optimizing to handle the case where reverse relation doesn't exist
         return self.staff_members.filter(is_active=True) if hasattr(self, 'staff_members') else self.staff_members.none()
 
     @property
     def full_address(self):
         """Returns formatted full address string"""
         return f"{self.address}, {self.city}, {self.state}"
+
+    def get_staff_member_info(self):
+        """Fetch and return a list of active staff members' info in a dict"""
+        active_staff = self.get_active_staff()
+        return [
+            {
+                'id': staff.id,
+                'name': staff.get_full_name(),
+                'role': staff.role,
+                'email': staff.email,
+                'phone': staff.phone,
+            }
+            for staff in active_staff
+        ]
