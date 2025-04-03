@@ -30,7 +30,7 @@ def upload_student(request):
                 'message': f"Successfully created {result['created']} students",
                 'created': result['created']
             }
-            if result['errors']:
+            if result.get('errors'):
                 response_data['warning'] = f"{len(result['errors'])} rows had errors"
                 response_data['error_count'] = len(result['errors'])
                 if len(result['errors']) <= 10:
@@ -47,7 +47,10 @@ def upload_student(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
     # Single student creation
-    serializer = StudentSerializer(data=request.data)
+    data = request.data.copy()
+    data['role'] = data.get('role', 'student')  # Default role
+    
+    serializer = StudentSerializer(data=data)
     if not serializer.is_valid():
         return Response({
             'success': False,
@@ -56,46 +59,12 @@ def upload_student(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        student_data = serializer.validated_data
-        if 'role' not in student_data:
-            student_data['role'] = 'Student'
-            
-        password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-        verification_code = secrets.token_urlsafe(24)
-        
-        student = serializer.save(
-            verification_code=verification_code,
-            verified=False
-        )
-        student.set_password(password)
-        student.save()
-        
-        # Send verification email
-        try:
-            verification_url = f"{settings.SITE_URL}/api/student/verify/{verification_code}/"
-            send_mail(
-                f"Your {student.role} Account",
-                f"""Hello {student.first_name},
-                
-Your account has been created:
-Email: {student.email}
-Temporary Password: {password}
-
-Please verify your email by visiting:
-{verification_url}""",
-                settings.DEFAULT_FROM_EMAIL,
-                [student.email],
-                fail_silently=False
-            )
-        except Exception as e:
-            logger.error(f"Email sending failed: {str(e)}")
-        
+        student = serializer.save()
         return Response({
             'success': True,
-            'message': 'Student created successfully',
+            'message': 'Student created successfully. Verification email sent.',
             'student': StudentSerializer(student).data
         }, status=status.HTTP_201_CREATED)
-        
     except Exception as e:
         logger.error(f"Student creation failed: {str(e)}")
         return Response({
@@ -123,9 +92,16 @@ def show_options(request):
 def verify_email(request, verification_code):
     try:
         student = Student.objects.get(verification_code=verification_code)
+        if student.verified:
+            return Response({'status': 'Email already verified'}, status=status.HTTP_200_OK)
+            
         student.verified = True
         student.verification_code = None
         student.save()
+        
         return Response({'status': 'Email verified successfully'})
     except Student.DoesNotExist:
-        return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'Invalid verification code or link has expired'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
