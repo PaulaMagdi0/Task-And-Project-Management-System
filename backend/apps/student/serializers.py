@@ -1,12 +1,11 @@
 from rest_framework import serializers
-from apps.student.models import Student
+from .models import Student
 import openpyxl
 from django.core.mail import send_mail
 from django.conf import settings
 import secrets
 import string
 import re
-from django.core.exceptions import ValidationError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class ExcelUploadSerializer(serializers.Serializer):
         
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
-                if len(row) < 3:  # At least first_name, last_name, email
+                if len(row) < 3:
                     errors.append(f"Row {row_idx}: Missing required fields")
                     continue
                     
@@ -110,9 +109,8 @@ class ExcelUploadSerializer(serializers.Serializer):
         if errors:
             logger.warning(f"Excel import completed with {len(errors)} errors")
         
-        created_students = Student.objects.bulk_create(students)
         return {
-            'created': len(created_students),
+            'created': len(Student.objects.bulk_create(students)),
             'errors': errors
         }
 
@@ -126,16 +124,14 @@ class ExcelUploadSerializer(serializers.Serializer):
     def _send_verification_email(self, student, password):
         verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
         subject = f"Your {student.role} Account Verification"
-        message = f"""
-        Hello {student.first_name} {student.last_name},
+        message = f"""Hello {student.first_name} {student.last_name},
         
-        Your {student.role} account has been created:
-        Email: {student.email}
-        Temporary Password: {password}
-        
-        Please verify your email by clicking:
-        {verification_url}
-        """
+Your {student.role} account has been created:
+Email: {student.email}
+Temporary Password: {password}
+
+Please verify your email by clicking:
+{verification_url}"""
         send_mail(
             subject,
             message.strip(),

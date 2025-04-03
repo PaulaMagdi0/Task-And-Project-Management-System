@@ -2,15 +2,18 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from .serializers import ExcelUploadSerializer, StudentSerializer
-from apps.student.models import Student
-from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
+from .models import Student
+from django.conf import settings
+from django.core.mail import send_mail
+import secrets
+import string
 import logging
 
 logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 def upload_student(request):
+    # Excel file upload handling
     if 'excel_file' in request.FILES:
         serializer = ExcelUploadSerializer(data=request.data)
         if not serializer.is_valid():
@@ -30,7 +33,7 @@ def upload_student(request):
             if result['errors']:
                 response_data['warning'] = f"{len(result['errors'])} rows had errors"
                 response_data['error_count'] = len(result['errors'])
-                if len(result['errors']) <= 10:  # Don't return too many errors
+                if len(result['errors']) <= 10:
                     response_data['sample_errors'] = result['errors'][:5]
             
             return Response(response_data, status=status.HTTP_201_CREATED)
@@ -43,7 +46,7 @@ def upload_student(request):
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Handle single student creation
+    # Single student creation
     serializer = StudentSerializer(data=request.data)
     if not serializer.is_valid():
         return Response({
@@ -53,7 +56,6 @@ def upload_student(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        # Create student with default role 'Student'
         student_data = serializer.validated_data
         if 'role' not in student_data:
             student_data['role'] = 'Student'
@@ -79,9 +81,11 @@ Your account has been created:
 Email: {student.email}
 Temporary Password: {password}
 
-Please verify: {verification_url}""",
+Please verify your email by visiting:
+{verification_url}""",
                 settings.DEFAULT_FROM_EMAIL,
-                [student.email]
+                [student.email],
+                fail_silently=False
             )
         except Exception as e:
             logger.error(f"Email sending failed: {str(e)}")
@@ -100,25 +104,28 @@ Please verify: {verification_url}""",
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# ... (keep other views the same)
-# ... (keep other views the same)
-# @api_view(['POST'])
-# def upload_excel(request):
-#     """Handle the upload of an Excel file and process its data."""
-#     if 'excel_file' not in request.FILES:
-#         return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
+@api_view(['GET'])
+def list_students(request):
+    students = Student.objects.all()
+    serializer = StudentSerializer(students, many=True)
+    return Response(serializer.data)
 
-#     serializer = ExcelUploadSerializer(data=request.data)
+@api_view(['GET'])
+def show_options(request):
+    options = {
+        'upload_endpoint': '/api/student/upload/',
+        'list_endpoint': '/api/student/list/',
+        'verify_endpoint': '/api/student/verify/<str:verification_code>/'
+    }
+    return Response(options)
 
-#     if serializer.is_valid():
-#         result = serializer.save_users_from_excel()
-#         students = result.get("users", [])  # ✅ Extract list of students safely
-#         student_serializer = StudentSerializer(students, many=True)  
-
-#         return Response({
-#             "message": f"{len(students)} users created and verification emails sent.",
-#             "users": student_serializer.data
-#         }, status=status.HTTP_201_CREATED)
-
-#     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    # return Response(options, status=status.HTTP_200_OK)
+@api_view(['GET'])
+def verify_email(request, verification_code):
+    try:
+        student = Student.objects.get(verification_code=verification_code)
+        student.verified = True
+        student.verification_code = None
+        student.save()
+        return Response({'status': 'Email verified successfully'})
+    except Student.DoesNotExist:
+        return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
