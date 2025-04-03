@@ -2,7 +2,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import './Navbar.css';
-import SignIn from '../pages/SignIn';
+
+import SignIn from '../pages/Signin';
 
 const Navbar = () => {
   return (

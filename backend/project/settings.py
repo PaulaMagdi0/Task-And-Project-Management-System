@@ -26,7 +26,7 @@ INSTALLED_APPS = [
     "apps.staff_members",
     "apps.student",
     "apps.custom_auth",
-      "corsheaders",
+    "corsheaders",
 
 
 ]
@@ -45,6 +45,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "project.urls"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5175",
 ]
 
 TEMPLATES = [
@@ -69,7 +70,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",  # Change this to your database name
         "USER": "postgres",  # Your PostgreSQL username
-        "PASSWORD": "1234",  # Your PostgreSQL password
+        "PASSWORD": "2625",  # Your PostgreSQL password
         "HOST": "localhost",
         "PORT": "5432",
     }
@@ -118,11 +119,20 @@ SITE_URL = 'http://127.0.0.1:8000'
 # # EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'
 
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = "smtp.gmail.com"
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = "m.nasr266@gmail.com"
+# EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Use an App Password, NOT your Gmail password
+# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Email Configuration (Updated)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "m.nasr266@gmail.com"
-EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Use an App Password, NOT your Gmail password
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
+EMAIL_HOST_USER = 'm.nasr266@gmail.com'
+EMAIL_HOST_PASSWORD = 'efvh pzab wslt upfq'  # Your App Password
+DEFAULT_FROM_EMAIL = 'm.nasr266@gmail.com'
+SITE_URL = 'http://localhost:5175/'  # Make sure this matches your frontend URL
