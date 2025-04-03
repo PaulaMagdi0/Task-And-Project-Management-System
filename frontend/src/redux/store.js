@@ -2,13 +2,16 @@
 import { configureStore } from '@reduxjs/toolkit';
 import coursesReducer from './coursesSlice';
 import authReducer from './authSlice';
+import supervisorsReducer from './supervisorsSlice';
+import tracksReducer from './tracksSlice';
 // Import other reducers here when you create them (e.g., tracksSlice, assignmentsSlice, gradesSlice)
 
 const store = configureStore({
   reducer: {
     courses: coursesReducer,
     auth: authReducer,
-    // Add other reducers here
+    supervisors: supervisorsReducer,
+    tracks: tracksReducer,
   },
 });
 

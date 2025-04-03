@@ -31,4 +31,8 @@
   .navbar-links li a:hover {
     text-decoration: underline;
   }
-  
+  .welcome-message{
+    color: #fff;
+    font-size: 1rem;
+    margin-left: 1rem;
+  }

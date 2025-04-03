@@ -54,9 +54,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "project.urls"
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 
 TEMPLATES = [
     {
@@ -80,7 +78,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",  # Change this to your database name
         "USER": "postgres",  # Your PostgreSQL username
-        "PASSWORD": "2625",  # Your PostgreSQL password
+        "PASSWORD": "1234",  # Your PostgreSQL password
         "HOST": "localhost",
         "PORT": "5432",
     }
