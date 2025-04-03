@@ -25,6 +25,15 @@ class StaffMember(AbstractUser):
         verbose_name=_('staff role')
     )
 
+    # Branch location field
+    branch_location = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name=_('branch location'),
+        help_text=_('The physical branch location this staff member is associated with')
+    )
+
     # Phone number validation
     phone_regex = RegexValidator(
         regex=r'^\+?1?\d{9,15}$',
@@ -74,6 +83,12 @@ class StaffMember(AbstractUser):
                 {'role': _('Invalid role selected.')}
             )
         
+        # Branch managers must have a branch location
+        if self.role == self.Role.BRANCH_MANAGER and not self.branch_location:
+            raise ValidationError(
+                {'branch_location': _('Branch managers must have an associated branch location.')}
+            )
+        
         # Normalize email
         self.email = self.__class__.objects.normalize_email(self.email)
 
@@ -83,7 +98,8 @@ class StaffMember(AbstractUser):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.get_full_name()} ({self.get_role_display()})"
+        location = f" at {self.branch_location}" if self.branch_location else ""
+        return f"{self.get_full_name()} ({self.get_role_display()}{location})"
 
     @property
     def is_branch_manager(self):

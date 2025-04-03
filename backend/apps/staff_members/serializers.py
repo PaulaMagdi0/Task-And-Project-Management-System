@@ -7,20 +7,21 @@ from django.utils.translation import gettext_lazy as _
 class StaffMemberSerializer(serializers.ModelSerializer):
     """
     Comprehensive serializer for StaffMember model with enhanced security and validation.
-    Handles creation, updates, and password management with proper role-based controls.
+    Now includes branch_location field with role-based validation.
     """
     class Meta:
         model = StaffMember
         fields = [
             'id', 'username', 'email', 'password',
-            'first_name', 'last_name', 'role', 'phone',
-            'is_active', 'date_joined'
+            'first_name', 'last_name', 'role', 'branch_location',
+            'phone', 'is_active', 'date_joined'
         ]
         read_only_fields = ['id', 'date_joined']
         extra_kwargs = {
             'password': {'write_only': True, 'required': True},
             'email': {'required': True},
-            'role': {'required': True}
+            'role': {'required': True},
+            'branch_location': {'required': False}  # Not required by default
         }
 
     def validate_password(self, value):
@@ -41,6 +42,26 @@ class StaffMemberSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def validate(self, data):
+        """Add validation for branch_location based on role"""
+        role = data.get('role', self.instance.role if self.instance else None)
+        branch_location = data.get('branch_location', None)
+        
+        # Branch managers must have a branch location
+        if role == StaffMember.Role.BRANCH_MANAGER and not branch_location:
+            if not self.instance or not self.instance.branch_location:
+                raise serializers.ValidationError({
+                    'branch_location': _('Branch managers must have an associated branch location.')
+                })
+        
+        # Non-branch managers shouldn't have branch locations
+        if role != StaffMember.Role.BRANCH_MANAGER and branch_location:
+            raise serializers.ValidationError({
+                'branch_location': _('Only branch managers can have branch locations.')
+            })
+            
+        return data
+
     def create(self, validated_data):
         """Create staff member with proper password hashing and role validation"""
         password = validated_data.pop('password')
@@ -58,7 +79,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
         
         # Only allow staff to modify sensitive fields
         if request and not request.user.is_staff:
-            for field in ['role', 'is_active']:
+            for field in ['role', 'is_active', 'branch_location']:
                 validated_data.pop(field, None)
         
         # Handle password change
@@ -80,7 +101,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
         # Remove sensitive fields for non-staff users
         request = self.context.get('request')
         if request and not request.user.is_staff:
-            representation.pop('is_active', None)
-            representation.pop('date_joined', None)
+            for field in ['is_active', 'date_joined', 'branch_location']:
+                representation.pop(field, None)
         
         return representation
