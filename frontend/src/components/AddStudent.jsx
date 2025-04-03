@@ -112,22 +112,35 @@ const UploadStudentPage = () => {
         try {
             const response = await axios.post(
                 `${import.meta.env.VITE_API_URL}/api/student/upload/`,
-                studentData,
+                {
+                    first_name: studentData.first_name,
+                    last_name: studentData.last_name,
+                    email: studentData.email,
+                    role: 'student' // Default role
+                },
                 {
                     headers: {
                         'Content-Type': 'application/json',
                     },
                 }
             );
-            showSuccessModal('Student added successfully!');
+
+            showSuccessModal(
+                'Student added successfully! ' +
+                'A verification email has been sent to the student.'
+            );
+
             setStudentData({
                 first_name: '',
                 last_name: '',
                 email: ''
             });
         } catch (error) {
+            const errorMsg = error.response?.data?.error ||
+                error.response?.data?.message ||
+                'Failed to add student';
             console.error('Error submitting student data:', error);
-            showErrorModal(error.response?.data?.error || 'Failed to add student');
+            showErrorModal(errorMsg);
         } finally {
             setLoading(false);
         }

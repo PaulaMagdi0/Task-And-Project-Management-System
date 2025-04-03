@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-// import SignIn from './pages/Signin';
+import SignIn from './pages/Signin';
 import NotFound from './pages/NotFound';
 import StudentDashboard from './pages/StudentDashboard';
 import InstructorDashboard from './pages/InstructorDashboard';
@@ -17,7 +17,7 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
-        {/* <Route path="/signin" element={<SignIn />} /> */}
+        <Route path="/signin" element={<SignIn />} />
         <Route path="/upload-student" element={<UploadStudentPage />} />
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
