@@ -1,3 +1,4 @@
+// File: src/redux/authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
@@ -23,6 +24,7 @@ export const loginUser = createAsyncThunk(
         refresh,
         role: decoded.role,
         userType: decoded.userType,
+        username: decoded.username || decoded.email || 'User', // Fallback to 'User'
       };
     } catch (error) {
       return thunkAPI.rejectWithValue({
@@ -38,6 +40,7 @@ const authSlice = createSlice({
     token: null,
     userType: null, // 'staff' or 'student'
     role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
+    username: '',   // Holds the logged-in user's username
     loading: false,
     error: null,
   },
@@ -46,6 +49,7 @@ const authSlice = createSlice({
       state.token = null;
       state.userType = null;
       state.role = null;
+      state.username = '';
       localStorage.removeItem('authToken');
       localStorage.removeItem('userType');
       localStorage.removeItem('role');
@@ -62,6 +66,7 @@ const authSlice = createSlice({
         state.token = action.payload.access;
         state.userType = action.payload.userType;
         state.role = action.payload.role || null;
+        state.username = action.payload.username;
         localStorage.setItem('authToken', action.payload.access);
         localStorage.setItem('userType', action.payload.userType);
         if (action.payload.role) {

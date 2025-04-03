@@ -1,69 +1,74 @@
-// File: src/pages/BranchManagerDashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
 import AddTrack from '../components/AddTrack';
 import AddSupervisor from '../components/AddSupervisor';
 import BulkUploadSupervisors from '../components/BulkUploadSupervisors';
+import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
+import TracksTable from '../components/TracksTable';
+import DeleteSupervisor from '../components/DeleteSupervisor';
+import './BranchManagerDashboard.css';
 
 const BranchManagerDashboard = () => {
-  const token = localStorage.getItem('authToken');
-  const [username, setUsername] = useState('User');
+  // Retrieve username from Redux auth slice
+  const { username } = useSelector((state) => state.auth);
+  
+  // Options: "addTrack", "addSupervisors", "deleteSupervisor", "assignSupervisor", "viewTracks"
   const [selectedOption, setSelectedOption] = useState('addTrack');
+  // For "addSupervisors" sub-options: "manual" or "bulk"
   const [supervisorOption, setSupervisorOption] = useState('manual');
-
-  useEffect(() => {
-    if (token) {
-      // Dynamically import jwt-decode without any extra path
-      import('jwt-decode')
-        .then((module) => {
-          const jwt_decode = module.default;
-          if (typeof jwt_decode !== 'function') {
-            console.error("jwt_decode is not a function");
-            return;
-          }
-          const decoded = jwt_decode(token);
-          setUsername(decoded.username || decoded.email || 'User');
-        })
-        .catch((error) => {
-          console.error("Failed to decode token:", error);
-        });
-    }
-  }, [token]);
+  // Sidebar state (closed by default)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <div style={{ width: '250px', backgroundColor: '#f0f0f0', padding: '1rem' }}>
-        <h2>Welcome, {username}</h2>
-        <hr />
-        <button
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            marginBottom: '0.5rem',
-            backgroundColor: selectedOption === 'addTrack' ? '#ccc' : '#fff',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-          onClick={() => setSelectedOption('addTrack')}
+    <div className="dashboard-container">
+      {/* Collapsible Sidebar */}
+      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <button 
+          className="sidebar-toggle" 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
         >
-          Add Track
+          {sidebarOpen ? '<' : '>'}
         </button>
-        <button
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            backgroundColor: selectedOption === 'addSupervisors' ? '#ccc' : '#fff',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-          onClick={() => setSelectedOption('addSupervisors')}
-        >
-          Add Supervisors
-        </button>
+        {sidebarOpen && (
+          <>
+            <h2>Welcome, {username || 'User'}</h2>
+            <hr />
+            <button 
+              className={`sidebar-button ${selectedOption === 'addTrack' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('addTrack')}
+            >
+              Add Track
+            </button>
+            <button 
+              className={`sidebar-button ${selectedOption === 'addSupervisors' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('addSupervisors')}
+            >
+              Add Supervisors
+            </button>
+            <button 
+              className={`sidebar-button ${selectedOption === 'deleteSupervisor' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('deleteSupervisor')}
+            >
+              Delete Supervisor
+            </button>
+            <button 
+              className={`sidebar-button ${selectedOption === 'assignSupervisor' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('assignSupervisor')}
+            >
+              Assign Supervisor
+            </button>
+            <button 
+              className={`sidebar-button ${selectedOption === 'viewTracks' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('viewTracks')}
+            >
+              View Tracks
+            </button>
+          </>
+        )}
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, padding: '2rem' }}>
+      <div className="main-content">
         {selectedOption === 'addTrack' && (
           <div>
             <h1>Add Track</h1>
@@ -74,32 +79,42 @@ const BranchManagerDashboard = () => {
         {selectedOption === 'addSupervisors' && (
           <div>
             <h1>Add Supervisors</h1>
-            <div style={{ marginBottom: '1rem' }}>
-              <button
-                style={{
-                  marginRight: '1rem',
-                  padding: '0.5rem',
-                  backgroundColor: supervisorOption === 'manual' ? '#ccc' : '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+            <div className="subnav">
+              <button 
+                className={`subnav-button ${supervisorOption === 'manual' ? 'active' : ''}`}
                 onClick={() => setSupervisorOption('manual')}
               >
                 Add Single Supervisor
               </button>
-              <button
-                style={{
-                  padding: '0.5rem',
-                  backgroundColor: supervisorOption === 'bulk' ? '#ccc' : '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+              <button 
+                className={`subnav-button ${supervisorOption === 'bulk' ? 'active' : ''}`}
                 onClick={() => setSupervisorOption('bulk')}
               >
                 Upload Excel
               </button>
             </div>
             {supervisorOption === 'manual' ? <AddSupervisor /> : <BulkUploadSupervisors />}
+          </div>
+        )}
+
+        {selectedOption === 'deleteSupervisor' && (
+          <div>
+            <h1>Delete Supervisor</h1>
+            <DeleteSupervisor />
+          </div>
+        )}
+
+        {selectedOption === 'assignSupervisor' && (
+          <div>
+            <h1>Assign Supervisor to Track</h1>
+            <AssignSupervisorToTrack />
+          </div>
+        )}
+
+        {selectedOption === 'viewTracks' && (
+          <div>
+            <h1>Current Tracks</h1>
+            <TracksTable />
           </div>
         )}
       </div>

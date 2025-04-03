@@ -14,3 +14,6 @@ class TrackCreateView(generics.CreateAPIView):
     queryset = Track.objects.all()
     serializer_class = TrackSerializer
     permission_classes = [AllowAny]  # Replace with your branch manager-specific permission if available
+class TrackUpdateView(generics.UpdateAPIView):
+    queryset = Track.objects.all()
+    serializer_class = TrackSerializer

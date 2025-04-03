@@ -44,8 +44,10 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
 
-        # Ensure 'role' and 'userType' are included in the token
+        # Include role and userType in the token
         token['role'] = user.role if hasattr(user, 'role') else 'unknown'
         token['userType'] = 'student' if isinstance(user, Student) else 'staff'
+        # Include the username in the token (fallback to email if username is not available)
+        token['username'] = user.username if hasattr(user, 'username') else user.email
 
         return token
