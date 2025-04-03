@@ -1,9 +1,9 @@
+# apps/custom_auth/serializers.py
+
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
 from apps.student.models import Student
 from apps.staff_members.models import StaffMember
-
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -14,7 +14,7 @@ class LoginSerializer(serializers.Serializer):
         password = data.get('password')
         user = None
 
-        # Try fetching user from Student model
+        # Try fetching user from the Student model
         try:
             user = Student.objects.get(email=email)
         except Student.DoesNotExist:
@@ -27,11 +27,11 @@ class LoginSerializer(serializers.Serializer):
             except StaffMember.DoesNotExist:
                 raise serializers.ValidationError({"detail": "No active account found with the given credentials."})
 
-        # Ensure password is correct
+        # Ensure the password is correct
         if not user.check_password(password):
             raise serializers.ValidationError({"detail": "Invalid credentials."})
 
-        # Ensure user is active
+        # Ensure the user is active
         if not user.is_active:
             raise serializers.ValidationError({"detail": "Account is inactive."})
 
@@ -43,7 +43,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        
+
         # Ensure 'role' and 'userType' are included in the token
         token['role'] = user.role if hasattr(user, 'role') else 'unknown'
         token['userType'] = 'student' if isinstance(user, Student) else 'staff'

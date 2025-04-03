@@ -1,6 +1,8 @@
 # File: apps/staff_members/serializers.py
 
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import StaffMember
 import secrets
 import string
@@ -12,12 +14,40 @@ logger = logging.getLogger(__name__)
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     """
-    Serializer for StaffMember model, used for creating and updating staff members.
+    Comprehensive serializer for StaffMember model with enhanced security and validation.
+    Handles creation, updates, and password management with proper role-based controls.
     """
     class Meta:
         model = StaffMember
-        fields = ["username", "email", "password", "role", "phone"]
-        extra_kwargs = {"password": {"write_only": True}}
+        fields = [
+            'id', 'username', 'email', 'password',
+            'first_name', 'last_name', 'role', 'phone',
+            'is_active', 'date_joined'
+        ]
+        read_only_fields = ['id', 'date_joined']
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': True},
+            'email': {'required': True},
+            'role': {'required': True}
+        }
+
+    def validate_password(self, value):
+        """Enforce password validation rules"""
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
+
+    def validate_role(self, value):
+        """Ensure role is valid and prevent privilege escalation"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            if not request.user.is_staff and value != StaffMember.Role.INSTRUCTOR:
+                raise serializers.ValidationError(
+                    _("Only administrators can assign higher roles")
+                )
+        return value
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

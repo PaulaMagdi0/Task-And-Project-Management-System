@@ -16,56 +16,47 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
         Allow students to see only their own submissions, and instructors to view all submissions.
         """
         user = self.request.user
+        
+        if not user.is_authenticated:
+            raise PermissionDenied("User is not authenticated.")
+
+        # Log user's groups for debugging
+        print(f"User groups: {user.groups.all()}")
+        
         if user.groups.filter(name="Instructors").exists():
-            # Instructors can view all submissions
-            return AssignmentSubmission.objects.all()
-        else:
-            # Students can only see their submissions
-            return AssignmentSubmission.objects.filter(student=user)
-
-    def perform_update(self, serializer):
-        """
-        Ensure that only instructors can update feedback and marks for submissions.
-        """
-        user = self.request.user
-        if not user.groups.filter(name="Instructors").exists():
-            raise PermissionDenied("You do not have permission to update feedback and marks.")
-
-        # Ensure feedback, mark, and visibility are updated correctly
-        feedback = serializer.validated_data.get('feedback', None)
-        mark = serializer.validated_data.get('mark', None)
-        is_feedback_visible = serializer.validated_data.get('is_feedback_visible', None)
-
-        # Only allow updating these fields if provided
-        if feedback is not None:
-            serializer.instance.feedback = feedback
-        if mark is not None:
-            serializer.instance.mark = mark
-        if is_feedback_visible is not None:
-            serializer.instance.is_feedback_visible = is_feedback_visible
-
-        # Save the updated submission
-        serializer.save()
+            return AssignmentSubmission.objects.all()  # Instructors see all submissions
+        return AssignmentSubmission.objects.filter(student=user)  # Students see only their submissions
 
     def perform_create(self, serializer):
         """
         Handle file submissions by students. Ensure students can submit a file or URL, but not both.
         """
         user = self.request.user
+        
+        if not user.is_authenticated:
+            raise PermissionDenied("User is not authenticated.")
+
+        # Log the user for debugging
+        print(f"Authenticated User: {user.username}")
+        
         assignment = serializer.validated_data['assignment']
 
-        # Check if the submission is before the due date
-        if assignment.due_date < timezone.now():
+        # Ensure only students can submit assignments
+        if user.groups.filter(name="Instructors").exists():
+            raise PermissionDenied("Instructors cannot submit assignments.")
+
+        # Check if submission is before the due date
+        if assignment.due_date and assignment.due_date < timezone.now():
             raise PermissionDenied("You cannot submit the assignment after the due date.")
 
-        # Check if the student is submitting both a file and URL, which is not allowed
-        file_submission = serializer.validated_data.get('file', None)
-        url_submission = serializer.validated_data.get('url', None)
+        # Validate file or file_url submission (one is required, but not both)
+        file_submission = serializer.validated_data.get('file')
+        file_url_submission = serializer.validated_data.get('file_url')
 
-        if file_submission and url_submission:
-            raise PermissionDenied("You cannot submit both a file and a URL for the assignment.")
-        if not file_submission and not url_submission:
-            raise PermissionDenied("You must submit either a file or a URL for the assignment.")
+        if file_submission and file_url_submission:
+            raise PermissionDenied("You cannot submit both a file and a URL.")
+        if not file_submission and not file_url_submission:
+            raise PermissionDenied("You must submit either a file or a URL.")
 
-        # Save the submission
-        serializer.save()
+        # Save the submission with the current user as the student
+        serializer.save(student=user)
