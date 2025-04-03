@@ -3,7 +3,9 @@ from apps.staff_members.models import StaffMember
 from django.utils import timezone
 
 class Track(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
+    courses = models.ManyToManyField("courses.Course", related_name="tracks")  # ✅ Use string reference
+
     description = models.TextField()
     created_at = models.DateTimeField(default=timezone.now)
     supervisor = models.ForeignKey(
@@ -12,12 +14,6 @@ class Track(models.Model):
         null=True,
         blank=True,
         related_name="supervised_tracks"
-    )
-
-    courses = models.ManyToManyField(
-        'courses.Course',  # String-based reference for Course model
-        related_name='course_tracks', 
-        blank=True
     )
 
     class Meta:

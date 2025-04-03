@@ -3,28 +3,29 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import StaffMember
 from .serializers import StaffMemberSerializer, CreateSupervisorSerializer, ExcelUploadSupervisorSerializer
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
+from .permissions import IsAdminOrBranchManager  # Custom permission class (you can create one as per your needs)
 
 # Existing endpoints for listing and updating staff members:
 class StaffMemberListCreateView(generics.ListCreateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]  # Only authenticated users can access this view
 
 class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]  # Only authenticated users can access this view
 
 # New endpoint for creating a supervisor (branch manager functionality)
 class CreateSupervisorView(generics.CreateAPIView):
     queryset = StaffMember.objects.filter(role="supervisor")
     serializer_class = CreateSupervisorSerializer
-    permission_classes = [AllowAny]  # Replace with your branch manager-specific permission if available
+    permission_classes = [IsAdminOrBranchManager]  # Replace with your specific permission class
 
 # New endpoint for bulk uploading supervisors via Excel (branch manager functionality)
 class SupervisorBulkUploadView(APIView):
-    permission_classes = [AllowAny]  # Replace with your branch manager-specific permission if available
+    permission_classes = [IsAdminOrBranchManager]  # Only admin or branch managers can upload supervisors
 
     def post(self, request, *args, **kwargs):
         serializer = ExcelUploadSupervisorSerializer(data=request.data)

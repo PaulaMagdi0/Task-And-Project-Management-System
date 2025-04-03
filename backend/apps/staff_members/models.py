@@ -1,22 +1,18 @@
+# staff_members/models.py
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
-
 class StaffMember(AbstractUser):
-    # Email configuration
-    email = models.EmailField(
-        unique=True,
-        verbose_name=_('email address'),
-        help_text=_('Required. Must be a valid email address.')
-    )
+    # Ensure email is explicitly defined and unique
+    email = models.EmailField(unique=True, verbose_name=_('email'))
 
-    # Role choices with proper case handling
     class Role(models.TextChoices):
         BRANCH_MANAGER = 'branch_manager', _('Branch Manager')
         SUPERVISOR = 'supervisor', _('Supervisor')
         INSTRUCTOR = 'instructor', _('Instructor')
+        ADMIN = 'admin', _('System Administrator')
 
     role = models.CharField(
         max_length=20,
@@ -24,14 +20,14 @@ class StaffMember(AbstractUser):
         default=Role.INSTRUCTOR,
         verbose_name=_('staff role')
     )
-
-    # Branch location field
-    branch_location = models.CharField(
-        max_length=100,
-        blank=True,
+    
+    branch = models.ForeignKey(
+        'branch_location.Branch',  # String reference to avoid direct import
+        on_delete=models.PROTECT,
         null=True,
-        verbose_name=_('branch location'),
-        help_text=_('The physical branch location this staff member is associated with')
+        blank=True,
+        related_name='staff_members',
+        verbose_name=_('assigned branch')
     )
 
     # Phone number validation
@@ -45,6 +41,16 @@ class StaffMember(AbstractUser):
         blank=True,
         null=True,
         verbose_name=_('phone number')
+    )
+
+    # Additional fields
+    is_verified = models.BooleanField(
+        default=False,
+        verbose_name=_('verification status')
+    )
+    date_joined = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('date joined')
     )
 
     # Permission settings
@@ -66,7 +72,7 @@ class StaffMember(AbstractUser):
     )
 
     # Authentication configuration
-    USERNAME_FIELD = 'email'
+    USERNAME_FIELD = 'email'  # Email is now the unique identifier for authentication
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
     class Meta:
@@ -74,23 +80,37 @@ class StaffMember(AbstractUser):
         verbose_name = _('staff member')
         verbose_name_plural = _('staff members')
         ordering = ['last_name', 'first_name']
+        permissions = [
+            ('can_manage_branches', 'Can manage branch locations'),
+        ]
 
     def clean(self):
         """Validate model before saving"""
         super().clean()
+        
+        # Role validation
         if self.role not in self.Role.values:
             raise ValidationError(
                 {'role': _('Invalid role selected.')}
             )
         
-        # Branch managers must have a branch location
-        if self.role == self.Role.BRANCH_MANAGER and not self.branch_location:
+        # Branch validation
+        if self.role in [self.Role.BRANCH_MANAGER, self.Role.SUPERVISOR] and not self.branch:
             raise ValidationError(
-                {'branch_location': _('Branch managers must have an associated branch location.')}
+                {'branch': _('Branch managers and supervisors must be assigned to a branch.')}
             )
         
-        # Normalize email
-        self.email = self.__class__.objects.normalize_email(self.email)
+        if self.role == self.Role.BRANCH_MANAGER:
+            # Check if this user is already managing another branch
+            if hasattr(self, 'managed_branch') and self.managed_branch != self.branch:
+                raise ValidationError(
+                    {'branch': _('A manager can only manage one branch.')}
+                )
+        
+        if self.role not in [self.Role.BRANCH_MANAGER, self.Role.SUPERVISOR] and self.branch:
+            raise ValidationError(
+                {'branch': _('Only branch managers and supervisors should be assigned to specific branches.')}
+            )
 
     def save(self, *args, **kwargs):
         """Override save to include clean validation"""
@@ -98,8 +118,8 @@ class StaffMember(AbstractUser):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        location = f" at {self.branch_location}" if self.branch_location else ""
-        return f"{self.get_full_name()} ({self.get_role_display()}{location})"
+        branch_info = f" at {self.branch.name}" if self.branch else ""
+        return f"{self.get_full_name()} ({self.get_role_display()}{branch_info})"
 
     @property
     def is_branch_manager(self):
@@ -113,7 +133,23 @@ class StaffMember(AbstractUser):
     def is_instructor(self):
         return self.role == self.Role.INSTRUCTOR
 
+    @property
+    def is_admin(self):
+        return self.role == self.Role.ADMIN or self.is_superuser
+
     def get_full_name(self):
         """Return full name with fallback to username"""
         full_name = f'{self.first_name} {self.last_name}'.strip()
         return full_name if full_name else self.username
+
+    def get_branch_location(self):
+        """Helper method to get branch location details"""
+        if self.branch:
+            return {
+                'id': self.branch.id,
+                'name': self.branch.name,
+                'address': self.branch.address,
+                'phone': self.branch.phone,
+                'is_active': self.branch.is_active
+            }
+        return None

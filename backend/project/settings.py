@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework.authtoken',  # Add this line for Token Authentication
     'rest_framework_simplejwt',
     "rest_framework",
     "apps.tracks",
@@ -27,10 +28,12 @@ INSTALLED_APPS = [
     "apps.student",
     "apps.custom_auth",
     "apps.submission",
+    "apps.branch_location",
     "corsheaders",
 
 
 ]
+# settings.py
 # settings.py
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -38,8 +41,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
+        'rest_framework.permissions.IsAuthenticated',  # Default to require auth
+    ]
 }
 
 MIDDLEWARE = [
@@ -78,7 +81,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",  # Change this to your database name
         "USER": "postgres",  # Your PostgreSQL username
-        "PASSWORD": "1234",  # Your PostgreSQL password
+        "PASSWORD": "2625",  # Your PostgreSQL password
         "HOST": "localhost",
         "PORT": "5432",
     }
