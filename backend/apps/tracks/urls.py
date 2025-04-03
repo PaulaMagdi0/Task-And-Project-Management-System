@@ -1,8 +1,7 @@
 from django.urls import path
-from .views import TrackListView, TrackCreateView, TrackUpdateView
+from .views import TrackListView, TrackDetailView
 
 urlpatterns = [
     path("", TrackListView.as_view(), name="track-list"),
-    path("create/", TrackCreateView.as_view(), name="track-create"),
-      path("<int:pk>/", TrackUpdateView.as_view(), name="track-update"),
+    path("<int:pk>/", TrackDetailView.as_view(), name="track-detail"),  # Supports GET, PUT, PATCH, DELETE
 ]
