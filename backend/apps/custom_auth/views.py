@@ -1,38 +1,45 @@
-# views.py (in your accounts or auth app)
+# apps/custom_auth/views.py
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from apps.student.models import Student
-from apps.staff_members.models import StaffMember
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import MyTokenObtainPairSerializer
+from .serializers import MyTokenObtainPairSerializer, LoginSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError  # Import the proper exceptions
 
+# Login view for handling username/password authentication and token generation
 @api_view(['POST'])
 def login_view(request):
     email = request.data.get('email')
     password = request.data.get('password')
-    
-    # Check if the email belongs to a student.
-    try:
-        student = Student.objects.get(email=email)
-        if student.check_password(password):
-            return Response({"message": "Hi student!"})
-        else:
-            return Response({"error": "Invalid credentials."}, status=400)
-    except Student.DoesNotExist:
-        pass  # Not a student, try staff next.
-    
-    # Check if the email belongs to a staff member.
-    try:
-        staff = StaffMember.objects.get(email=email)
-        if staff.check_password(password):
-            if staff.role in ["branch_manager", "supervisor", "instructor"]:
-                return Response({"message": f"Hi {staff.role}!"})
-            else:
-                return Response({"error": "Invalid role for staff member."}, status=400)
-        else:
-            return Response({"error": "Invalid credentials."}, status=400)
-    except StaffMember.DoesNotExist:
-        return Response({"error": "Invalid credentials."}, status=400)
 
+    try:
+        # Validate the login credentials using the LoginSerializer
+        login_serializer = LoginSerializer(data=request.data)
+        if login_serializer.is_valid():
+            user = login_serializer.validated_data['user']
+
+            # Get the token for the user using the custom serializer
+            token = MyTokenObtainPairSerializer.get_token(user)
+
+            # You can print the user for debugging
+            print(f"Authenticated User: {user}")
+
+            # Return response with access and refresh tokens, along with role and userType
+            return Response({
+                'access_token': str(token.access_token),  # Access token
+                'refresh_token': str(token),  # Refresh token
+                'role': token['role'],  # Custom role added to the token
+                'userType': token['userType'],  # Custom userType added to the token
+            })
+        else:
+            raise AuthenticationFailed("Invalid credentials")
+    except (InvalidToken, TokenError):
+        raise AuthenticationFailed("Token could not be validated")
+    except Exception as e:
+        raise AuthenticationFailed(f"An error occurred: {str(e)}")
+
+
+# TokenObtainPairView class for handling token generation using JWT
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer

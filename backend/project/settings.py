@@ -17,8 +17,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework_simplejwt',
     "rest_framework",
-    "apps.accounts",
     "apps.tracks",
     "apps.courses",
     "apps.assignments",
@@ -26,10 +26,17 @@ INSTALLED_APPS = [
     "apps.staff_members",
     "apps.student",
     "apps.custom_auth",
+    "apps.submission",
     "corsheaders",
 
 
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -43,10 +50,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "project.urls"
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5175",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 
 TEMPLATES = [
     {

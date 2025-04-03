@@ -1,4 +1,3 @@
-// src/pages/SignIn.jsx
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser } from '../redux/authSlice';
@@ -17,12 +16,22 @@ const SignIn = () => {
     const resultAction = await dispatch(loginUser({ email, password }));
     if (loginUser.fulfilled.match(resultAction)) {
       const { userType, role } = resultAction.payload;
+      // Redirect based on the token payload
       if (userType === 'student') {
-        alert('Hi student!');
+        navigate('/student/dashboard');
       } else if (userType === 'staff') {
-        alert(`Hi ${role}!`);
+        if (role === 'instructor') {
+          navigate('/instructor/dashboard');
+        } else if (role === 'supervisor') {
+          navigate('/supervisor/dashboard');
+        } else if (role === 'branch_manager') {
+          navigate('/branchmanager/dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        navigate('/');
       }
-      // Future: Redirect to the appropriate dashboard based on userType/role.
     }
   };
 

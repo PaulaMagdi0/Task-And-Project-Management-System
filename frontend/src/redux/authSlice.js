@@ -1,29 +1,46 @@
+// File: src/redux/authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
-// Async thunk for logging in
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
-  async ({ email, password }, { rejectWithValue }) => {
+  async ({ email, password }, thunkAPI) => {
     try {
-      const response = await apiClient.post('/auth/token/', { email, password });
-      return response.data;
-    } catch (err) {
-      if (!err.response) {
-        return rejectWithValue({ error: "Network error: Cannot connect to server." });
+      const response = await apiClient.post('/auth/token/', { email: email.trim(), password });
+      const { access, refresh } = response.data;
+      
+      // Dynamically import jwt-decode and destructure the named export
+      const jwtDecodeModule = await import('jwt-decode');
+      const { jwtDecode } = jwtDecodeModule;
+      
+      if (typeof jwtDecode !== 'function') {
+        throw new Error("jwtDecode is not a function");
       }
-      return rejectWithValue(err.response.data);
+      
+      const decoded = jwtDecode(access);
+      
+      return {
+        access,
+        refresh,
+        role: decoded.role,
+        userType: decoded.userType,
+        username: decoded.username || decoded.email || 'User', // Fallback to 'User'
+      };
+    } catch (error) {
+      return thunkAPI.rejectWithValue({
+        error: error.response?.data?.detail || error.message || 'Login failed',
+      });
     }
   }
 );
-
 
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     token: null,
     userType: null, // 'staff' or 'student'
-    role: null,     // for staff: 'supervisor', 'instructor', or 'branch_manager'
+    role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
+    username: '',   // Holds the logged-in user's username
     loading: false,
     error: null,
   },
@@ -32,6 +49,7 @@ const authSlice = createSlice({
       state.token = null;
       state.userType = null;
       state.role = null;
+      state.username = '';
       localStorage.removeItem('authToken');
       localStorage.removeItem('userType');
       localStorage.removeItem('role');
@@ -48,6 +66,7 @@ const authSlice = createSlice({
         state.token = action.payload.access;
         state.userType = action.payload.userType;
         state.role = action.payload.role || null;
+        state.username = action.payload.username;
         localStorage.setItem('authToken', action.payload.access);
         localStorage.setItem('userType', action.payload.userType);
         if (action.payload.role) {

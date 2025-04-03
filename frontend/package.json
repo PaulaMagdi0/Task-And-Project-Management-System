@@ -17,6 +17,7 @@
     "@reduxjs/toolkit": "^2.6.1",
     "@toolpad/core": "^0.13.0",
     "axios": "^1.8.4",
+    "jwt-decode": "^4.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-redux": "^9.2.0",

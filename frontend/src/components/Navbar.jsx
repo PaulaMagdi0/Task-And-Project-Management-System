@@ -1,11 +1,20 @@
-// src/components/Navbar.jsx
+// File: src/components/Navbar.jsx
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import './Navbar.css';
-
-import SignIn from '../pages/Signin';
+import { logout } from '../redux/authSlice';
 
 const Navbar = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { token, username } = useSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/signin');
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-logo">
@@ -13,9 +22,21 @@ const Navbar = () => {
       </div>
       <ul className="navbar-links">
         <li><Link to="/">Home</Link></li>
-        <li><Link to="/signin">Sign In</Link></li>
-        <li><Link to="/signup">Sign Up</Link></li>
-        {/* Future: Add links for logged-in student pages */}
+        {token ? (
+          <>
+            <li className="welcome-message"> {username}</li>
+            <li>
+              <button className="logout-button" onClick={handleLogout}>
+                Sign Out
+              </button>
+            </li>
+          </>
+        ) : (
+          <>
+            <li><Link to="/signin">Sign In</Link></li>
+            <li><Link to="/signup">Sign Up</Link></li>
+          </>
+        )}
       </ul>
     </nav>
   );

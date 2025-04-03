@@ -1,38 +1,44 @@
 from django.db import models
 from django.utils.timezone import now
 from apps.assignments.models import Assignment
-from apps.student.models import Student  # Updated import: use the Student model now
-from apps.courses.models import Course  # Ensure course is linked properly
+from apps.student.models import Student  
+from apps.courses.models import Course  
+from django.utils import timezone
 
-# Default function to get the first available assignment
+# ✅ Ensure these functions are defined before the model
 def get_default_assignment():
-    return Assignment.objects.first().id if Assignment.objects.exists() else None
+    """Return the first available Assignment ID, or None if no assignments exist."""
+    first_assignment = Assignment.objects.first()
+    return first_assignment.id if first_assignment else None
 
-# Default function to get the first available student from the Student model
 def get_default_student():
-    return Student.objects.first().id if Student.objects.exists() else None
+    """Return the first available Student ID, or None if no students exist."""
+    first_student = Student.objects.first()
+    return first_student.id if first_student else None
 
 class Grade(models.Model):
     assignment = models.ForeignKey(
         Assignment,
         on_delete=models.CASCADE,
-        default=get_default_assignment  # Dynamic default
+        default=get_default_assignment
     )
     student = models.ForeignKey(
         Student,
         on_delete=models.CASCADE,
-        # No need for limit_choices_to since only Student model is used for students
         related_name="grades",
-        default=get_default_student  # Dynamic default
+        default=get_default_student
     )
     score = models.IntegerField()
     feedback = models.TextField()
-    graded_date = models.DateTimeField(default=now)  # Default timestamp
+    graded_date = models.DateTimeField(default=now)
     course = models.ForeignKey(
         Course,
         on_delete=models.CASCADE
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'grades'
 
     def __str__(self):
         return f"{self.student.username} - {self.assignment.title}: {self.score}"
