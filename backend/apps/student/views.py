@@ -82,7 +82,9 @@ def upload_excel(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+
 def list_students(request):
     """List students with optimized querying and pagination"""
     try:

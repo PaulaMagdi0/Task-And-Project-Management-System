@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 import logging
 from django.db import transaction
 from django.core.validators import validate_email
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -21,31 +22,173 @@ class ExcelUploadSerializer(serializers.Serializer):
         allow_null=True,
         source='track'
     )
-
-    class Meta:
-        fields = ['excel_file', 'track_id']
-
     def validate_excel_file(self, value):
-        """Validate the uploaded Excel file."""
-        if not value.name.endswith(('.xlsx', '.xls')):
-            raise ValidationError("Only Excel files (.xlsx, .xls) are allowed")
-        return value
+        """Robust Excel validation without magic dependency"""
+        try:
+            # 1. Verify file extension first
+            if not value.name.lower().endswith(('.xlsx', '.xls')):
+                raise ValidationError("Only .xlsx or .xls files allowed")
+            
+            # 2. Verify file content by trying to read it
+            try:
+                # Read the file content into memory
+                content = value.read()
+                value.seek(0)  # Reset file pointer to the beginning
+                
+                # Try loading the workbook
+                wb = openpyxl.load_workbook(filename=BytesIO(content))
+                sheet = wb.active
+            except Exception as e:
+                logger.error(f"Excel read error: {str(e)}")
+                raise ValidationError(f"Invalid Excel file: {str(e)}")
+            
+            # 3. Validate header row
+            try:
+                header_row = [str(cell.value).strip().lower() for cell in sheet[1]]
+                required_columns = [
+                    'first name', 
+                    'last name', 
+                    'email', 
+                    'role'
+                ]
+                
+                missing = [col for col in required_columns if col not in header_row]
+                if missing:
+                    raise ValidationError(
+                        f"Missing columns: {', '.join(missing).title()}. "
+                        f"Found columns: {', '.join(header_row)}"
+                    )
+            except IndexError:
+                raise ValidationError("Excel file has no header row")
+            
+            # 4. Verify data exists
+            if sheet.max_row < 2:  # At least 1 row of data after header
+                raise ValidationError("Excel file contains no data rows")
+            
+            # Return the validated file
+            return value
+        
+        except ValidationError:
+            # Reraise validation errors
+            raise
+        except Exception as e:
+            logger.exception("Excel validation failed")
+            raise ValidationError("Invalid Excel file format")
+
+
+    def _process_excel_file(self):
+        try:
+            # Code to process the Excel file and create student records...
+            for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
+                # Assume that row contains the data: [first_name, last_name, email, role]
+                first_name = row[0].value.strip()
+                last_name = row[1].value.strip()
+                email = row[2].value.strip()
+                role = row[3].value.strip()
+
+                # Create or save the student record
+                student = Student(
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email,
+                    role=role
+                )
+                student.save()  # This is where the error might occur
+
+        except IntegrityError as e:
+            logger.error(f"Integrity error while saving student: {str(e)}")
+            raise ValidationError("Failed to create student records due to data integrity issues. Please check the values for any overly long fields.")
+        except Exception as e:
+            logger.error(f"Error processing Excel file: {str(e)}")
+            raise ValidationError(f"Failed to create student records: {str(e)}")
+            
+    def _process_excel_file(self):
+        """Process the validated Excel file with detailed error handling"""
+        excel_file = self.validated_data['excel_file']
+        track = self.validated_data.get('track')
+
+        try:
+            wb = openpyxl.load_workbook(excel_file)
+            sheet = wb.active
+            
+            # Verify sheet is not empty
+            if sheet.max_row < 2:  # 1 header row + at least 1 data row
+                raise ValidationError("Excel file contains no data rows")
+
+            students_to_create = []
+            errors = []
+            
+            for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    if len(row) < 4:
+                        raise ValidationError("Insufficient columns in row")
+                        
+                    first_name, last_name, email, role = row[:4]
+                    
+                    # Validate required fields
+                    if not all([first_name, last_name, email]):
+                        raise ValidationError("Missing required fields")
+                        
+                    # Process and validate the row data
+                    student_data = {
+                        'first_name': str(first_name).strip(),
+                        'last_name': str(last_name).strip(),
+                        'email': str(email).strip().lower(),
+                        'role': (str(role).strip().lower() if role else 'student'),
+                        'track': track
+                    }
+                    
+                    # Validate with your StudentSerializer
+                    student_serializer = StudentSerializer(data=student_data)
+                    if not student_serializer.is_valid():
+                        raise ValidationError(student_serializer.errors)
+                        
+                    students_to_create.append(student_serializer)
+                    
+                except ValidationError as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    logger.warning(f"Row {row_num} validation failed: {str(e)}")
+                    continue
+
+            if not students_to_create and errors:
+                raise ValidationError({
+                    'detail': 'All rows failed validation',
+                    'errors': errors
+                })
+
+            # Create students in a transaction
+            with transaction.atomic():
+                created_students = []
+                for serializer in students_to_create:
+                    try:
+                        student = serializer.save()
+                        created_students.append(student)
+                    except Exception as e:
+                        errors.append(f"Failed to create student: {str(e)}")
+                        raise  # This will rollback the transaction
+
+            return {
+                'status': 'partial_success' if errors else 'success',
+                'created_count': len(created_students),
+                'error_count': len(errors),
+                'errors': errors,
+                'students': StudentSerializer(created_students, many=True).data
+            }
+
+        except Exception as e:
+            logger.exception(f"Excel processing failed: {str(e)}")
+            raise ValidationError(f"Error processing Excel file: {str(e)}")
 
     def save(self, **kwargs):
-        """Process the Excel file and create student accounts."""
+        """Main entry point with proper error handling"""
         try:
             return self._process_excel_file()
         except ValidationError as e:
-            raise
+            raise  # Re-raise validation errors
         except Exception as e:
-            logger.exception("Error processing Excel file")
-            error_msg = f"Error processing Excel file: {str(e)}"
-            if hasattr(e, 'sheet'):
-                error_msg += f" (Sheet: {e.sheet})"
-            if hasattr(e, 'row'):
-                error_msg += f" (Row: {e.row})"
-            raise ValidationError(error_msg)
-
+            logger.exception("Unexpected error during Excel processing")
+            raise ValidationError("Failed to process Excel file")
+        
     def _process_excel_file(self):
         """Process the Excel file and create student accounts."""
         excel_file = self.validated_data['excel_file']
@@ -162,7 +305,7 @@ class ExcelUploadSerializer(serializers.Serializer):
 
     def _generate_verification_code(self):
         """Generate a secure verification code."""
-        return secrets.token_urlsafe(32)
+        return secrets.token_urlsafe(24)
 
     def _generate_username(self, email):
         """Generate username from email."""
@@ -174,7 +317,7 @@ class ExcelUploadSerializer(serializers.Serializer):
             try:
                 password = email_password_map.get(student.email)
                 if password:
-                    verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
+                    verification_url = f"{settings.SITE_URL}api/student/verify/{student.verification_code}/"
                     
                     subject = "Your Student Account Details"
                     message = f"""

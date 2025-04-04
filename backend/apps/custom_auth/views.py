@@ -15,90 +15,52 @@ logger = logging.getLogger(__name__)
 @permission_classes([AllowAny])
 def login_view(request):
     """
-    Handle username/password authentication and JWT token generation.
-    Sets HTTP-only cookies for access and refresh tokens.
-    Returns user information and tokens in response body.
+    Handle email/password authentication and JWT token generation.
+    Returns only the JWT access token in the response.
     """
     try:
-        # Input validation
         if not all(key in request.data for key in ['email', 'password']):
             raise AuthenticationFailed(
-                {"detail": "Email and password are required"}, 
+                {"detail": "Email and password are required."},
                 code="missing_credentials"
             )
         
-        # Validate credentials
+        # Validate credentials using LoginSerializer
         login_serializer = LoginSerializer(data=request.data)
         login_serializer.is_valid(raise_exception=True)
         user = login_serializer.validated_data['user']
         
-        # Generate tokens
-        token_serializer = MyTokenObtainPairSerializer()
-        token = token_serializer.get_token(user)
+        # Generate token using the custom token serializer
+        token = MyTokenObtainPairSerializer.get_token(user)
         access_token = str(token.access_token)
-        refresh_token = str(token)
         
-        logger.info(f"User {user.id} logged in successfully")
-        
-        # Determine user type
-        user_type = 'staff'  # default
-        if hasattr(user, 'is_student') and user.is_student:
-            user_type = 'student'
-        elif hasattr(user, 'is_staff') and user.is_staff:
-            user_type = 'staff'
-        
-        # Create response with user data AND tokens
-        response_data = {
-            'message': 'Login successful',
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'role': getattr(user, 'role', None),
-                'user_type': user_type,
-            },
-            'tokens': {
-                'access': access_token,
-                'refresh': refresh_token
-            }
-        }
-        
-        response = Response(response_data, status=status.HTTP_200_OK)
-        
-        # Set secure HTTP-only cookies (still set them for browser-based usage)
+        # Optionally, you can set the access token as an HTTP-only cookie
+        response = Response({"token": access_token}, status=200)
         cookie_settings = {
-            'httponly': True,
-            'secure': not settings.DEBUG,
-            'samesite': 'Strict',
-            'path': settings.JWT_AUTH['COOKIE_PATH'],
+            "httponly": True,
+            "secure": not settings.DEBUG,
+            "samesite": "Strict",
+            "path": settings.JWT_AUTH['COOKIE_PATH'],
         }
-        
         response.set_cookie(
             key=settings.JWT_AUTH['ACCESS_TOKEN_COOKIE'],
             value=access_token,
             max_age=settings.JWT_AUTH['ACCESS_TOKEN_LIFETIME'].total_seconds(),
             **cookie_settings
         )
-        
-        response.set_cookie(
-            key=settings.JWT_AUTH['REFRESH_TOKEN_COOKIE'],
-            value=refresh_token,
-            max_age=settings.JWT_AUTH['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-            **cookie_settings
-        )
-        
         return response
-        
+
     except AuthenticationFailed as e:
         logger.warning(f"Authentication failed for email {request.data.get('email')}: {str(e)}")
         raise
     except Exception as e:
         logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
         raise AuthenticationFailed(
-            {"detail": "An unexpected error occurred during login"},
+            {"detail": "An unexpected error occurred during login."},
             code="login_error"
         )
-
 @api_view(['POST'])
+
 def logout_view(request):
     """
     Handle user logout by clearing JWT cookies.

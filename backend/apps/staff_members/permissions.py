@@ -126,8 +126,8 @@ class IsStudentManager(permissions.BasePermission):
 
 # ✅ FIXED FUNCTION: No more AnonymousUser issues
 def has_student_management_permission(user):
-    print(f"DEBUG: User Info - ID: {user.id}, Role: {getattr(user, 'role', None)}, Branch: {getattr(user, 'branch', None)}, Superuser: {user.is_superuser}")
+    print(f"User: {user}, Role: {user.role}, Superuser: {user.is_superuser}")
     return (
         user.is_superuser or 
-        getattr(user, 'role', None) in ['admin', 'supervisor', 'branch_manager']
+        user.role in ['admin', 'supervisor', 'branch_manager','']
     )
