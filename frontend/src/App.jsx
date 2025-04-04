@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -6,10 +5,13 @@ import Home from './pages/Home';
 import SignIn from './pages/SignIn';
 import NotFound from './pages/NotFound';
 import StudentDashboard from './pages/StudentDashboard';
-import InstructorDashboard from './pages/InstructorDashboard';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import BranchManagerDashboard from './pages/BranchManagerDashboard';
-
+import InstructorDashboard from './pages/Instructor/Dashboard';
+import Assignments from './pages/Instructor/Assignments';
+import Submissions from './pages/Instructor/Submissions';
+import Grades from './pages/Instructor/Grades';
+import CreateTask from './pages/Instructor/CreateAssignment';
 function App() {
   return (
     <BrowserRouter>
@@ -18,9 +20,17 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
         <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
         <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />
+        
+        {/* Instructor Dashboard Routes */}
+        <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+        <Route path="/instructor/assignments" element={<Assignments />} />
+        <Route path="/instructor/submissions" element={<Submissions />} />
+        <Route path="/instructor/grades" element={<Grades />} />
+        <Route path="/instructor/createTask" element={<CreateTask />} />
+
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

@@ -1,0 +1,29 @@
+{
+    "submissions": [
+      {
+        "id": 1,
+        "student": {
+          "id": 201,
+          "name": "Ahmed Mohamed"
+        },
+        "course": 101,
+        "assignment": 1,
+        "file": "ahmed_database_design.pdf",
+        "file_url": "https://example.com/submissions/ahmed_database_design.pdf",
+        "submission_date": "2025-04-08"
+      },
+      {
+        "id": 2,
+        "student": {
+          "id": 202,
+          "name": "Sara Ali"
+        },
+        "course": 102,
+        "assignment": 2,
+        "file": "sara_api_development.zip",
+        "file_url": "https://example.com/submissions/sara_api_development.zip",
+        "submission_date": "2025-04-09"
+      }
+    ]
+  }
+  
