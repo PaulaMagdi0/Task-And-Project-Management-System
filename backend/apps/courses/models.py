@@ -1,5 +1,6 @@
 from django.db import models
 from apps.staff_members.models import StaffMember
+from apps.tracks.models import Track
 
 class Course(models.Model):
     
@@ -9,10 +10,9 @@ class Course(models.Model):
 
     # One track can have many courses (many courses per track)
     track = models.ForeignKey(
-        'tracks.Track',  
+        Track,
         on_delete=models.CASCADE,
-        null=True,
-        blank=True
+        related_name='courses'  # This enables reverse tracking
     )
 
     # The instructor is a foreign key to StaffMember
