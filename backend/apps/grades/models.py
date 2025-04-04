@@ -12,9 +12,7 @@ def get_default_assignment():
     return first_assignment.id if first_assignment else None
 
 def get_default_student():
-    """Return the first available Student ID, or None if no students exist."""
-    first_student = Student.objects.first()
-    return first_student.id if first_student else None
+    return Student.objects.values_list('id', flat=True).first()
 
 class Grade(models.Model):
     assignment = models.ForeignKey(

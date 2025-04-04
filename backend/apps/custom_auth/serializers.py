@@ -59,8 +59,6 @@ class LoginSerializer(serializers.Serializer):
 
         data['user'] = user
         return data
-
-
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     default_error_messages = {
         'no_active_account': 'Invalid credentials.'
@@ -76,17 +74,26 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Custom claims
         token['role'] = getattr(user, 'role', 'unknown')
-        token['user_type'] = 'student' if isinstance(user, Student) else 'staff'
+        token['userType'] = 'student' if isinstance(user, Student) else 'staff'
         token['username'] = getattr(user, 'username', user.email)
         token['is_active'] = user.is_active
 
-        # Add model-specific fields
+        # Model-specific fields
         if isinstance(user, Student):
             token['student_id'] = getattr(user, 'student_id', None)
             token['is_student'] = True
         elif isinstance(user, StaffMember):
             token['staff_id'] = getattr(user, 'staff_id', None)
             token['is_staff'] = True
+
+        # Include branch info instead of track
+        if hasattr(user, 'branch') and user.branch:
+            token['branch'] = {
+                'id': user.branch.id,
+                'name': user.branch.name,
+            }
+        else:
+            token['branch'] = None
 
         return token
 
@@ -103,11 +110,15 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
                     'id': user.pk,
                     'email': user.email,
                     'role': getattr(user, 'role', 'unknown'),
-                    'user_type': 'student' if isinstance(user, Student) else 'staff',
+                    'userType': 'student' if isinstance(user, Student) else 'staff',
                     'username': getattr(user, 'username', user.email),
                     'is_active': user.is_active,
                     **({'student_id': user.student_id} if isinstance(user, Student) else {}),
-                    **({'staff_id': user.staff_id} if isinstance(user, StaffMember) else {})
+                    **({'staff_id': user.staff_id} if isinstance(user, StaffMember) else {}),
+                    'track': {
+                        'id': user.track.id,
+                        'name': user.track.name,
+                    } if hasattr(user, 'track') and user.track else None,
                 }
             }
         except Exception as e:
@@ -115,7 +126,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise serializers.ValidationError({
                 "detail": "Authentication failed. Please try again."
             })
-
 
 class TokenRefreshSerializer(serializers.Serializer):
     refresh = serializers.CharField()
