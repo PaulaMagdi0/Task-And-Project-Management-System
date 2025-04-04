@@ -17,7 +17,8 @@ class AssignmentListView(generics.ListCreateAPIView):
     """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def perform_create(self, serializer):
         file = self.request.FILES.get('file')
@@ -71,7 +72,9 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = []
+
     lookup_field = 'pk'
 
     def get_object(self):
