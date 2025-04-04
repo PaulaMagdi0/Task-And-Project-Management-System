@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.submission",
     "apps.branch_location",
     "corsheaders",
+    'django_extensions',
 
 
 ]

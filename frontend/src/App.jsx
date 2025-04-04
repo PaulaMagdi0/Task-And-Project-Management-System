@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useSelector } from 'react-redux'; // Import useSelector
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import SignIn from './pages/SignIn';
@@ -12,7 +13,11 @@ import Assignments from './pages/Instructor/Assignments';
 import Submissions from './pages/Instructor/Submissions';
 import Grades from './pages/Instructor/Grades';
 import CreateTask from './pages/Instructor/CreateAssignment';
+
 function App() {
+  // Retrieve userType and role from Redux store
+  const { userType, role } = useSelector((state) => state.auth);
+
   return (
     <BrowserRouter>
       <Navbar />
@@ -24,13 +29,13 @@ function App() {
         <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />
         
         {/* Instructor Dashboard Routes */}
-        <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+        {userType === 'staff' && role === 'instructor' && (
+          <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+        )}
         <Route path="/instructor/assignments" element={<Assignments />} />
         <Route path="/instructor/submissions" element={<Submissions />} />
         <Route path="/instructor/grades" element={<Grades />} />
         <Route path="/instructor/createTask" element={<CreateTask />} />
-
-        
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
