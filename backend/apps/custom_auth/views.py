@@ -17,7 +17,7 @@ def login_view(request):
     """
     Handle username/password authentication and JWT token generation.
     Sets HTTP-only cookies for access and refresh tokens.
-    Returns user information in response body.
+    Returns user information and tokens in response body.
     """
     try:
         # Input validation
@@ -40,28 +40,31 @@ def login_view(request):
         
         logger.info(f"User {user.id} logged in successfully")
         
-        # Determine user type - more robust approach
+        # Determine user type
         user_type = 'staff'  # default
         if hasattr(user, 'is_student') and user.is_student:
             user_type = 'student'
         elif hasattr(user, 'is_staff') and user.is_staff:
             user_type = 'staff'
-        # Add more user types if needed
         
-        # Create response with user data
+        # Create response with user data AND tokens
         response_data = {
             'message': 'Login successful',
             'user': {
                 'id': user.id,
                 'email': user.email,
                 'role': getattr(user, 'role', None),
-                'user_type': user_type,  # Use the determined user type
+                'user_type': user_type,
+            },
+            'tokens': {
+                'access': access_token,
+                'refresh': refresh_token
             }
         }
         
         response = Response(response_data, status=status.HTTP_200_OK)
-                
-        # Set secure HTTP-only cookies
+        
+        # Set secure HTTP-only cookies (still set them for browser-based usage)
         cookie_settings = {
             'httponly': True,
             'secure': not settings.DEBUG,
@@ -94,7 +97,6 @@ def login_view(request):
             {"detail": "An unexpected error occurred during login"},
             code="login_error"
         )
-
 
 @api_view(['POST'])
 def logout_view(request):
