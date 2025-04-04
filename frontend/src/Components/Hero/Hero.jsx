@@ -11,7 +11,7 @@ const Hero = () => {
           <div className="col-lg-8">
             <h2>Welcome to Task Flow</h2>
             <p>We are a team of talented developers making websites.</p>
-            <Link to="/about" className="btn-get-started">
+            <Link to="/register" className="btn-get-started">
               Get Started
             </Link>
           </div>

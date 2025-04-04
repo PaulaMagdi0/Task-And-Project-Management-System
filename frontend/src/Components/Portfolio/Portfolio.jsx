@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom"; // Import Link from react-router-dom
+import useCustomScripts from "../../Hooks/useCustomScripts";
 
 // Import portfolio images
 import portfolio1 from "../../assets/img/masonry-portfolio/masonry-portfolio-1.jpg";
@@ -79,6 +80,7 @@ const portfolioItems = [
 ];
 
 const Portfolio = () => {
+  useCustomScripts();
   return (
     <section id="portfolio" className="portfolio section">
       <div className="container section-title" data-aos="fade-up">
@@ -98,7 +100,7 @@ const Portfolio = () => {
           data-sort="original-order"
         >
           <ul
-            className="portfolio-filters isotope-filters"
+            className="portfolio-filters isotope-filters gap-5"
             data-aos="fade-up"
             data-aos-delay="100"
           >
@@ -124,14 +126,6 @@ const Portfolio = () => {
                 <div className="portfolio-info">
                   <h4>{item.title}</h4>
                   <p>{item.description}</p>
-                  <Link
-                    href={item.image}
-                    title={item.title}
-                    data-gallery={`portfolio-gallery-${item.category}`}
-                    className="glightbox details-link"
-                  >
-                    <i className="bi bi-zoom-in"></i>
-                  </Link>
                 </div>
               </div>
             ))}

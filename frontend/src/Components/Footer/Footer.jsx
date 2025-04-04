@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom"; // Ensure you're using React Router for navigation
 
 const footerInfo = {
-  logo: "Day",
+  logo: "Task Flow",
   address: "A108 Adam Street, New York, NY 535022", // Original location
   phone: "+1 5589 55488 55",
   email: "info@example.com",
@@ -19,42 +19,39 @@ const footerInfo = {
     { name: "Terms of service", url: "/terms" },
     { name: "Privacy policy", url: "/privacy" },
   ],
-  services: [
-    { name: "Web Design", url: "/web-design" },
-    { name: "Web Development", url: "/web-development" },
-    { name: "Product Management", url: "/product-management" },
-    { name: "Marketing", url: "/marketing" },
-    { name: "Graphic Design", url: "/graphic-design" },
-  ],
 };
 
 const Footer = () => {
   return (
-    <footer id="footer" className="footer position-relative dark-background">
+    <footer
+      id="footer"
+      className="footer position-relative dark-background py-4"
+    >
       <div className="container footer-top">
         <div className="row gy-4">
-          <div className="col-lg-4 col-md-6">
-            <div className="footer-about">
-              <Link to="/" className="logo sitename">
+          {/* Contact Section - Adjusted to take 50% width on large screens */}
+          <div className="col-lg-6 col-md-12">
+            <div className="footer-about text-center text-lg-start">
+              <Link to="/" className="logo sitename fs-3 fw-bold">
                 {footerInfo.logo}
               </Link>
               <div className="footer-contact pt-3">
-                <p>{footerInfo.address}</p>
-                <p className="mt-3">
-                  <strong>Phone:</strong> <span>{footerInfo.phone}</span>
+                <p className="mb-1">{footerInfo.address}</p>
+                <p className="mb-1">
+                  <strong>Phone:</strong> {footerInfo.phone}
                 </p>
-                <p>
-                  <strong>Email:</strong> <span>{footerInfo.email}</span>
+                <p className="mb-3">
+                  <strong>Email:</strong> {footerInfo.email}
                 </p>
               </div>
-              <div className="social-links d-flex mt-4">
-                <Link to={footerInfo.socialLinks.twitter}>
+              <div className="social-links d-flex justify-content-center justify-content-lg-start mt-3">
+                <Link to={footerInfo.socialLinks.twitter} className="me-3">
                   <i className="bi bi-twitter-x"></i>
                 </Link>
-                <Link to={footerInfo.socialLinks.facebook}>
+                <Link to={footerInfo.socialLinks.facebook} className="me-3">
                   <i className="bi bi-facebook"></i>
                 </Link>
-                <Link to={footerInfo.socialLinks.instagram}>
+                <Link to={footerInfo.socialLinks.instagram} className="me-3">
                   <i className="bi bi-instagram"></i>
                 </Link>
                 <Link to={footerInfo.socialLinks.linkedin}>
@@ -63,47 +60,19 @@ const Footer = () => {
               </div>
             </div>
           </div>
-          <div className="col-lg-2 col-md-3 footer-links">
-            <h4>Useful Links</h4>
-            <ul>
+
+          {/* Useful Links Section - Adjusted to take 50% width on large screens */}
+          <div className="col-lg-6 col-md-12 footer-links">
+            <h4 className="text-center">Useful Links</h4>
+            <ul className="list-unstyled text-center text-lg-start">
               {footerInfo.usefulLinks.map((link, index) => (
-                <li key={index}>
-                  <Link to={link.url}>{link.name}</Link>
+                <li key={index} className="mb-2 justify-content-center">
+                  <Link to={link.url} className="text-decoration-none">
+                    {link.name}
+                  </Link>
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="col-lg-2 col-md-3 footer-links">
-            <h4>Our Services</h4>
-            <ul>
-              {footerInfo.services.map((service, index) => (
-                <li key={index}>
-                  <Link to={service.url}>{service.name}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="col-lg-4 col-md-12 footer-newsletter">
-            <h4>Our Newsletter</h4>
-            <p>
-              Subscribe to our newsletter and receive the latest news about our
-              products and services!
-            </p>
-            <form
-              action="forms/newsletter.php"
-              method="post"
-              className="php-email-form"
-            >
-              <div className="newsletter-form">
-                <input type="email" name="email" />
-                <input type="submit" value="Subscribe" />
-              </div>
-              <div className="loading">Loading</div>
-              <div className="error-message"></div>
-              <div className="sent-message">
-                Your subscription request has been sent. Thank you!
-              </div>
-            </form>
           </div>
         </div>
       </div>

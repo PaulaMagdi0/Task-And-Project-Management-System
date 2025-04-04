@@ -24,7 +24,7 @@ const contactInfo = {
 
 const Contact = () => {
   return (
-    <section id="contact" className="contact section">
+    <section className="contact section">
       <div className="container section-title" data-aos="fade-up">
         <span>Contact</span>
         <h2>Contact</h2>

@@ -1,8 +1,11 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import about from "/src/assets/img/about.jpg";
 
 const About = () => {
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
+
   const aboutData = {
     title: "About Us",
     subtitle: "Voluptatem dignissimos provident",
@@ -15,8 +18,13 @@ const About = () => {
     ],
   };
 
+  // ✅ Show only 2 items on homepage, else show all
+  const visibleItems = isHomePage
+    ? aboutData.listItems.slice(0, 2)
+    : aboutData.listItems;
+
   return (
-    <section id="about" className="about section">
+    <section className="about section">
       <div className="container section-title" data-aos="fade-up">
         <span>
           {aboutData.title}
@@ -45,17 +53,21 @@ const About = () => {
             <h3>{aboutData.subtitle}</h3>
             <p className="fst-italic">{aboutData.description}</p>
             <ul>
-              {aboutData.listItems.map((item, index) => (
+              {visibleItems.map((item, index) => (
                 <li key={index}>
                   <i className="bi bi-check-circle"></i>
                   <span>{item}</span>
                 </li>
               ))}
             </ul>
-            <Link to="/about" className="read-more">
-              <span>Read More</span>
-              <i className="bi bi-arrow-right"></i>
-            </Link>
+
+            {/* ✅ Show button only on homepage */}
+            {isHomePage && (
+              <Link to="/about" className="read-more">
+                <span>Read More</span>
+                <i className="bi bi-arrow-right"></i>
+              </Link>
+            )}
           </div>
         </div>
       </div>

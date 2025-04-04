@@ -29,7 +29,7 @@ const CallToAction = () => {
             <div className="text-center">
               <h3>{title}</h3>
               <p>{description}</p>
-              <Link to="#" className="cta-btn">
+              <Link to="/contact" className="cta-btn">
                 {" "}
                 {/* Change <a> to <Link> */}
                 {buttonText}

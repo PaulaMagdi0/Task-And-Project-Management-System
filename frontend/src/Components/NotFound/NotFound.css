@@ -1,0 +1,15 @@
+.text-color {
+    color: #444444;
+}
+
+.btn-default {
+    background-color: #444444;
+    color: white;
+}
+
+.btn-default:hover {
+    transform: scale(1.1);
+    transition: 0.3s ease-in-out;
+    background-color: #cc1616;
+    color: white;
+}

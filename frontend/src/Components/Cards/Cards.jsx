@@ -47,7 +47,7 @@ const cardData = [
 
 const Cards = () => {
   return (
-    <section id="cards" className="cards section">
+    <section className="cards section mb-5">
       <div className="container">
         <div className="row no-gutters">
           {cardData.map(({ id, number, title, description }, index) => (

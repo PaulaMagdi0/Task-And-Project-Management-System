@@ -1,33 +1,38 @@
-import React, { Fragment } from "react";
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Navbar from "./Components/Navbar/Navbar";
-import Hero from "./Components/Hero/Hero";
-import About from "./Components/About/About";
-import Cards from "./Components/Cards/Cards";
-import Clients from "./Components/Clients/Clients";
-import Services from "./Components/Services/Services";
-import CallToAction from "./Components/CallToAction/CallToAction";
-import Portfolio from "./Components/Portfolio/Portfolio";
-import Team from "./Components/Team/Team";
-import Contact from "./Components/Contact/Contact";
 import Footer from "./Components/Footer/Footer";
+import NotFound from "./Components/NotFound/NotFound";
+import Home from "./pages/Home/Home";
+import About from "./pages/About/About";
+import Services from "./pages/Services/Services";
+import Contact from "./pages/Contact/Contact";
+import TermsOfService from "./pages/TermsOfService/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
+import useCustomScripts from "./Hooks/useCustomScripts";
+import "./assets/css/main.css";
+import "aos/dist/aos.css";
+import "./App.css";
 
 const App = () => {
+  useCustomScripts();
   return (
-    <Fragment>
+    <BrowserRouter>
       <Navbar />
-      {/* <main className="main"> */}
-      <Hero />
-      <About />
-      <Cards />
-      <Clients />
-      <Services />
-      <CallToAction />
-      <Portfolio />
-      <Team />
-      <Contact />
-      {/* </main> */}
+      <main className="main">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/*" element={<NotFound />} />
+        </Routes>
+      </main>
       <Footer />
-    </Fragment>
+    </BrowserRouter>
   );
 };
 

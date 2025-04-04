@@ -1,5 +1,9 @@
 import React from "react";
-import { Link } from "react-router-dom"; // Import Link from react-router-dom
+import { Link } from "react-router-dom";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "swiper/css/autoplay";
+import { Autoplay } from "swiper/modules";
 
 // Import team images
 import team1Image from "../../assets/img/team/team-1.jpg";
@@ -13,13 +17,8 @@ const teamMembers = [
     role: "Web Development",
     description:
       "Magni qui quod omnis unde et eos fuga et exercitationem. Odio veritatis perspiciatis quaerat qui aut aut aut",
-    image: team1Image, // Use the imported image here
-    socialLinks: {
-      twitter: "#",
-      facebook: "#",
-      instagram: "#",
-      linkedin: "#",
-    },
+    image: team1Image,
+    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
   {
     id: "sarah-jhinson",
@@ -27,13 +26,8 @@ const teamMembers = [
     role: "Marketing",
     description:
       "Repellat fugiat adipisci nemo illum nesciunt voluptas repellendus. In architecto rerum rerum temporibus",
-    image: team2Image, // Use the imported image here
-    socialLinks: {
-      twitter: "#",
-      facebook: "#",
-      instagram: "#",
-      linkedin: "#",
-    },
+    image: team2Image,
+    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
   {
     id: "william-anderson",
@@ -41,13 +35,17 @@ const teamMembers = [
     role: "Content",
     description:
       "Voluptas necessitatibus occaecati quia. Earum totam consequuntur qui porro et laborum toro des clara",
-    image: team3Image, // Use the imported image here
-    socialLinks: {
-      twitter: "#",
-      facebook: "#",
-      instagram: "#",
-      linkedin: "#",
-    },
+    image: team3Image,
+    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
+  },
+  {
+    id: "william-anderson",
+    name: "William Anderson",
+    role: "Content",
+    description:
+      "Voluptas necessitatibus occaecati quia. Earum totam consequuntur qui porro et laborum toro des clara",
+    image: team3Image,
+    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
 ];
 
@@ -63,17 +61,25 @@ const Team = () => {
         </p>
       </div>
       <div className="container">
-        <div className="row">
+        <Swiper
+          modules={[Autoplay]}
+          spaceBetween={30}
+          slidesPerView={1}
+          breakpoints={{
+            768: { slidesPerView: 2 },
+            1024: { slidesPerView: 3 },
+          }}
+          autoplay={{
+            delay: 5000,
+            disableOnInteraction: false,
+          }}
+          loop={true}
+        >
           {teamMembers.map((member) => (
-            <div
-              key={member.id}
-              className="col-lg-4 col-md-6 d-flex"
-              data-aos="fade-up"
-              data-aos-delay="100"
-            >
-              <div className="member">
+            <SwiperSlide key={member.id}>
+              <div className="member" data-aos="fade-up" data-aos-delay="100">
                 <img
-                  src={member.image} // Dynamically set image
+                  src={member.image}
                   className="img-fluid"
                   alt={member.name}
                 />
@@ -82,27 +88,27 @@ const Team = () => {
                   <span>{member.role}</span>
                   <p>{member.description}</p>
                   <div className="social">
-                    <a href={member.socialLinks.twitter}>
+                    <Link to={member.socialLinks.twitter}>
                       <i className="bi bi-twitter-x"></i>
-                    </a>
-                    <a href={member.socialLinks.facebook}>
+                    </Link>
+                    <Link to={member.socialLinks.facebook}>
                       <i className="bi bi-facebook"></i>
-                    </a>
-                    <a href={member.socialLinks.instagram}>
+                    </Link>
+                    <Link to={member.socialLinks.instagram}>
                       <i className="bi bi-instagram"></i>
-                    </a>
-                    <a href={member.socialLinks.linkedin}>
+                    </Link>
+                    <Link to={member.socialLinks.linkedin}>
                       <i className="bi bi-linkedin"></i>
-                    </a>
+                    </Link>
                   </div>
                   <Link to={`/team/${member.id}`} className="details-link">
                     <i className="bi bi-link-45deg"></i> View Profile
                   </Link>
                 </div>
               </div>
-            </div>
+            </SwiperSlide>
           ))}
-        </div>
+        </Swiper>
       </div>
     </section>
   );
