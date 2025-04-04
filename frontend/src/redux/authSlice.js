@@ -23,12 +23,16 @@ export const loginUser = createAsyncThunk(
       
       // Decode the token to extract custom claims.
       const decoded = jwtDecode(token);
-      
+
+      // Add this log to check the decoded token
+     // console.log('Decoded JWT Token:', decoded);
+
       return {
         access: token,
         role: decoded.role,
         userType: decoded.userType,
         username: decoded.username || decoded.email || 'User',
+        user_id: decoded.user_id, // Ensure this is passed
       };
     } catch (error) {
       return thunkAPI.rejectWithValue({
@@ -45,6 +49,7 @@ const authSlice = createSlice({
     userType: null, // 'staff' or 'student'
     role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
     username: '',   // Logged-in user's username
+    user_id: null,   // Add default value for user_id
     loading: false,
     error: null,
   },
@@ -54,6 +59,7 @@ const authSlice = createSlice({
       state.userType = null;
       state.role = null;
       state.username = '';
+      state.user_id = null; // Reset user_id on logout
       localStorage.removeItem('authToken');
       localStorage.removeItem('userType');
       localStorage.removeItem('role');
@@ -71,6 +77,8 @@ const authSlice = createSlice({
         state.userType = action.payload.userType;
         state.role = action.payload.role || null;
         state.username = action.payload.username;
+        state.user_id = action.payload.user_id; // Set user_id here
+        //console.log('Redux state after login:', state); // Log the entire state
         localStorage.setItem('authToken', action.payload.access);
         localStorage.setItem('userType', action.payload.userType);
         if (action.payload.role) {
@@ -83,7 +91,6 @@ const authSlice = createSlice({
       });
   },
 });
-
 
 export const { logout } = authSlice.actions;
 export default authSlice.reducer;

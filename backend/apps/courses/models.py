@@ -9,11 +9,8 @@ class Course(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # One track can have many courses (many courses per track)
-    track = models.ForeignKey(
-        Track,
-        on_delete=models.CASCADE,
-        related_name='courses'  # This enables reverse tracking
-    )
+    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="course_set")
+
 
     # The instructor is a foreign key to StaffMember
     instructor = models.ForeignKey(

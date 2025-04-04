@@ -1,52 +1,56 @@
 from rest_framework import generics, permissions
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from .models import Grade
 from .serializers import GradeSerializer
-from django.utils import timezone
 
-class GradeListView(generics.ListCreateAPIView):
+class GradePagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class GradeListView(generics.ListAPIView):
     serializer_class = GradeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]  # Ensure user is authenticated
+    pagination_class = GradePagination
 
     def get_queryset(self):
-        """Filter grades based on user role with optimized queries"""
         user = self.request.user
-        
+        instructor_id = self.request.query_params.get('instructor', None)
+        queryset = Grade.objects.select_related('student', 'assignment', 'course')
+
+        # If the user is an admin or instructor
         if user.is_staff:
-            # Staff can see all grades with related objects prefetched
-            return Grade.objects.select_related(
-                'student', 'assignment', 'course'
-            ).all()
+            if instructor_id:
+                try:
+                    instructor_id = int(instructor_id)
+                    return queryset.filter(assignment__instructor__id=instructor_id)  # Filter by instructor
+                except (ValueError, TypeError):
+                    return queryset.none()  # Invalid instructor ID
+            return queryset  # Return all grades for staff/instructor
+
+        # If the user is a student, filter grades by their student profile
+        if hasattr(user, 'student'):
+            return queryset.filter(student=user.student)
         
-        # Students only see their own visible grades
-        return Grade.objects.filter(
-            student=user
-        ).select_related(
-            'assignment', 'course'
-        ).filter(
-            is_score_visible=True
-        )
+        return queryset.none()  # Return no grades for non-student, non-staff users
 
-    def perform_create(self, serializer):
-        """Secure grade creation with role-based permissions"""
-        user = self.request.user
-        data = serializer.validated_data
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
 
-        if not user.is_staff:
-            # Students can only create placeholder grades
-            if any(field in data for field in ['score', 'feedback', 'is_score_visible', 'is_feedback_visible']):
-                raise PermissionDenied(
-                    "Students cannot set grades, feedback, or visibility settings"
-                )
-            serializer.save(
-                student=user,
-                score=None,
-                feedback=None,
-                is_score_visible=False,
-                is_feedback_visible=False,
-                graded_date=None
-            )
-        else:
-            # Instructors can create full grade records
-            if 'graded_date' not in data:
-                serializer.save
+        # Handle pagination if page exists
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response({
+                "grades": serializer.data
+            })
+
+        # If no pagination, return all results
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "count": len(serializer.data),
+            "page": 1,
+            "page_size": len(serializer.data),
+            "grades": serializer.data
+        })

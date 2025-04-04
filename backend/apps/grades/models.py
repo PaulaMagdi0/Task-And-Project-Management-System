@@ -1,8 +1,8 @@
 from django.db import models
 from django.utils.timezone import now
 from apps.assignments.models import Assignment
-from apps.student.models import Student  
-from apps.courses.models import Course  
+from apps.student.models import Student
+from apps.courses.models import Course
 from django.utils import timezone
 
 # ✅ Ensure these functions are defined before the model
