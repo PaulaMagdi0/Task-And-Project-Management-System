@@ -6,6 +6,7 @@ import { createTrack, clearTrackState } from '../redux/tracksSlice';
 const AddTrack = () => {
   const dispatch = useDispatch();
   const { loading, error, message } = useSelector((state) => state.tracks);
+  const { branch } = useSelector((state) => state.auth); // Retrieve logged-in branch info
 
   const [form, setForm] = useState({
     name: '',
@@ -18,7 +19,12 @@ const AddTrack = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    dispatch(createTrack(form));
+    // Automatically include the branch id from the logged-in branch manager
+    const trackData = {
+      ...form,
+      branch: branch ? branch.id : null,
+    };
+    dispatch(createTrack(trackData));
   };
 
   useEffect(() => {
@@ -32,12 +38,27 @@ const AddTrack = () => {
       <h2>Add Track</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <input type="text" name="name" placeholder="Track Name" value={form.name} onChange={handleChange} required />
+          <input
+            type="text"
+            name="name"
+            placeholder="Track Name"
+            value={form.name}
+            onChange={handleChange}
+            required
+          />
         </div>
         <div>
-          <textarea name="description" placeholder="Track Description" value={form.description} onChange={handleChange} required />
+          <textarea
+            name="description"
+            placeholder="Track Description"
+            value={form.description}
+            onChange={handleChange}
+            required
+          />
         </div>
-        <button type="submit" disabled={loading}>Create Track</button>
+        <button type="submit" disabled={loading}>
+          Create Track
+        </button>
       </form>
       {loading && <p>Loading...</p>}
       {message && <p>{message}</p>}

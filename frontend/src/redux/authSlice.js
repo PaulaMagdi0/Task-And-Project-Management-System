@@ -6,22 +6,13 @@ export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async ({ email, password }, thunkAPI) => {
     try {
-      // Use the correct login endpoint
       const response = await apiClient.post('/auth/login/', { email: email.trim(), password });
-      // Now, the backend returns { "token": "JWT_TOKEN_STRING" }
       const { token } = response.data;
       if (!token) {
         throw new Error("No token returned from server");
       }
-      
-      // Dynamically import jwt-decode.
       const jwtDecodeModule = await import('jwt-decode');
       const jwtDecode = jwtDecodeModule.default || jwtDecodeModule.jwtDecode;
-      if (typeof jwtDecode !== 'function') {
-        throw new Error("jwtDecode is not a function");
-      }
-      
-      // Decode the token to extract custom claims.
       const decoded = jwtDecode(token);
       
       return {
@@ -29,6 +20,7 @@ export const loginUser = createAsyncThunk(
         role: decoded.role,
         userType: decoded.userType,
         username: decoded.username || decoded.email || 'User',
+        branch: decoded.branch || null,  // Save branch info from the token
       };
     } catch (error) {
       return thunkAPI.rejectWithValue({
@@ -42,9 +34,10 @@ const authSlice = createSlice({
   name: 'auth',
   initialState: {
     token: null,
-    userType: null, // 'staff' or 'student'
-    role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
-    username: '',   // Logged-in user's username
+    userType: null,
+    role: null,
+    username: '',
+    branch: null,   // <-- This will store branch info (e.g., { id: 1, name: "newcapital" })
     loading: false,
     error: null,
   },
@@ -54,9 +47,11 @@ const authSlice = createSlice({
       state.userType = null;
       state.role = null;
       state.username = '';
+      state.branch = null;
       localStorage.removeItem('authToken');
       localStorage.removeItem('userType');
       localStorage.removeItem('role');
+      localStorage.removeItem('branch');
     },
   },
   extraReducers: (builder) => {
@@ -69,12 +64,16 @@ const authSlice = createSlice({
         state.loading = false;
         state.token = action.payload.access;
         state.userType = action.payload.userType;
-        state.role = action.payload.role || null;
+        state.role = action.payload.role;
         state.username = action.payload.username;
+        state.branch = action.payload.branch; // <-- branch info stored here
         localStorage.setItem('authToken', action.payload.access);
         localStorage.setItem('userType', action.payload.userType);
         if (action.payload.role) {
           localStorage.setItem('role', action.payload.role);
+        }
+        if (action.payload.branch) {
+          localStorage.setItem('branch', JSON.stringify(action.payload.branch));
         }
       })
       .addCase(loginUser.rejected, (state, action) => {

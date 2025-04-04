@@ -1,3 +1,4 @@
+import secrets, string
 from django.db import transaction
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
@@ -5,6 +6,10 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from .models import StaffMember
 from apps.branch_location.models import Branch
+import openpyxl
+import logging
+
+logger = logging.getLogger(__name__)
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField(read_only=True)
@@ -40,12 +45,10 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def validate(self, data):
         role = data.get('role')
         branch = data.get('branch')
-        # Ensure branch is provided for branch managers and supervisors.
         if role in [StaffMember.Role.BRANCH_MANAGER, StaffMember.Role.SUPERVISOR] and not branch:
             raise serializers.ValidationError({
                 'branch': _('Branch managers and supervisors must be assigned to a branch.')
             })
-        # For branch managers, ensure the branch doesn't already have a different manager.
         if role == StaffMember.Role.BRANCH_MANAGER and branch:
             if branch.manager and (not self.instance or branch.manager != self.instance):
                 raise serializers.ValidationError({
@@ -57,7 +60,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         branch = validated_data.pop('branch', None)
-        # Create the staff member with branch already assigned.
+        validated_data.pop('role', None)  # Remove duplicate role if exists
         staff_member = StaffMember(branch=branch, **validated_data)
         try:
             validate_password(password, staff_member)
@@ -83,7 +86,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
             instance.branch = branch
         instance.save()
         return instance
-    
+
 class StaffMemberListSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField()
 
@@ -95,7 +98,6 @@ class StaffMemberListSerializer(serializers.ModelSerializer):
         ]
 
     def get_branch(self, obj):
-        """Safe method to get branch information"""
         if obj.branch is None:
             return None
         return obj.branch.name
@@ -107,7 +109,7 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
         write_only=True,
         required=True
     )
-    
+
     class Meta:
         model = StaffMember
         fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id']
@@ -127,26 +129,21 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         branch = validated_data.pop('branch')
-        
+        validated_data.pop('role', None)  # Remove any role in validated_data
         if not password:
             password = ''.join(
                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
                 for _ in range(12)
             )
-            
         supervisor = StaffMember(
             **validated_data,
             role=StaffMember.Role.SUPERVISOR
         )
-        
         try:
             validate_password(password, supervisor)
             supervisor.set_password(password)
             supervisor.branch = branch
             supervisor.save()
-            
-            # Note: We don't update branch.manager since this is a supervisor
-            
             return supervisor
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
@@ -158,7 +155,7 @@ class CreateBranchManagerSerializer(serializers.ModelSerializer):
         write_only=True,
         required=True
     )
-    
+
     class Meta:
         model = StaffMember
         fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id']
@@ -172,41 +169,34 @@ class CreateBranchManagerSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'email': _('A user with this email already exists.')
             })
-            
         branch = data.get('branch')
         if branch and branch.manager is not None:
             raise serializers.ValidationError({
                 'branch_id': _('This branch already has a manager assigned.')
             })
-            
         return data
-        
+
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         branch = validated_data.pop('branch')
-        
+        validated_data.pop('role', None)  # Remove duplicate role
         if not password:
             password = ''.join(
                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
                 for _ in range(12)
             )
-            
         manager = StaffMember(
             **validated_data,
             role=StaffMember.Role.BRANCH_MANAGER
         )
-        
         try:
             validate_password(password, manager)
             manager.set_password(password)
             manager.branch = branch
             manager.save()
-            
-            # Update the branch with the new manager
             branch.manager = manager
             branch.save()
-            
             return manager
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
@@ -226,36 +216,28 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
     def create(self, validated_data):
         excel_file = validated_data['excel_file']
         branch = validated_data['branch_id']
-        
         try:
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
         except Exception as e:
             logger.error(f"Failed to open Excel file: {e}")
             raise serializers.ValidationError(_('Failed to process the Excel file. Please check the format.'))
-
         supervisors = []
         errors = []
         existing_emails = set(StaffMember.objects.values_list('email', flat=True))
-
         for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
                 if len(row) < 4:
                     raise ValueError(_('Incomplete row data'))
-                    
                 first_name, last_name, email, phone = row[:4]
-                
                 if not all([first_name, last_name, email]):
                     raise ValueError(_('Missing required fields'))
-                
                 if email in existing_emails:
                     raise ValueError(_('Email already exists'))
-                
                 password = ''.join(
                     secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
                     for _ in range(12)
                 )
-                
                 supervisor = StaffMember(
                     username=email.split('@')[0],
                     first_name=first_name,
@@ -265,12 +247,10 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
                     role=StaffMember.Role.SUPERVISOR,
                     branch=branch
                 )
-                
                 validate_password(password, supervisor)
                 supervisor.set_password(password)
                 supervisors.append(supervisor)
                 existing_emails.add(email)
-                
             except Exception as e:
                 errors.append({
                     'row': row_num,
@@ -278,13 +258,11 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
                     'data': row
                 })
                 continue
-
         if errors and not supervisors:
             raise serializers.ValidationError({
                 'errors': errors,
                 'message': _('No supervisors were created due to errors in the Excel file.')
             })
-
         try:
             created_supervisors = StaffMember.objects.bulk_create(supervisors)
             result = {

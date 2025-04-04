@@ -6,11 +6,11 @@ import { createSupervisor, clearSupervisorState } from '../redux/supervisorsSlic
 const AddSupervisor = () => {
   const dispatch = useDispatch();
   const { loading, error, message } = useSelector((state) => state.supervisors);
+  const { branch } = useSelector((state) => state.auth); // Get branch info from auth slice
 
   const [form, setForm] = useState({
     username: '',
     email: '',
-    password: '',
     phone: '',
   });
 
@@ -20,7 +20,17 @@ const AddSupervisor = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    dispatch(createSupervisor(form));
+    if (!branch || !branch.id) {
+      alert("No branch information available. Please log in again.");
+      return;
+    }
+    // Remove the "role" field since the view will set it automatically.
+    const supervisorData = {
+      ...form,
+      branch_id: branch.id,
+      password: "password1345", // Default password
+    };
+    dispatch(createSupervisor(supervisorData));
   };
 
   useEffect(() => {
@@ -29,27 +39,51 @@ const AddSupervisor = () => {
     };
   }, [dispatch]);
 
+  // Helper to safely render errors/messages
+  const renderValue = (value) =>
+    typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+
   return (
     <div>
       <h2>Add Supervisor</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <input type="text" name="username" placeholder="Username" value={form.username} onChange={handleChange} required />
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            value={form.username}
+            onChange={handleChange}
+            required
+          />
         </div>
         <div>
-          <input type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange} required />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            required
+          />
         </div>
         <div>
-          <input type="password" name="password" placeholder="Password" value={form.password} onChange={handleChange} required />
+          <p>Default password: <strong>password1345</strong></p>
         </div>
         <div>
-          <input type="text" name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
+          <input
+            type="text"
+            name="phone"
+            placeholder="Phone"
+            value={form.phone}
+            onChange={handleChange}
+          />
         </div>
         <button type="submit" disabled={loading}>Create Supervisor</button>
       </form>
       {loading && <p>Loading...</p>}
-      {message && <p>{message}</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {message && <p>{renderValue(message)}</p>}
+      {error && <p style={{ color: 'red' }}>{renderValue(error)}</p>}
     </div>
   );
 };

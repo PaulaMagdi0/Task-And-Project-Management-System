@@ -1,3 +1,4 @@
+// File: src/components/TracksTable.jsx
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/api';
 
@@ -48,7 +49,7 @@ const TracksTable = () => {
   // Toggle edit mode for a track row
   const toggleEditMode = (track) => {
     setEditingTrackId(track.id);
-    setNewSupervisorId(track.supervisor_id || '');
+    setNewSupervisorId(track.supervisor || '');
   };
 
   // Cancel edit mode
@@ -81,6 +82,12 @@ const TracksTable = () => {
       console.error("Error deleting track:", err);
       setMsg("Error deleting track.");
     }
+  };
+
+  // Helper: Given a supervisor id, find and return its username.
+  const getSupervisorName = (supervisorId) => {
+    const supervisor = supervisors.find((s) => s.id === supervisorId);
+    return supervisor ? supervisor.username : supervisorId;
   };
 
   return (
@@ -127,7 +134,7 @@ const TracksTable = () => {
                     </>
                   ) : (
                     <>
-                      {track.supervisor || 'None'}
+                      {track.supervisor ? getSupervisorName(track.supervisor) : 'None'}
                       <button onClick={() => toggleEditMode(track)} style={{ marginLeft: '8px' }}>
                         {track.supervisor ? 'Change' : 'Assign'}
                       </button>

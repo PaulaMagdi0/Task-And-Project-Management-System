@@ -1,8 +1,8 @@
+// File: src/components/BranchManagerDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import AddTrack from '../components/AddTrack';
 import AddSupervisor from '../components/AddSupervisor';
-import BulkUploadSupervisors from '../components/BulkUploadSupervisors';
 import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
 import TracksTable from '../components/TracksTable';
 import DeleteSupervisor from '../components/DeleteSupervisor';
@@ -14,8 +14,6 @@ const BranchManagerDashboard = () => {
   
   // Options: "addTrack", "addSupervisors", "deleteSupervisor", "assignSupervisor", "viewTracks"
   const [selectedOption, setSelectedOption] = useState('addTrack');
-  // For "addSupervisors" sub-options: "manual" or "bulk"
-  const [supervisorOption, setSupervisorOption] = useState('manual');
   // Sidebar state (closed by default)
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -43,7 +41,7 @@ const BranchManagerDashboard = () => {
               className={`sidebar-button ${selectedOption === 'addSupervisors' ? 'active' : ''}`}
               onClick={() => setSelectedOption('addSupervisors')}
             >
-              Add Supervisors
+              Add Supervisor
             </button>
             <button 
               className={`sidebar-button ${selectedOption === 'deleteSupervisor' ? 'active' : ''}`}
@@ -78,22 +76,8 @@ const BranchManagerDashboard = () => {
 
         {selectedOption === 'addSupervisors' && (
           <div>
-            <h1>Add Supervisors</h1>
-            <div className="subnav">
-              <button 
-                className={`subnav-button ${supervisorOption === 'manual' ? 'active' : ''}`}
-                onClick={() => setSupervisorOption('manual')}
-              >
-                Add Single Supervisor
-              </button>
-              <button 
-                className={`subnav-button ${supervisorOption === 'bulk' ? 'active' : ''}`}
-                onClick={() => setSupervisorOption('bulk')}
-              >
-                Upload Excel
-              </button>
-            </div>
-            {supervisorOption === 'manual' ? <AddSupervisor /> : <BulkUploadSupervisors />}
+            <h1>Add Supervisor</h1>
+            <AddSupervisor />
           </div>
         )}
 
