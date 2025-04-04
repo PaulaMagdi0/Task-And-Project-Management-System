@@ -3,14 +3,8 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
-import secrets
-import string
-import logging
-import openpyxl
 from .models import StaffMember
 from apps.branch_location.models import Branch
-
-logger = logging.getLogger(__name__)
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField(read_only=True)
@@ -63,18 +57,14 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         branch = validated_data.pop('branch', None)
-        staff_member = StaffMember(**validated_data)
+        # Create the staff member with branch already assigned.
+        staff_member = StaffMember(branch=branch, **validated_data)
         try:
             validate_password(password, staff_member)
             staff_member.set_password(password)
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
-        # Save the staff member; the model's save() will run full_clean().
         staff_member.save()
-        # If a branch is provided, assign it and save again.
-        if branch:
-            staff_member.branch = branch
-            staff_member.save()
         return staff_member
 
     @transaction.atomic
@@ -93,7 +83,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
             instance.branch = branch
         instance.save()
         return instance
-        
+    
 class StaffMemberListSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField()
 

@@ -24,7 +24,8 @@ class StaffMemberListCreateView(generics.ListCreateAPIView):
 class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer  # Change to StaffMemberSerializer for detail view
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -41,7 +42,8 @@ class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
 class CreateSupervisorView(generics.CreateAPIView):
     queryset = StaffMember.objects.filter(role="supervisor")
     serializer_class = CreateSupervisorSerializer
-    permission_classes = [IsAdminOrBranchManager]
+    # permission_classes = [IsAdminOrBranchManager]
+    permission_classes = []
 
     def perform_create(self, serializer):
         instance = serializer.save(role=StaffMember.Role.SUPERVISOR)
