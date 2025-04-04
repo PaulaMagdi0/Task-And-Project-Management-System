@@ -17,7 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "channels",  # WebSockets support
+    "channels",
     "apps.accounts",
     "apps.tracks",
     "apps.courses",
@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.staff_members",
     "apps.student",
     "apps.chat",
+    "apps.contact",
 ]
 
 MIDDLEWARE = [

@@ -1,3 +1,4 @@
+# project/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
@@ -13,4 +14,5 @@ urlpatterns = [
     path("api/staff/", include("apps.staff_members.urls")),
     path("api/student/", include("apps.student.urls")),
     path("api/chat/", include("apps.chat.urls")),
+    path("api/contact/", include("apps.contact.urls")),
 ]
