@@ -1,8 +1,11 @@
 # students/models.py
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 import random
 import string
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.db import models
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 def get_default_track():
     """Returns the first available Track instance as default (if any)."""
@@ -35,7 +38,8 @@ class Student(AbstractBaseUser, PermissionsMixin):
     # Permissions
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-
+    date_joined = models.DateTimeField(default=timezone.now)
+    
     # Authentication Fields
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']

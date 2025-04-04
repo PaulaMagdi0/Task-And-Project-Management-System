@@ -10,8 +10,13 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+<<<<<<< HEAD
         ("assignments", "0002_initial"),
         ("courses", "0002_initial"),
+=======
+        ("assignments", "0004_assignment_file_url"),
+        ("courses", "0003_remove_course_tracks"),
+>>>>>>> aff42fa9b2daa7bf3e146b491b793ad52c0ae009
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

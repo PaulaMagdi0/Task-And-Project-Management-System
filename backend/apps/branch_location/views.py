@@ -1,44 +1,40 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from .models import Branch  # Ensure the model name is correct
-from .serializers import BranchSerializer  # Ensure this serializer is defined correctly
-from apps.staff_members.permissions import IsAdminOrBranchManager
-from apps.staff_members.serializers import StaffMemberListSerializer
 from django.db.models import Count
+from .models import Branch
+from .serializers import BranchSerializer
+from apps.staff_members.serializers import StaffMemberListSerializer
+from apps.staff_members.models import StaffMember
 
 class BranchLocationViewSet(viewsets.ModelViewSet):
     serializer_class = BranchSerializer
-    # permission_classes = [IsAuthenticated, IsAdminOrBranchManager]
-    permission_classes = []  # Disable all permissions temporarily
+    permission_classes = []  # Allow unauthenticated access
     filterset_fields = ['is_active', 'country', 'city']
     search_fields = ['name', 'code', 'manager__email']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
-    def get_queryset(self):
-        """Filter branches based on user role"""
-        queryset = Branch.objects.annotate(
-            staff_count=Count('staff_members')
-        )
 
+    def get_queryset(self):
+        """Filter branches based on user role if authenticated"""
+        queryset = Branch.objects.annotate(staff_count=Count('staff_members'))
         user = self.request.user
 
-        if hasattr(user, 'is_admin') and user.is_admin:
-            return queryset  # Admins can see all branches
-        elif hasattr(user, 'is_branch_manager') and user.is_branch_manager:
-            # Branch managers can only access their managed branch
-            return queryset.filter(manager=user)
+        if user.is_authenticated:
+            if getattr(user, 'is_admin', False):  # Safe check for admin role
+                return queryset  
+            elif getattr(user, 'is_branch_manager', False):  # Safe check for branch managers
+                return queryset.filter(manager=user)
 
-        return queryset.none()  # If user has no relevant permissions, return no branches    
-
+        return queryset.all()
 
     def perform_create(self, serializer):
-        """Set manager if creating as branch manager"""
-        if self.request.user.is_branch_manager:
-            serializer.save(manager=self.request.user)
-        else:
-            serializer.save()
+        """Assign a manager if the provided staff member has the 'branch_manager' role"""
+        instance = serializer.save()
+
+        if instance.manager and instance.manager.role == StaffMember.Role.BRANCH_MANAGER:
+            instance.manager.branch = instance
+            instance.manager.save()
 
     @action(detail=True, methods=['get'])
     def staff(self, request, pk=None):
