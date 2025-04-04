@@ -32,6 +32,7 @@ __pycache__/
 *.pyo
 venv/
 env/
+myenv/
 *.egg-info/
 db.sqlite3
 media/

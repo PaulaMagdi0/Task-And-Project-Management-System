@@ -59,8 +59,10 @@ class BranchSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
 
         if request and request.method in ['POST', 'PUT', 'PATCH']:
-            if 'manager' in data and data['manager']:
-                if data['manager'].role != 'branch_manager':
+            manager = data.get('manager')
+
+            if manager and hasattr(manager, 'role'):  # Ensure manager is not None
+                if manager.role != 'branch_manager':
                     raise serializers.ValidationError({'manager': _('Only branch managers can be assigned.')})
 
             if request.method == 'POST':
@@ -70,7 +72,7 @@ class BranchSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({field: _('This field is required.') for field in missing_fields})
 
         return data
-
+    
     def create(self, validated_data):
         """Handle branch creation"""
         manager = validated_data.pop('manager', None)
