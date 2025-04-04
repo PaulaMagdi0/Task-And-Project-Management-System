@@ -60,13 +60,12 @@ JWT_AUTH = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # 'rest_framework.authentication.SessionAuthentication',  # Comment this out
-        # 'rest_framework.authentication.BasicAuthentication',  # Or comment this out as well
+        'rest_framework.authentication.TokenAuthentication',  # Token Auth
+        'rest_framework.authentication.SessionAuthentication',  # Session Auth (optional)
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Allow unauthenticated access
+        'rest_framework.permissions.IsAuthenticated',
     ],
-    # Other settings...
 }
 # REST_FRAMEWORK = {
 #     'DEFAULT_AUTHENTICATION_CLASSES': [

@@ -9,6 +9,7 @@ import string
 from django.core.exceptions import ValidationError
 import logging
 from django.db import transaction
+from django.core.validators import validate_email
 
 logger = logging.getLogger(__name__)
 
@@ -34,45 +35,71 @@ class ExcelUploadSerializer(serializers.Serializer):
         """Process the Excel file and create student accounts."""
         try:
             return self._process_excel_file()
+        except ValidationError as e:
+            raise
         except Exception as e:
             logger.exception("Error processing Excel file")
-            raise ValidationError(f"Error processing Excel file: {str(e)}")
+            error_msg = f"Error processing Excel file: {str(e)}"
+            if hasattr(e, 'sheet'):
+                error_msg += f" (Sheet: {e.sheet})"
+            if hasattr(e, 'row'):
+                error_msg += f" (Row: {e.row})"
+            raise ValidationError(error_msg)
 
     def _process_excel_file(self):
-        """Internal method to process the Excel file."""
+        """Process the Excel file and create student accounts."""
         excel_file = self.validated_data['excel_file']
         track = self.validated_data.get('track')
 
         try:
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
+            
+            # Validate header row
+            header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+            required_columns = ['First Name', 'Last Name', 'Email', 'Role']
+            if not all(col in header_row for col in required_columns):
+                raise ValidationError(
+                    f"Excel file missing required columns. Found: {header_row}, Required: {required_columns}"
+                )
+                
         except Exception as e:
+            e.sheet = getattr(sheet, 'title', 'Unknown')
             logger.error(f"Failed to open Excel file: {str(e)}")
-            raise ValidationError("Invalid Excel file format")
+            raise ValidationError("Invalid Excel file format or structure")
 
         students_to_create = []
         existing_emails = set(Student.objects.values_list('email', flat=True))
         created_students = []
+        email_password_map = {}
+        errors = []
 
         for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
                 if len(row) < 4:
-                    logger.warning(f"Row {row_num}: Insufficient data")
+                    errors.append(f"Row {row_num}: Insufficient data (expected 4 columns, got {len(row)})")
                     continue
 
                 first_name, last_name, email, role = row[:4]
                 email = (email or "").strip().lower()
 
-                if not all([first_name, last_name, email]):
-                    logger.warning(f"Row {row_num}: Missing required fields")
+                # Validate required fields
+                if not first_name:
+                    errors.append(f"Row {row_num}: Missing first name")
+                    continue
+                if not last_name:
+                    errors.append(f"Row {row_num}: Missing last name")
+                    continue
+                if not email:
+                    errors.append(f"Row {row_num}: Missing email")
                     continue
 
                 if not self._validate_email(email):
-                    logger.warning(f"Row {row_num}: Invalid email format")
+                    errors.append(f"Row {row_num}: Invalid email format '{email}'")
                     continue
 
                 if email in existing_emails:
-                    logger.warning(f"Row {row_num}: Email already exists")
+                    errors.append(f"Row {row_num}: Email '{email}' already exists")
                     continue
 
                 password = self._generate_password()
@@ -80,36 +107,48 @@ class ExcelUploadSerializer(serializers.Serializer):
 
                 student = Student(
                     username=self._generate_username(email),
-                    first_name=first_name.strip(),
-                    last_name=last_name.strip(),
+                    first_name=str(first_name).strip(),
+                    last_name=str(last_name).strip(),
                     email=email,
-                    role=(role or 'student').strip().lower(),
+                    role=(str(role) if role else 'student').strip().lower(),
                     track=track,
                     verification_code=verification_code,
-                    verified=False,
-                    raw_password=password  # Temporary storage for email
+                    verified=False
                 )
                 student.set_password(password)
                 students_to_create.append(student)
                 existing_emails.add(email)
+                email_password_map[email] = password
 
             except Exception as e:
+                errors.append(f"Row {row_num}: Error processing - {str(e)}")
                 logger.error(f"Row {row_num}: Error processing - {str(e)}")
                 continue
 
-        with transaction.atomic():
-            created_students = Student.objects.bulk_create(students_to_create)
-            self._send_verification_emails(created_students)
+        if errors and not students_to_create:
+            raise ValidationError({
+                'detail': 'All rows failed validation',
+                'errors': errors
+            })
+
+        try:
+            with transaction.atomic():
+                created_students = Student.objects.bulk_create(students_to_create)
+                self._send_verification_emails(created_students, email_password_map)
+        except Exception as e:
+            logger.error(f"Database error during bulk create: {str(e)}")
+            raise ValidationError(f"Failed to create student records: {str(e)}")
 
         return {
-            "status": "success",
+            "status": "partial_success" if errors else "success",
             "created_count": len(created_students),
-            "students": StudentSerializer(created_students, many=True).data
+            "error_count": len(errors),
+            "students": StudentSerializer(created_students, many=True).data,
+            "errors": errors if errors else None
         }
 
     def _validate_email(self, email):
         """Validate email format."""
-        from django.core.validators import validate_email
         try:
             validate_email(email)
             return True
@@ -129,40 +168,38 @@ class ExcelUploadSerializer(serializers.Serializer):
         """Generate username from email."""
         return email.split('@')[0]
 
-    def _send_verification_emails(self, students):
+    def _send_verification_emails(self, students, email_password_map):
         """Send verification emails to created students."""
         for student in students:
             try:
-                self._send_single_verification_email(student)
+                password = email_password_map.get(student.email)
+                if password:
+                    verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
+                    
+                    subject = "Your Student Account Details"
+                    message = f"""
+                    Hello {student.first_name},
+                    
+                    Your student account has been created:
+                    Email: {student.email}
+                    Temporary Password: {password}
+                    
+                    Please verify your email by visiting:
+                    {verification_url}
+                    
+                    After verification, you can login and change your password.
+                    """
+                    
+                    send_mail(
+                        subject,
+                        message.strip(),
+                        settings.DEFAULT_FROM_EMAIL,
+                        [student.email],
+                        fail_silently=False
+                    )
+                    logger.info(f"Verification email sent to {student.email}")
             except Exception as e:
                 logger.error(f"Failed to send email to {student.email}: {str(e)}")
-
-    def _send_single_verification_email(self, student):
-        """Send verification email to a single student."""
-        verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
-        
-        subject = "Your Student Account Details"
-        message = f"""
-        Hello {student.first_name},
-        
-        Your student account has been created:
-        Email: {student.email}
-        Temporary Password: {student.raw_password}
-        
-        Please verify your email by visiting:
-        {verification_url}
-        
-        After verification, you can login and change your password.
-        """
-        
-        send_mail(
-            subject,
-            message.strip(),
-            settings.DEFAULT_FROM_EMAIL,
-            [student.email],
-            fail_silently=False
-        )
-        logger.info(f"Verification email sent to {student.email}")
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -212,12 +249,13 @@ class StudentSerializer(serializers.ModelSerializer):
         if password:
             student.set_password(password)
         else:
-            student.set_password(self._generate_temp_password())
+            temp_password = self._generate_temp_password()
+            student.set_password(temp_password)
 
         student.verification_code = self._generate_verification_code()
         student.save()
 
-        self._send_verification_email(student, password)
+        self._send_verification_email(student, password or temp_password)
         return student
 
     def update(self, instance, validated_data):
