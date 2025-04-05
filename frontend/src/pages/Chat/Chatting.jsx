@@ -39,12 +39,12 @@ const Chatting = ({ users: initialUsers }) => {
   }, []);
 
   // Debounced resize handler for better performance
-  const handleResize = useCallback(
-    debounce(() => {
+  const handleResize = useCallback(() => {
+    const debouncedResize = debounce(() => {
       setIsMobile(window.innerWidth <= 768); // Adjust breakpoint as needed
-    }, 200),
-    []
-  );
+    }, 200);
+    debouncedResize();
+  }, []);
 
   useEffect(() => {
     window.addEventListener("resize", handleResize);
