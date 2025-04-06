@@ -4,6 +4,8 @@ import openpyxl
 from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework.exceptions import ValidationError
+from apps.assignments.models import Assignment
+from apps.courses.models import Course
 import secrets
 import string
 import re
@@ -193,3 +195,22 @@ Please verify your email by visiting:
             # Don't fail the whole operation if email fails
 
         return student
+
+class DashboardSerializer(serializers.ModelSerializer):
+    upcoming_assignments = serializers.SerializerMethodField()
+    courses = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Student
+        fields = ['stats']
+    
+    def get_upcoming_assignments(self, obj):
+        return AssignmentSubmission.objects.filter(
+            student=obj,
+            status='pending'
+        ).values('assignment__title', 'due_date')[:5]
+    
+    def get_courses(self, obj):
+        return Enrollment.objects.filter(
+            student=obj
+        ).select_related('course')

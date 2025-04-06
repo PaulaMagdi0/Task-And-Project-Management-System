@@ -1,7 +1,9 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .serializers import ExcelUploadSerializer, StudentSerializer
+from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics
 from .models import Student
 from django.conf import settings
 from django.core.mail import send_mail
@@ -105,3 +107,11 @@ def verify_email(request, verification_code):
             {'error': 'Invalid verification code or link has expired'},
             status=status.HTTP_400_BAD_REQUEST
         )
+        
+class StudentDashboardAPI(generics.RetrieveAPIView):
+    serializer_class = DashboardSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_object(self):
+        # Returns the logged-in student's profile
+        return self.request.user.student_profile

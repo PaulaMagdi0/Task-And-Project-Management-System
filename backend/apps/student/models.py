@@ -24,7 +24,18 @@ class Student(AbstractBaseUser, PermissionsMixin):
         null=True,
         blank=True,
         default=get_default_track
+        
     )
+    #     track = models.ForeignKey(
+    #     'tracks.Track',  # String reference to avoid direct import
+    #     related_name='students',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     default=get_default_track,
+    #     verbose_name='Assigned Track'
+    # )
+
 
 
     # Email Verification Fields
