@@ -3,6 +3,7 @@ from .models import Student
 import openpyxl
 from django.core.mail import send_mail
 from django.conf import settings
+from rest_framework.exceptions import ValidationError
 import secrets
 import string
 import re

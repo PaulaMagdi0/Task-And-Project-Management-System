@@ -49,7 +49,7 @@ class Student(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
     class Meta:
-        db_table = 'students'
+        db_table = 'student_account'
 
     def __str__(self):
         """Returns the student's name and their assigned track."""
