@@ -1,34 +1,48 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Assignment
-from .serializers import AssignmentSerializer
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 import logging
 import os
 
+from .models import Assignment
+from .serializers import AssignmentSerializer
+from apps.student.models import Student  # Make sure this import is at the top
+
 logger = logging.getLogger(__name__)
+
 
 class AssignmentListView(generics.ListCreateAPIView):
     """
     GET: List all assignments
-    POST: Create new assignment with optional file upload (saved locally)
+    POST: Create new assignment with optional file upload (saved locally) or Google Drive URL
     """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    # permission_classes = [IsAuthenticated]
-    permission_classes = []
+    permission_classes = []  # Adjust as per your requirement
 
     def perform_create(self, serializer):
         file = self.request.FILES.get('file')
+        file_url = self.request.data.get('file_url')
+        assigned_to_id = self.request.data.get('assigned_to')  # Get the student ID
+
         try:
+            assigned_to_instance = None
+            if assigned_to_id:
+                assigned_to_instance = Student.objects.get(id=assigned_to_id)
+
             if file:
                 file_path = self.save_file_locally(file)
                 logger.info(f"File saved locally: {file_path}")
-                serializer.save(file_url=file_path)
+                serializer.save(file_url=file_path, assigned_to=assigned_to_instance)
+            elif file_url:
+                serializer.save(file_url=file_url, assigned_to=assigned_to_instance)
             else:
-                serializer.save()
+                serializer.save(assigned_to=assigned_to_instance)
+
+        except Student.DoesNotExist:
+            raise ValidationError(f"No student found with ID {assigned_to_id}")
         except Exception as e:
             logger.error(f"Error saving file: {str(e)}")
             raise ValidationError(f"File upload failed: {str(e)}")
@@ -55,7 +69,7 @@ class AssignmentListView(generics.ListCreateAPIView):
         uploads_dir = "uploads"
         os.makedirs(uploads_dir, exist_ok=True)  # Ensure the directory exists
         file_path = os.path.join(uploads_dir, file.name)
-        
+
         with open(file_path, "wb") as f:
             for chunk in file.chunks():
                 f.write(chunk)
@@ -72,36 +86,11 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    # permission_classes = [IsAuthenticated]
-    permission_classes = []
-
+    permission_classes = []  # Adjust as per your requirement
     lookup_field = 'pk'
 
     def get_object(self):
         return get_object_or_404(Assignment, pk=self.kwargs['pk'])
-
-    def perform_update(self, serializer):
-        file = self.request.FILES.get('file')
-        assignment = self.get_object()
-        old_file_path = assignment.file_url
-
-        try:
-            if file:
-                # Save new file locally
-                new_file_path = self.save_file_locally(file)
-                logger.info(f"Saved new file locally: {new_file_path}")
-                
-                # Delete old file if it exists
-                if old_file_path and os.path.exists(old_file_path):
-                    os.remove(old_file_path)
-                    logger.info(f"Deleted old file: {old_file_path}")
-                
-                serializer.save(file_url=new_file_path)
-            else:
-                serializer.save()
-        except Exception as e:
-            logger.error(f"Error during file update: {str(e)}")
-            raise ValidationError(f"File update failed: {str(e)}")
 
     def update(self, request, *args, **kwargs):
         try:
@@ -126,7 +115,7 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             if instance.file_url and os.path.exists(instance.file_url):
                 os.remove(instance.file_url)
                 logger.info(f"Deleted file: {instance.file_url}")
-            
+
             instance.delete()
             logger.info(f"Assignment {instance.id} deleted successfully")
         except Exception as e:

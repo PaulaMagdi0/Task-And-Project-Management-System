@@ -1,11 +1,10 @@
-# apps/assignments/admin.py
 from django.contrib import admin
 from .models import Assignment  # Import the Assignment model
 
 class AssignmentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'course', 'assignment_type', 'due_date', 'end_date', 'created_at')  # Fields to display
-    search_fields = ('title', 'course__name', 'assignment_type')  # Search by title, course name, and type
-    list_filter = ('assignment_type', 'course')  # Filter by assignment type and course
+    list_display = ('title', 'course', 'assignment_type', 'assigned_to', 'due_date', 'end_date', 'created_at')  # Fields to display, added 'assigned_to'
+    search_fields = ('title', 'course__name', 'assignment_type', 'assigned_to__full_name')  # Search by title, course name, type, and assigned student's full name
+    list_filter = ('assignment_type', 'course', 'assigned_to')  # Filter by assignment type, course, and assigned student
     ordering = ('-created_at',)  # Order by creation date in descending order
     
     # Read-only fields to display additional information (e.g., file URL)

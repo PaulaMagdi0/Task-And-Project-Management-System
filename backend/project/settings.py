@@ -43,7 +43,7 @@ JWT_AUTH = {
     'ACCESS_TOKEN_COOKIE': 'access_token',
     'REFRESH_TOKEN_COOKIE': 'refresh_token',
     'COOKIE_PATH': '/',
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,

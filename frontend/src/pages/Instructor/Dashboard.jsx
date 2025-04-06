@@ -4,6 +4,7 @@ import Courses from './Courses';
 import Assignments from './Assignments';
 import Submissions from './Submissions';
 import Grades from './Grades'; // Import the Grades component
+import CreateAssignment from './CreateAssignment'; // Import CreateAssignment component
 import './InstructorDashboard.css';
 
 const InstructorDashboard = () => {
@@ -39,6 +40,12 @@ const InstructorDashboard = () => {
               Assignments
             </button>
             <button
+              className={`sidebar-button ${selectedOption === 'create-assignment' ? 'active' : ''}`}
+              onClick={() => setSelectedOption('create-assignment')}
+            >
+              Create Assignment
+            </button>
+            <button
               className={`sidebar-button ${selectedOption === 'submissions' ? 'active' : ''}`}
               onClick={() => setSelectedOption('submissions')}
             >
@@ -58,21 +65,28 @@ const InstructorDashboard = () => {
       <div className="main-content">
         {selectedOption === 'courses' && (
           <>
-            <h1>Instructor Dashboard</h1>
+            <h1>You Assigend To</h1>
             <Courses />
           </>
         )}
 
         {selectedOption === 'assignments' && (
           <>
-            <h1>Assignments</h1>
+            <h1>Your Created Assignments</h1>
             <Assignments />
+          </>
+        )}
+
+        {selectedOption === 'create-assignment' && (
+          <>
+            <h1>Create Assignment</h1>
+            <CreateAssignment />
           </>
         )}
 
         {selectedOption === 'submissions' && (
           <>
-            <h1>Submissions</h1>
+            <h1>Submissions from students</h1>
             <Submissions />
           </>
         )}

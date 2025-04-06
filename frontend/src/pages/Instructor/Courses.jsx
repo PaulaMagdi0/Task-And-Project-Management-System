@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../../services/api';
 import { useSelector } from 'react-redux';
+import './Courses.css'; // Import the CSS file
 
 const Courses = () => {
   const [courses, setCourses] = useState([]);
@@ -40,14 +41,22 @@ const Courses = () => {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">Courses</h2>
       {courses.length > 0 ? (
-        <ul className="space-y-4">
-          {courses.map((course) => (
-            <li key={course.id} className="p-4 border rounded-lg shadow-md">
-              <h3 className="text-lg font-semibold">{course.name}</h3>
-              <p>{course.description}</p>
-            </li>
-          ))}
-        </ul>
+        <table className="courses-table">
+          <thead>
+            <tr>
+              <th>Course Name</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {courses.map((course) => (
+              <tr key={course.id}>
+                <td>{course.name}</td>
+                <td>{course.description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : (
         <p>You are not assigned to any courses yet.</p>
       )}

@@ -9,7 +9,14 @@ class Course(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # One track can have many courses (many courses per track)
-    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="course_set")
+    track = models.ForeignKey(
+    "tracks.Track",
+    on_delete=models.CASCADE,
+    related_name="course_set",
+    null=False,  # Set null=False to make it non-nullable
+    default=1  # Replace with a valid default track ID or fetch it dynamically in migration
+)
+
 
 
     # The instructor is a foreign key to StaffMember
