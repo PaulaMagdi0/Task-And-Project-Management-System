@@ -7,6 +7,7 @@ import tracksReducer from './tracksSlice';
 import assignmentsReducer from './assignmentsSlice'; // Import assignments reducer
 import submissionsReducer from './submissionsSlice';
 import gradesReducer from './gradesSlice';
+import studentsReducer from './studentsSlice';  // Import the students reducer
 
 const store = configureStore({
   reducer: {
@@ -17,6 +18,8 @@ const store = configureStore({
     assignments: assignmentsReducer, // Add it to the store
     submissions: submissionsReducer,
     grades: gradesReducer,
+    students: studentsReducer,  // Add students reducer
+
   },
 });
 

@@ -1,10 +1,12 @@
 from django.db import models
-from django.conf import settings
+from django.conf import settings  # Import settings for possible future adjustments
 from apps.courses.models import Course
 from apps.assignments.models import Assignment
+from apps.student.models import Student  # Import Student model directly
 
 class AssignmentSubmission(models.Model):
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="submissions")
+    # Reference to the Student model directly
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="submissions")
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
     
@@ -18,3 +20,12 @@ class AssignmentSubmission(models.Model):
     
     def __str__(self):
         return f"Submission by {self.student.username} for {self.assignment.title}"
+    
+    def clean(self):
+        """Ensure that either a file or file_url is provided, but not both."""
+        if not self.file and not self.file_url:
+            raise ValueError('You must provide either a file or a file URL.')
+
+    def save(self, *args, **kwargs):
+        self.clean()  # Validate before saving
+        super().save(*args, **kwargs)
