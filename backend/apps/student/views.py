@@ -2,139 +2,100 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework import generics
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
+from rest_framework import generics
 from apps.student.models import Student
-from apps.tracks.models import Track
 import logging
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
-from django.conf import settings
-from django.core.mail import send_mail
 from apps.staff_members.permissions import has_student_management_permission
 
 logger = logging.getLogger(__name__)
 
+
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def upload_students(request):
-    """
-    Handle both bulk Excel upload and single student creation
-    with proper authentication and permission checks
-    """
-    # Permission check
+# @permission_classes([IsAuthenticated])  # ✅ Enforce authentication
+@permission_classes([AllowAny])
+def upload_excel(request):
+    """Handle bulk student creation via Excel upload"""
+    print(f"DEBUG: User Authenticated? {request.user.is_authenticated}, User: {request.user}")
+    
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=401)
+
     if not has_student_management_permission(request.user):
-        return Response(
-            {"detail": "You don't have permission to manage students"},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    # Excel file upload handling
-    if 'excel_file' in request.FILES:
-        serializer = ExcelUploadSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        
-        if not serializer.is_valid():
-            logger.error(f"Excel validation failed: {serializer.errors}")
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Invalid file upload',
-                    'errors': serializer.errors
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
-        try:
-            with transaction.atomic():
-                result = serializer.save()
-                
-                response_data = {
-                    'success': True,
-                    'status': 'partial_success' if result.get('error_count', 0) > 0 else 'success',
-                    'message': f"Successfully created {result.get('created_count', 0)} students",
-                    'created_count': result.get('created_count', 0),
-                    'students': result.get('students', [])
-                }
-                
-                if result.get('error_count', 0) > 0:
-                    response_data['error_count'] = result.get('error_count')
-                    response_data['errors'] = result.get('errors')
-                    if len(result.get('errors', [])) <= 10:
-                        response_data['sample_errors'] = result.get('errors')[:5]
-                
-                status_code = status.HTTP_207_MULTI_STATUS if result.get('error_count', 0) > 0 else status.HTTP_201_CREATED
-                return Response(response_data, status=status_code)
-                
-        except Exception as e:
-            logger.error(f"Excel processing failed: {str(e)}")
-            return Response(
-                {
-                    'success': False,
-                    'message': 'Failed to process Excel file',
-                    'error': str(e)
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-    # Single student creation
-    data = request.data.copy()
-    data['role'] = data.get('role', 'student')  # Default role
+        return Response({"detail": "You don't have permission to add students"}, status=403)
     
-    serializer = StudentSerializer(
-        data=data,
-        context={'request': request}
-    )
-    
-    if not serializer.is_valid():
+    # ✅ Prevent AttributeError for Anonymous Users
+    user_role = getattr(request.user, 'role', 'Unknown')
+    is_superuser = getattr(request.user, 'is_superuser', False)
+    print(f"User Role: {user_role}, Superuser: {is_superuser}")
+
+    # ✅ Permission Check
+    if not has_student_management_permission(request.user):
+        raise PermissionDenied("You don't have permission to add students")
+
+    # ✅ Ensure file is provided
+    if 'excel_file' not in request.FILES:
+        logger.warning("Excel file missing in upload request")
         return Response(
-            {
-                'success': False,
-                'message': 'Validation failed',
-                'errors': serializer.errors
-            },
+            {"error": "Excel file is required"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
+    # ✅ Validate the uploaded Excel file
+    serializer = ExcelUploadSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+
+    if not serializer.is_valid():
+        logger.error(f"Excel validation failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # ✅ Process file inside a transaction
     try:
         with transaction.atomic():
-            student = serializer.save()
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Student created successfully. Verification email sent.',
-                    'student': StudentSerializer(student).data
-                },
-                status=status.HTTP_201_CREATED
-            )
+            result = serializer.save()
+            
+            if result.get('error_count', 0) > 0:
+                return Response({
+                    "status": "partial_success",
+                    "created_count": result.get('created_count', 0),
+                    "error_count": result.get('error_count', 0),
+                    "errors": result.get('errors', []),
+                    "students": result.get('students', [])
+                }, status=status.HTTP_207_MULTI_STATUS)
+            
+            return Response({
+                "status": "success",
+                "created_count": result.get('created_count', 0),
+                "students": result.get('students', [])
+            }, status=status.HTTP_201_CREATED)
+
     except Exception as e:
-        logger.error(f"Student creation failed: {str(e)}")
+        logger.exception(f"Excel processing failed: {str(e)}")
         return Response(
-            {
-                'success': False,
-                'message': 'Failed to create student',
-                'error': str(e)
-            },
+            {"error": "Internal server error during processing"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+
 def list_students(request):
-    """
-    List students with optimized querying, filtering and pagination
-    """
+    """List students with optimized querying and pagination"""
     try:
+        # Admins/supervisors see all, branch managers see their branch only
         students = Student.objects.all()
         
-        # Apply permission-based filtering
         if request.user.groups.filter(name='branchmanager').exists():
             students = students.filter(branch=request.user.branch)
         
-        # Apply filters from query params
+        # Apply filters
         if track_id := request.query_params.get('track_id'):
             students = students.filter(track_id=track_id)
         
@@ -142,13 +103,12 @@ def list_students(request):
             students = students.filter(is_active=is_active.lower() == 'true')
 
         # Pagination
-        page = int(request.query_params.get('page', 1))
+        page = request.query_params.get('page', 1)
         page_size = min(int(request.query_params.get('page_size', 20)), 100)
         paginated_students = students[(page-1)*page_size : page*page_size]
 
         serializer = StudentSerializer(paginated_students, many=True)
         return Response({
-            "success": True,
             "count": students.count(),
             "page": page,
             "page_size": page_size,
@@ -158,30 +118,21 @@ def list_students(request):
     except Exception as e:
         logger.error(f"Student listing error: {str(e)}")
         return Response(
-            {
-                "success": False,
-                "error": "Failed to retrieve student list",
-                "message": str(e)
-            },
+            {"error": "Failed to retrieve student list"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def verify_email(request, verification_code):
-    """
-    Email verification endpoint with security checks
-    """
+    """Email verification endpoint with security checks"""
     try:
         student = get_object_or_404(Student, verification_code=verification_code)
         
         if student.verified:
             return Response(
-                {
-                    'success': True,
-                    'status': 'already_verified',
-                    'message': 'Email already verified'
-                },
+                {'status': 'already_verified'}, 
                 status=status.HTTP_200_OK
             )
 
@@ -191,42 +142,27 @@ def verify_email(request, verification_code):
         
         logger.info(f"Student {student.id} email verified")
         return Response(
-            {
-                'success': True,
-                'status': 'success',
-                'message': 'Email verified successfully'
-            },
+            {'status': 'success'},
             status=status.HTTP_200_OK
         )
 
     except Exception as e:
         logger.error(f"Verification failed: {str(e)}")
         return Response(
-            {
-                'success': False,
-                'status': 'invalid_code',
-                'message': 'Invalid verification code or link has expired'
-            },
+            {'status': 'invalid_code'},
             status=status.HTTP_400_BAD_REQUEST
         )
+
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
-    """
-    Secure student update with permission checks
-    """
+    """Secure student update with permission checks"""
     student = get_object_or_404(Student, id=student_id)
     
-    # Permission check - either has management permission or is updating own profile
+    # Permission check
     if not (has_student_management_permission(request.user) or request.user.id == student_id):
-        return Response(
-            {
-                'success': False,
-                'message': "You don't have permission to update this student"
-            },
-            status=status.HTTP_403_FORBIDDEN
-        )
+        raise PermissionDenied("You don't have permission to update this student")
 
     serializer = StudentSerializer(
         student, 
@@ -236,78 +172,42 @@ def update_student(request, student_id):
     )
 
     if not serializer.is_valid():
-        return Response(
-            {
-                'success': False,
-                'message': 'Validation failed',
-                'errors': serializer.errors
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        with transaction.atomic():
-            serializer.save()
-            logger.info(f"Student {student_id} updated by user {request.user.id}")
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Student updated successfully',
-                    'student': serializer.data
-                }
-            )
+        serializer.save()
+        logger.info(f"Student {student_id} updated by user {request.user.id}")
+        return Response(serializer.data)
     
     except Exception as e:
         logger.error(f"Update failed for student {student_id}: {str(e)}")
         return Response(
-            {
-                'success': False,
-                'message': 'Update failed',
-                'error': str(e)
-            },
+            {"error": "Update failed"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_student(request, student_id):
-    """
-    Student deletion with confirmation checks
-    """
+    """Student deletion with confirmation checks"""
     if not has_student_management_permission(request.user):
-        return Response(
-            {
-                'success': False,
-                'message': "You don't have permission to delete students"
-            },
-            status=status.HTTP_403_FORBIDDEN
-        )
+        raise PermissionDenied("You don't have permission to delete students")
 
     student = get_object_or_404(Student, id=student_id)
     
     try:
-        with transaction.atomic():
-            student.delete()
-            logger.warning(f"Student {student_id} deleted by user {request.user.id}")
-            return Response(
-                {
-                    'success': True,
-                    'message': 'Student deleted successfully'
-                },
-                status=status.HTTP_204_NO_CONTENT
-            )
+        student.delete()
+        logger.warning(f"Student {student_id} deleted by user {request.user.id}")
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     except Exception as e:
         logger.error(f"Deletion failed for student {student_id}: {str(e)}")
         return Response(
-            {
-                'success': False,
-                'message': 'Deletion failed',
-                'error': str(e)
-            },
+            {"error": "Deletion failed"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
+        
 class StudentDashboardAPI(generics.RetrieveAPIView):
     """
     Student dashboard with personalized data
@@ -318,6 +218,7 @@ class StudentDashboardAPI(generics.RetrieveAPIView):
     def get_object(self):
         # Returns the logged-in student's profile
         return self.request.user.student_profile
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -349,4 +250,4 @@ def show_options(request):
             }
         }
     }
-    return Response(options)
+    return Response(options)        
