@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useSelector } from 'react-redux'; // Import useSelector
 import Navbar from './components/Navbar';
-import Home from './pages/Home';
+// import Home from './pages/Home';
 import SignIn from './pages/Signin';
 import NotFound from './pages/NotFound';
 import StudentDashboard from './pages/StudentDashboard';
@@ -14,10 +14,20 @@ import Submissions from './pages/Instructor/Submissions';
 import Grades from './pages/Instructor/Grades';
 import CreateTask from './pages/Instructor/CreateAssignment';
 import UploadStudentPage from './components/AddStudent';
-
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
+import useCustomScripts from './Hooks/useCustomScripts';
+import ScrollToTop from './Components/ScrollToTop';
+import About from './Components/About/About';
+import Services from './Components/Services/Services';
+import Contact from './Components/Contact/Contact';
+import TermsOfService from './Components/TermsOfService/TermsOfService';
+import PrivacyPolicy from './Components/PrivacyPolicy/PrivacyPolicy';
+import Chatting, { dummyUsers } from './pages/Chat/Chatting';
+import Footer from './Components/Footer/Footer';
+import Home from './pages/Home/Home';
+import Team from './Components/Team/Team';
 
 const App = () => {
   useCustomScripts();
@@ -37,10 +47,13 @@ const App = () => {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/signin" element={<SignIn />} />
+          {/* <Route path="/home2" element={<Home />} /> */}
           <Route path="/upload-student" element={<UploadStudentPage />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
           <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />
+          <Route path="/Team" element={<Team />} />
+
 
           {/* Instructor Dashboard Routes */}
           {userType === 'staff' && role === 'instructor' && (

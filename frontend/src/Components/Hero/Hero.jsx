@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import heroBg from "/src/assets/img/hero-bg.jpg";
+import heroBg from "/src/assets/img/newCapital.png";
 
 const Hero = () => {
   return (
@@ -14,7 +14,7 @@ const Hero = () => {
               Task Flow helps you manage tasks, track projects, and collaborate
               with your team effortlessly and in real time.
             </p>
-            <Link to="/register" className="btn-get-started">
+            <Link to="/signin" className="btn-get-started">
               Get Started
             </Link>
           </div>

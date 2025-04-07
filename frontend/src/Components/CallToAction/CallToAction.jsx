@@ -6,7 +6,7 @@ const callToActionData = {
   title: "Let's Get Things Done",
   description:
     "Ready to boost your team's productivity and keep every task on track? Join Task Flow today and start managing your projects with clarity and confidence.",
-  buttonText: "Try Task Flow Now",
+  buttonText: "Services",
   imageUrl: ctaBgImage,
 };
 
@@ -29,7 +29,7 @@ const CallToAction = () => {
             <div className="text-center">
               <h3>{title}</h3>
               <p>{description}</p>
-              <Link to="/register" className="cta-btn">
+              <Link to="/services" className="cta-btn">
                 {buttonText}
               </Link>
             </div>
