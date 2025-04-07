@@ -2,29 +2,39 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
+export const selectToken = (state) => state.auth.token;
+
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async ({ email, password }, thunkAPI) => {
     try {
-      const response = await apiClient.post('/auth/token/', { email: email.trim(), password });
-      const { access, refresh } = response.data;
+      // Use the correct login endpoint
+      const response = await apiClient.post('/auth/login/', { email: email.trim(), password });
+      // Now, the backend returns { "token": "JWT_TOKEN_STRING" }
+      const { token } = response.data;
+      if (!token) {
+        throw new Error("No token returned from server");
+      }
       
-      // Dynamically import jwt-decode and destructure the named export
+      // Dynamically import jwt-decode.
       const jwtDecodeModule = await import('jwt-decode');
-      const { jwtDecode } = jwtDecodeModule;
-      
+      const jwtDecode = jwtDecodeModule.default || jwtDecodeModule.jwtDecode;
       if (typeof jwtDecode !== 'function') {
         throw new Error("jwtDecode is not a function");
       }
       
-      const decoded = jwtDecode(access);
-      
+      // Decode the token to extract custom claims.
+      const decoded = jwtDecode(token);
+
+      // Add this log to check the decoded token
+     // console.log('Decoded JWT Token:', decoded);
+
       return {
-        access,
-        refresh,
+        access: token,
         role: decoded.role,
         userType: decoded.userType,
-        username: decoded.username || decoded.email || 'User', // Fallback to 'User'
+        username: decoded.username || decoded.email || 'User',
+        user_id: decoded.user_id, // Ensure this is passed
       };
     } catch (error) {
       return thunkAPI.rejectWithValue({
@@ -40,7 +50,8 @@ const authSlice = createSlice({
     token: null,
     userType: null, // 'staff' or 'student'
     role: null,     // e.g., 'supervisor', 'instructor', or 'branch_manager'
-    username: '',   // Holds the logged-in user's username
+    username: '',   // Logged-in user's username
+    user_id: null,   // Add default value for user_id
     loading: false,
     error: null,
   },
@@ -50,6 +61,7 @@ const authSlice = createSlice({
       state.userType = null;
       state.role = null;
       state.username = '';
+      state.user_id = null; // Reset user_id on logout
       localStorage.removeItem('authToken');
       localStorage.removeItem('userType');
       localStorage.removeItem('role');
@@ -67,6 +79,8 @@ const authSlice = createSlice({
         state.userType = action.payload.userType;
         state.role = action.payload.role || null;
         state.username = action.payload.username;
+        state.user_id = action.payload.user_id; // Set user_id here
+        //console.log('Redux state after login:', state); // Log the entire state
         localStorage.setItem('authToken', action.payload.access);
         localStorage.setItem('userType', action.payload.userType);
         if (action.payload.role) {

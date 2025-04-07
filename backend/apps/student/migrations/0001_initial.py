@@ -2,6 +2,7 @@
 
 import apps.student.models
 import django.db.models.deletion
+import django.utils.timezone
 from django.db import migrations, models
 
 
@@ -18,23 +19,100 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Student',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('email', models.EmailField(max_length=254, unique=True)),
-                ('username', models.CharField(blank=True, default='', max_length=100)),
-                ('first_name', models.CharField(max_length=100)),
-                ('last_name', models.CharField(max_length=100)),
-                ('role', models.CharField(default='student', max_length=50)),
-                ('verification_code', models.CharField(blank=True, max_length=32, null=True)),
-                ('verified', models.BooleanField(default=False)),
-                ('groups', models.ManyToManyField(blank=True, related_name='student_set', to='auth.group')),
-                ('track', models.ForeignKey(blank=True, default=apps.student.models.get_default_track, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='students', to='tracks.track')),
-                ('user_permissions', models.ManyToManyField(blank=True, related_name='student_permissions_set', to='auth.permission')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "last_login",
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
+                ),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "email",
+                    models.EmailField(
+                        max_length=254, unique=True, verbose_name="Email Address"
+                    ),
+                ),
+                ("username", models.CharField(blank=True, default="", max_length=100)),
+                (
+                    "first_name",
+                    models.CharField(max_length=100, verbose_name="First Name"),
+                ),
+                (
+                    "last_name",
+                    models.CharField(max_length=100, verbose_name="Last Name"),
+                ),
+                (
+                    "role",
+                    models.CharField(default="student", editable=False, max_length=50),
+                ),
+                (
+                    "verification_code",
+                    models.CharField(blank=True, max_length=32, null=True),
+                ),
+                ("verified", models.BooleanField(default=False)),
+                ("is_active", models.BooleanField(default=True)),
+                ("is_staff", models.BooleanField(default=False)),
+                (
+                    "date_joined",
+                    models.DateTimeField(default=django.utils.timezone.now),
+                ),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "track",
+                    models.ForeignKey(
+                        blank=True,
+                        default=apps.student.models.get_default_track,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="students",
+                        to="tracks.track",
+                        verbose_name="Assigned Track",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'student_account',
+                "verbose_name": "Student",
+                "verbose_name_plural": "Students",
+                "db_table": "students",
+                "ordering": ["last_name", "first_name"],
             },
         ),
     ]

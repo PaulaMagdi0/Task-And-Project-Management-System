@@ -11,7 +11,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('courses', '0001_initial'),
+        ("branch_location", "0001_initial"),
+        ("courses", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -19,12 +20,50 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Track',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, unique=True)),
-                ('description', models.TextField()),
-                ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
-                ('courses', models.ManyToManyField(blank=True, related_name='course_tracks', to='courses.course')),
-                ('supervisor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='supervised_tracks', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField()),
+                (
+                    "track_type",
+                    models.CharField(
+                        choices=[("ICC", "ICC"), ("9month", "9 Month")],
+                        default="ICC",
+                        max_length=10,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(default=django.utils.timezone.now)),
+                (
+                    "branch",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="tracks",
+                        to="branch_location.branch",
+                    ),
+                ),
+                (
+                    "courses",
+                    models.ManyToManyField(related_name="tracks", to="courses.course"),
+                ),
+                (
+                    "supervisor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="supervised_tracks",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
                 'db_table': 'tracks',

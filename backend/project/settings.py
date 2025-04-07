@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework.authtoken',  # Add this line for Token Authentication
     'rest_framework_simplejwt',
     "rest_framework",
     "apps.tracks",
@@ -27,10 +28,36 @@ INSTALLED_APPS = [
     "apps.student",
     "apps.custom_auth",
     "apps.submission",
+    "apps.branch_location",
     "corsheaders",
+    'django_extensions',
 
 
 ]
+# settings.py
+# Add this import at the top of settings.py
+from datetime import timedelta
+
+# Then add your JWT configuration
+JWT_AUTH = {
+    'ACCESS_TOKEN_COOKIE': 'access_token',
+    'REFRESH_TOKEN_COOKIE': 'refresh_token',
+    'COOKIE_PATH': '/',
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+# settings.py
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -38,6 +65,11 @@ REST_FRAMEWORK = {
     ),
 }
 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': [
+#         'rest_framework.authentication.SessionAuthentication',
+#     ],
+# }
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",

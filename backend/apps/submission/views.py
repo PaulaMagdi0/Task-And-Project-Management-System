@@ -3,60 +3,38 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from .models import AssignmentSubmission
 from .serializers import AssignmentSubmissionSerializer
-from django.utils import timezone
-from django.contrib.auth.models import Group
+from apps.staff_members.permissions import IsInstructor  # Assuming this is in permissions.py
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
     queryset = AssignmentSubmission.objects.all()
     serializer_class = AssignmentSubmissionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInstructor]  # Add IsInstructor permission
 
     def get_queryset(self):
         """
-        Allow students to see only their own submissions, and instructors to view all submissions.
+        Allow instructors to view all submissions, but restrict students to see only their own submissions.
         """
         user = self.request.user
         
         if not user.is_authenticated:
             raise PermissionDenied("User is not authenticated.")
-
-        # Log user's groups for debugging
-        print(f"User groups: {user.groups.all()}")
         
-        if user.groups.filter(name="Instructors").exists():
+        # If the user is an instructor, return all submissions
+        if user.role == "instructor":  # Direct check for 'instructor' role
             return AssignmentSubmission.objects.all()  # Instructors see all submissions
-        return AssignmentSubmission.objects.filter(student=user)  # Students see only their submissions
-
+        
+        # Otherwise, students can only see their own submissions
+        return AssignmentSubmission.objects.filter(student=user)
+    
     def perform_create(self, serializer):
         """
-        Handle file submissions by students. Ensure students can submit a file or URL, but not both.
+        Instructors cannot submit assignments. This is overridden to prevent creating submissions.
         """
         user = self.request.user
         
-        if not user.is_authenticated:
-            raise PermissionDenied("User is not authenticated.")
-
-        # Log the user for debugging
-        print(f"Authenticated User: {user.username}")
-        
-        assignment = serializer.validated_data['assignment']
-
-        # Ensure only students can submit assignments
-        if user.groups.filter(name="Instructors").exists():
+        # Ensure that instructors cannot create submissions
+        if user.role == "instructor":  # Direct check for 'instructor' role
             raise PermissionDenied("Instructors cannot submit assignments.")
-
-        # Check if submission is before the due date
-        if assignment.due_date and assignment.due_date < timezone.now():
-            raise PermissionDenied("You cannot submit the assignment after the due date.")
-
-        # Validate file or file_url submission (one is required, but not both)
-        file_submission = serializer.validated_data.get('file')
-        file_url_submission = serializer.validated_data.get('file_url')
-
-        if file_submission and file_url_submission:
-            raise PermissionDenied("You cannot submit both a file and a URL.")
-        if not file_submission and not file_url_submission:
-            raise PermissionDenied("You must submit either a file or a URL.")
-
-        # Save the submission with the current user as the student
+        
+        # Allow students to submit their assignments as usual
         serializer.save(student=user)

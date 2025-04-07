@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from apps.courses.models import Course  # ✅ Ensure correct import
+from apps.student.models import Student  # Import Student model
 
 class Assignment(models.Model):
     ASSIGNMENT_TYPES = (
@@ -21,13 +22,25 @@ class Assignment(models.Model):
     file = models.URLField(null=True, blank=True)  # This is the file URL field
     file_url = models.URLField(null=True, blank=True)  # Add this if needed as a separate field
 
+    # Renamed the student field to assigned_to for clarity
+    assigned_to = models.ForeignKey(
+        Student, on_delete=models.SET_NULL, null=True, blank=True, related_name='assignments'
+    )
+
     class Meta:
         ordering = ["-created_at"]  # Latest first
         db_table = "assignments" 
 
     def __str__(self):
-        return f"{self.title} ({self.get_assignment_type_display()})"
-    
+        # Logic to return "Assigned to All" or the student's name
+        assigned_display = self.get_assigned_to_display()
+        return f"{self.title} ({self.get_assignment_type_display()} - {assigned_display})"
+
+    def get_assigned_to_display(self):
+        if self.assigned_to:
+            return f"Assigned to {self.assigned_to.full_name}"
+        return "Assigned to All"
+
     def save(self, *args, **kwargs):
         # If end_date is None, set it to the end of the current day
         if not self.end_date:

@@ -1,0 +1,16 @@
+{
+  "grades": [
+    {
+      "student_id": 1,
+      "score": 90,
+      "feedback": "Great work!",
+      "graded_date": "2025-04-01"
+    },
+    {
+      "student_id": 2,
+      "score": 85,
+      "feedback": "Good job, but could improve in some areas.",
+      "graded_date": "2025-04-02"
+    }
+  ]
+}

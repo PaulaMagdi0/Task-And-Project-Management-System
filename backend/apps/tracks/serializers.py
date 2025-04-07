@@ -1,20 +1,39 @@
-# File: apps/tracks/serializers.py
 from rest_framework import serializers
-from .models import Track
-
-class TrackSerializer(serializers.ModelSerializer):
+from apps.tracks.models import Track
+from apps.courses.models import Course
+class BaseTrackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Track
-        fields = "__all__"
+        fields = ['id', 'name', 'description', 'supervisor', 'track_type']
 
-    def validate_supervisor(self, value):
-        if value and value.role != "supervisor":
-            raise serializers.ValidationError("Assigned user must have the role 'supervisor'.")
+class TrackSerializer(serializers.ModelSerializer):
+    courses = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Course.objects.all(),  # Make sure to import Course model
+        required=False,  # This allows the field to be omitted
+        allow_empty=True  # This explicitly allows empty lists
+    )
+
+    class Meta:
+        model = Track
+        fields = ['id', 'name', 'description', 'supervisor', 'branch', 'courses', 'track_type']
+    
+    def validate_branch(self, value):
+        """Ensure that the branch is provided."""
+        if not value:
+            raise serializers.ValidationError("Branch must be provided.")
         return value
 
-    def to_representation(self, instance):
-        # Get the default representation
-        representation = super().to_representation(instance)
-        # Replace the 'supervisor' field with the username if supervisor exists
-        representation['supervisor'] = instance.supervisor.username if instance.supervisor else None
-        return representation
+    def create(self, validated_data):
+        courses = validated_data.pop('courses', [])  # Default to empty list
+        track = Track.objects.create(**validated_data)
+        track.courses.set(courses)  # This works with empty lists
+        return track
+
+    def update(self, instance, validated_data):
+        courses = validated_data.pop('courses', [])  # Default to empty list
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        instance.courses.set(courses)  # This works with empty lists
+        return instance

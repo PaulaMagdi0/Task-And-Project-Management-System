@@ -1,0 +1,29 @@
+{
+    "assignments": [
+      {
+        "id": 1,
+        "title": "Database Design",
+        "due_date": "2025-04-10",
+        "end_date": "2025-04-15",
+        "assignment_type": "Project",
+        "description": "Design an ERD for a task management system.",
+        "created_at": "2025-04-01",
+        "file": "database_design.pdf",
+        "file_url": "https://example.com/files/database_design.pdf",
+        "course_id": 101
+      },
+      {
+        "id": 2,
+        "title": "API Development",
+        "due_date": "2025-04-12",
+        "end_date": "2025-04-17",
+        "assignment_type": "Task",
+        "description": "Create a FastAPI-based CRUD API for tasks.",
+        "created_at": "2025-04-02",
+        "file": "api_development.zip",
+        "file_url": "https://example.com/files/api_development.zip",
+        "course_id": 102
+      }
+    ]
+  }
+  

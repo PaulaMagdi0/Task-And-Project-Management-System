@@ -1,8 +1,8 @@
 from django.db import models
 from django.utils.timezone import now
 from apps.assignments.models import Assignment
-from apps.student.models import Student  
-from apps.courses.models import Course  
+from apps.student.models import Student
+from apps.courses.models import Course
 from django.utils import timezone
 
 # ✅ Ensure these functions are defined before the model
@@ -12,9 +12,7 @@ def get_default_assignment():
     return first_assignment.id if first_assignment else None
 
 def get_default_student():
-    """Return the first available Student ID, or None if no students exist."""
-    first_student = Student.objects.first()
-    return first_student.id if first_student else None
+    return Student.objects.values_list('id', flat=True).first()
 
 class Grade(models.Model):
     assignment = models.ForeignKey(

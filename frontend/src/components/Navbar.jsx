@@ -30,6 +30,7 @@ const Navbar = () => {
                 Sign Out
               </button>
             </li>
+            <li><Link to="/instructor/tasks">Instructor Tasks</Link></li>
           </>
         ) : (
           <>
