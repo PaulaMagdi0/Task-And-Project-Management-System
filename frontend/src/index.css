@@ -1,8 +1,43 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --primary: #4318FF;
+  --primary-dark: #3311CC;
+  --secondary: #0B1437;
+  --accent: #A3AED0;
+}
+
+body {
+  background-color: var(--secondary);
+  color: var(--accent);
+  background-image: radial-gradient(circle at top right, rgba(67, 24, 255, 0.1), transparent 60%),
+                    radial-gradient(circle at bottom left, rgba(67, 24, 255, 0.1), transparent 60%);
+}
+
+.chart-gradient {
+  fill: url(#colorGradient);
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(11, 20, 55, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(67, 24, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(67, 24, 255, 0.5);
+}
