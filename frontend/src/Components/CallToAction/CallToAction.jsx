@@ -1,12 +1,12 @@
 import React from "react";
-import { Link } from "react-router-dom"; // Import Link from react-router-dom
+import { Link } from "react-router-dom";
 import ctaBgImage from "../../assets/img/cta-bg.jpg";
 
 const callToActionData = {
-  title: "Call To Action",
+  title: "Let's Get Things Done",
   description:
-    "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-  buttonText: "Call To Action",
+    "Ready to boost your team's productivity and keep every task on track? Join Task Flow today and start managing your projects with clarity and confidence.",
+  buttonText: "Try Task Flow Now",
   imageUrl: ctaBgImage,
 };
 
@@ -29,9 +29,7 @@ const CallToAction = () => {
             <div className="text-center">
               <h3>{title}</h3>
               <p>{description}</p>
-              <Link to="/contact" className="cta-btn">
-                {" "}
-                {/* Change <a> to <Link> */}
+              <Link to="/register" className="cta-btn">
                 {buttonText}
               </Link>
             </div>

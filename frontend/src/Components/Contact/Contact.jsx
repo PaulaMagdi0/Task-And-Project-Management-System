@@ -8,7 +8,7 @@ const Contact = () => {
     subject: "",
     message: "",
   });
-  const [status, setStatus] = useState(null); // For displaying submission status
+  const [status, setStatus] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,7 +27,10 @@ const Contact = () => {
       });
 
       if (response.ok) {
-        setStatus("Your message has been sent. Thank you!");
+        setStatus(
+          "Your message has been sent successfully. We'll get back to you shortly."
+        );
+        setFormData({ name: "", email: "", subject: "", message: "" });
       } else {
         const errorData = await response.json();
         setStatus(`Error: ${errorData.error}`);
@@ -40,11 +43,11 @@ const Contact = () => {
   return (
     <section className="contact section">
       <div className="container section-title" data-aos="fade-up">
-        <span>Contact</span>
-        <h2>Contact</h2>
+        <span>Contact Support</span>
+        <h2>Get in Touch</h2>
         <p>
-          Necessitatibus eius consequatur ex aliquid fuga eum quidem sint
-          consectetur velit
+          Have questions, feedback, or need help managing your projects? We're
+          here to assist you at every step of your productivity journey.
         </p>
       </div>
       <div className="container" data-aos="fade-up" data-aos-delay="100">
@@ -56,8 +59,8 @@ const Contact = () => {
               data-aos-delay="200"
             >
               <i className="bi bi-geo-alt"></i>
-              <h3>Address</h3>
-              <p>A108 Adam Street, New York, NY 535022</p>
+              <h3>Office Location</h3>
+              <p>456 Workflow Ave, Productivity City, PC 78910</p>
             </div>
           </div>
           <div className="col-lg-3 col-md-6">
@@ -67,8 +70,8 @@ const Contact = () => {
               data-aos-delay="300"
             >
               <i className="bi bi-telephone"></i>
-              <h3>Call Us</h3>
-              <p>+1 5589 55488 55</p>
+              <h3>Phone</h3>
+              <p>+1 (800) 123-4567</p>
             </div>
           </div>
           <div className="col-lg-3 col-md-6">
@@ -78,11 +81,12 @@ const Contact = () => {
               data-aos-delay="400"
             >
               <i className="bi bi-envelope"></i>
-              <h3>Email Us</h3>
-              <p>info@example.com</p>
+              <h3>Email</h3>
+              <p>support@taskflowpro.com</p>
             </div>
           </div>
         </div>
+
         <div className="row gy-4 mt-1">
           <div className="col-lg-6" data-aos="fade-up" data-aos-delay="300">
             <iframe
@@ -107,7 +111,7 @@ const Contact = () => {
                     type="text"
                     name="name"
                     className="form-control"
-                    placeholder="Your Name"
+                    placeholder="Full Name"
                     value={formData.name}
                     onChange={handleChange}
                     required
@@ -118,7 +122,7 @@ const Contact = () => {
                     type="email"
                     className="form-control"
                     name="email"
-                    placeholder="Your Email"
+                    placeholder="Work Email"
                     value={formData.email}
                     onChange={handleChange}
                     required
@@ -129,7 +133,7 @@ const Contact = () => {
                     type="text"
                     className="form-control"
                     name="subject"
-                    placeholder="Subject"
+                    placeholder="Subject (e.g. Feedback, Bug Report)"
                     value={formData.subject}
                     onChange={handleChange}
                     required
@@ -140,7 +144,7 @@ const Contact = () => {
                     className="form-control"
                     name="message"
                     rows="6"
-                    placeholder="Message"
+                    placeholder="Tell us how we can help..."
                     value={formData.message}
                     onChange={handleChange}
                     required

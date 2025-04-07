@@ -1,23 +1,23 @@
 import React from "react";
-import { Link } from "react-router-dom"; // Ensure you're using React Router for navigation
+import { Link } from "react-router-dom";
 
 const footerInfo = {
   logo: "Task Flow",
-  address: "A108 Adam Street, New York, NY 535022", // Original location
-  phone: "+1 5589 55488 55",
-  email: "info@example.com",
+  address: "456 Workflow Ave, Productivity City, PC 78910",
+  phone: "+1 (800) 123-4567",
+  email: "support@taskflowpro.com",
   socialLinks: {
-    twitter: "#",
-    facebook: "#",
-    instagram: "#",
-    linkedin: "#",
+    twitter: "https://twitter.com/",
+    facebook: "https://www.facebook.com/",
+    instagram: "https://www.instagram.com/",
+    linkedin: "https://www.linkedin.com/",
   },
   usefulLinks: [
     { name: "Home", url: "/" },
-    { name: "About us", url: "/about" },
+    { name: "About Us", url: "/about" },
     { name: "Services", url: "/services" },
-    { name: "Terms of service", url: "/terms" },
-    { name: "Privacy policy", url: "/privacy" },
+    { name: "Terms of Service", url: "/terms" },
+    { name: "Privacy Policy", url: "/privacy" },
   ],
 };
 
@@ -29,7 +29,7 @@ const Footer = () => {
     >
       <div className="container footer-top">
         <div className="row gy-4">
-          {/* Contact Section - Adjusted to take 50% width on large screens */}
+          {/* Contact Info */}
           <div className="col-lg-6 col-md-12">
             <div className="footer-about text-center text-lg-start">
               <Link to="/" className="logo sitename fs-3 fw-bold">
@@ -45,25 +45,44 @@ const Footer = () => {
                 </p>
               </div>
               <div className="social-links d-flex justify-content-center justify-content-lg-start mt-3">
-                <Link to={footerInfo.socialLinks.twitter} className="me-3">
+                <Link
+                  to={footerInfo.socialLinks.twitter}
+                  className="me-3"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <i className="bi bi-twitter-x"></i>
                 </Link>
-                <Link to={footerInfo.socialLinks.facebook} className="me-3">
+                <Link
+                  to={footerInfo.socialLinks.facebook}
+                  className="me-3"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <i className="bi bi-facebook"></i>
                 </Link>
-                <Link to={footerInfo.socialLinks.instagram} className="me-3">
+                <Link
+                  to={footerInfo.socialLinks.instagram}
+                  className="me-3"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <i className="bi bi-instagram"></i>
                 </Link>
-                <Link to={footerInfo.socialLinks.linkedin}>
+                <Link
+                  to={footerInfo.socialLinks.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <i className="bi bi-linkedin"></i>
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Useful Links Section - Adjusted to take 50% width on large screens */}
+          {/* Useful Links */}
           <div className="col-lg-6 col-md-12 footer-links">
-            <h4 className="text-center">Useful Links</h4>
+            <h4 className="text-center">Quick Navigation</h4>
             <ul className="list-unstyled text-center text-lg-start">
               {footerInfo.usefulLinks.map((link, index) => (
                 <li key={index} className="mb-2 justify-content-center">

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom"; // Import Link from react-router-dom
+import { Link } from "react-router-dom";
 import useCustomScripts from "../../Hooks/useCustomScripts";
 
 // Import portfolio images
@@ -16,64 +16,64 @@ import portfolio9 from "../../assets/img/masonry-portfolio/masonry-portfolio-9.j
 const portfolioItems = [
   {
     image: portfolio1,
-    title: "App 1",
-    description: "Lorem ipsum, dolor sit",
+    title: "Project Dashboard",
+    description: "Track tasks, progress, and deadlines all in one place.",
     category: "filter-app",
     detailsLink: "/portfolio-details/1",
   },
   {
     image: portfolio2,
-    title: "Product 1",
-    description: "Lorem ipsum, dolor sit",
+    title: "Team Collaboration",
+    description: "Chat, share files, and assign roles in real time.",
     category: "filter-product",
     detailsLink: "/portfolio-details/2",
   },
   {
     image: portfolio3,
-    title: "Branding 1",
-    description: "Lorem ipsum, dolor sit",
+    title: "Custom Workflows",
+    description: "Design workflows that fit your team’s unique needs.",
     category: "filter-branding",
     detailsLink: "/portfolio-details/3",
   },
   {
     image: portfolio4,
-    title: "App 2",
-    description: "Lorem ipsum, dolor sit",
+    title: "Task Templates",
+    description: "Quick-start your projects with pre-built templates.",
     category: "filter-app",
     detailsLink: "/portfolio-details/4",
   },
   {
     image: portfolio5,
-    title: "Product 2",
-    description: "Lorem ipsum, dolor sit",
+    title: "Progress Tracking",
+    description: "Visualize your progress with Gantt and Kanban views.",
     category: "filter-product",
     detailsLink: "/portfolio-details/5",
   },
   {
     image: portfolio6,
-    title: "Branding 2",
-    description: "Lorem ipsum, dolor sit",
+    title: "Role Management",
+    description: "Control who can view, edit, and assign tasks.",
     category: "filter-branding",
     detailsLink: "/portfolio-details/6",
   },
   {
     image: portfolio7,
-    title: "App 3",
-    description: "Lorem ipsum, dolor sit",
+    title: "Deadline Reminders",
+    description: "Never miss a task with smart reminders and alerts.",
     category: "filter-app",
     detailsLink: "/portfolio-details/7",
   },
   {
     image: portfolio8,
-    title: "Product 3",
-    description: "Lorem ipsum, dolor sit",
+    title: "Analytics & Reports",
+    description: "Gain insights into productivity and project health.",
     category: "filter-product",
     detailsLink: "/portfolio-details/8",
   },
   {
     image: portfolio9,
-    title: "Branding 3",
-    description: "Lorem ipsum, dolor sit",
+    title: "Client Portal",
+    description: "Share progress and get feedback from clients easily.",
     category: "filter-branding",
     detailsLink: "/portfolio-details/9",
   },
@@ -84,11 +84,11 @@ const Portfolio = () => {
   return (
     <section id="portfolio" className="portfolio section">
       <div className="container section-title" data-aos="fade-up">
-        <span>Portfolio</span>
-        <h2>Portfolio</h2>
+        <span>Features</span>
+        <h2>Platform Highlights</h2>
         <p>
-          Necessitatibus eius consequatur ex aliquid fuga eum quidem sint
-          consectetur velit
+          Explore how Task Flow can streamline your work, boost team
+          collaboration, and keep every project on track.
         </p>
       </div>
 
@@ -107,9 +107,9 @@ const Portfolio = () => {
             <li data-filter="*" className="filter-active">
               All
             </li>
-            <li data-filter=".filter-app">App</li>
-            <li data-filter=".filter-product">Card</li>
-            <li data-filter=".filter-branding">Web</li>
+            <li data-filter=".filter-app">Task Tools</li>
+            <li data-filter=".filter-product">Team Features</li>
+            <li data-filter=".filter-branding">Customization</li>
           </ul>
 
           <div

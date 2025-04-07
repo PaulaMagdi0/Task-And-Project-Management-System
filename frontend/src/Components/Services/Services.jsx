@@ -4,51 +4,45 @@ import { Link } from "react-router-dom";
 const servicesData = [
   {
     id: 1,
-    icon: "bi-activity",
-    title: "Nesciunt Mete",
+    icon: "bi-kanban",
+    title: "Task Management",
     description:
-      "Provident nihil minus qui consequatur non omnis maiores. Eos accusantium minus dolores iure perferendis tempore et consequatur.",
-    link: "#",
+      "Streamline task creation, assignment, and tracking to ensure projects are completed efficiently. Organize tasks with due dates, priorities, and deadlines.",
   },
   {
     id: 2,
-    icon: "bi-broadcast",
-    title: "Eosle Commodi",
+    icon: "bi-calendar-check",
+    title: "Project Scheduling",
     description:
-      "Ut autem aut autem non a. Sint sint sit facilis nam iusto sint. Libero corrupti neque eum hic non ut nesciunt dolorem.",
-    link: "#",
+      "Easily create and manage project timelines with Gantt charts, calendars, and task dependencies to stay on track with deadlines.",
   },
   {
     id: 3,
-    icon: "bi-easel",
-    title: "Ledo Markt",
+    icon: "bi-person-circle",
+    title: "Team Collaboration",
     description:
-      "Ut excepturi voluptatem nisi sed. Quidem fuga consequatur. Minus ea aut. Vel qui id voluptas adipisci eos earum corrupti.",
-    link: "#",
+      "Facilitate seamless communication between team members through real-time chat, notifications, and file sharing.",
   },
   {
     id: 4,
-    icon: "bi-bounding-box-circles",
-    title: "Asperiores Commodit",
+    icon: "bi-clipboard-data",
+    title: "Performance Tracking",
     description:
-      "Non et temporibus minus omnis sed dolor esse consequatur. Cupiditate sed error ea fuga sit provident adipisci neque.",
-    link: "#",
+      "Monitor progress with detailed reports and analytics to track project milestones, completed tasks, and team performance.",
   },
   {
     id: 5,
-    icon: "bi-calendar4-week",
-    title: "Velit Doloremque",
+    icon: "bi-file-earmark-text",
+    title: "Document Management",
     description:
-      "Cumque et suscipit saepe. Est maiores autem enim facilis ut aut ipsam corporis aut. Sed animi at autem alias eius labore.",
-    link: "#",
+      "Store and share important project files and documents securely with easy access for your team members.",
   },
   {
     id: 6,
-    icon: "bi-chat-square-text",
-    title: "Dolori Architecto",
+    icon: "bi-chat-left-text",
+    title: "Communication Tools",
     description:
-      "Hic molestias ea quibusdam eos. Fugiat enim doloremque aut neque non et debitis iure. Corrupti recusandae ducimus enim.",
-    link: "#",
+      "Engage with your team and clients using integrated messaging, comments, and notifications to ensure everyone stays aligned.",
   },
 ];
 
@@ -56,11 +50,11 @@ const Services = () => {
   return (
     <section className="services section">
       <div className="container section-title" data-aos="fade-up">
-        <span>Services</span>
-        <h2>Services</h2>
+        <span>Our Services</span>
+        <h2>Project & Task Management Solutions</h2>
         <p>
-          Necessitatibus eius consequatur ex aliquid fuga eum quidem sint
-          consectetur velit
+          Discover a comprehensive suite of tools designed to streamline your
+          task and project management workflows.
         </p>
       </div>
       <div className="container">
@@ -76,9 +70,9 @@ const Services = () => {
                 <div className="icon">
                   <i className={`bi ${service.icon}`}></i>
                 </div>
-                <Link to={service.link} className="stretched-link">
+                <div className="stretched-link">
                   <h3>{service.title}</h3>
-                </Link>
+                </div>
                 <p>{service.description}</p>
               </div>
             </div>

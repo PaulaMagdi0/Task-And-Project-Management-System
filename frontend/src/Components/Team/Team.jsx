@@ -14,36 +14,36 @@ const teamMembers = [
   {
     id: "walter-white",
     name: "Walter White",
-    role: "Web Development",
+    role: "Lead Web Developer",
     description:
-      "Magni qui quod omnis unde et eos fuga et exercitationem. Odio veritatis perspiciatis quaerat qui aut aut aut",
+      "Walter is the backbone of our platform, ensuring that all the front-end and back-end functionalities work seamlessly. He has extensive experience in building scalable systems.",
     image: team1Image,
     socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
   {
     id: "sarah-jhinson",
     name: "Sarah Jhinson",
-    role: "Marketing",
+    role: "Project Manager",
     description:
-      "Repellat fugiat adipisci nemo illum nesciunt voluptas repellendus. In architecto rerum rerum temporibus",
+      "Sarah manages the flow of tasks and ensures that deadlines are met. With a strong background in project management, she keeps everything organized and on track.",
     image: team2Image,
     socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
   {
     id: "william-anderson",
     name: "William Anderson",
-    role: "Content",
+    role: "Content Strategist",
     description:
-      "Voluptas necessitatibus occaecati quia. Earum totam consequuntur qui porro et laborum toro des clara",
+      "William works closely with the development team to ensure our content is clear, concise, and accessible. He drives the content strategy and ensures its alignment with project goals.",
     image: team3Image,
     socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
   {
-    id: "william-anderson",
-    name: "William Anderson",
-    role: "Content",
+    id: "jane-doe",
+    name: "Jane Doe",
+    role: "UI/UX Designer",
     description:
-      "Voluptas necessitatibus occaecati quia. Earum totam consequuntur qui porro et laborum toro des clara",
+      "Jane is in charge of creating intuitive, user-friendly designs that make our platform easy to use. She focuses on creating beautiful, functional interfaces.",
     image: team3Image,
     socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
   },
@@ -53,11 +53,11 @@ const Team = () => {
   return (
     <section id="team" className="team section">
       <div className="container section-title" data-aos="fade-up">
-        <span>Team</span>
-        <h2>Team</h2>
+        <span>Our Team</span>
+        <h2>Meet the Team</h2>
         <p>
-          Necessitatibus eius consequatur ex aliquid fuga eum quidem sint
-          consectetur velit
+          Our talented team works together to build and maintain a task and
+          project management platform tailored to meet your needs.
         </p>
       </div>
       <div className="container">
@@ -89,7 +89,7 @@ const Team = () => {
                   <p>{member.description}</p>
                   <div className="social">
                     <Link to={member.socialLinks.twitter}>
-                      <i className="bi bi-twitter-x"></i>
+                      <i className="bi bi-twitter"></i>
                     </Link>
                     <Link to={member.socialLinks.facebook}>
                       <i className="bi bi-facebook"></i>

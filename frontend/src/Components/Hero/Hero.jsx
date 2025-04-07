@@ -9,8 +9,11 @@ const Hero = () => {
       <div className="container" data-aos="fade-up" data-aos-delay="100">
         <div className="row justify-content-start">
           <div className="col-lg-8">
-            <h2>Welcome to Task Flow</h2>
-            <p>We are a team of talented developers making websites.</p>
+            <h2>Stay Organized</h2>
+            <p>
+              Task Flow helps you manage tasks, track projects, and collaborate
+              with your team effortlessly and in real time.
+            </p>
             <Link to="/register" className="btn-get-started">
               Get Started
             </Link>

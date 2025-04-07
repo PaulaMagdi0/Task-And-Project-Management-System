@@ -7,18 +7,17 @@ const About = () => {
   const isHomePage = location.pathname === "/";
 
   const aboutData = {
-    title: "About Us",
-    subtitle: "Voluptatem dignissimos provident",
+    title: "About Task Flow",
+    subtitle: "Empowering teams to achieve more",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "Task Flow is a powerful task and project management platform designed to streamline workflows, boost productivity, and simplify collaboration for teams of any size.",
     listItems: [
-      "Ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-      "Duis aute irure dolor in reprehenderit in voluptate velit.",
-      "Ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate trideta storacalaperda mastiro dolore eu fugiat nulla pariatur.",
+      "Create, assign, and track tasks across multiple projects effortlessly.",
+      "Collaborate with team members in real time through integrated chat and comments.",
+      "Visualize progress with Kanban boards, calendar views, and smart dashboards.",
     ],
   };
 
-  // ✅ Show only 2 items on homepage, else show all
   const visibleItems = isHomePage
     ? aboutData.listItems.slice(0, 2)
     : aboutData.listItems;
@@ -26,14 +25,8 @@ const About = () => {
   return (
     <section className="about section">
       <div className="container section-title" data-aos="fade-up">
-        <span>
-          {aboutData.title}
-          <br />
-        </span>
-        <h2>
-          {aboutData.title}
-          <br />
-        </h2>
+        <span>{aboutData.title}</span>
+        <h2>{aboutData.title}</h2>
         <p>{aboutData.description}</p>
       </div>
       <div className="container">
@@ -61,7 +54,6 @@ const About = () => {
               ))}
             </ul>
 
-            {/* ✅ Show button only on homepage */}
             {isHomePage && (
               <Link to="/about" className="read-more">
                 <span>Read More</span>

@@ -4,44 +4,44 @@ const cardData = [
   {
     id: 1,
     number: "01",
-    title: "Lorem Ipsum",
+    title: "Smart Task Management",
     description:
-      "Ulamco laboris nisi ut aliquip ex ea commodo consequat. Et consectetur ducimus vero placeat",
+      "Create, assign, and prioritize tasks effortlessly. Stay organized and in control of your projects from start to finish.",
   },
   {
     id: 2,
     number: "02",
-    title: "Repellat Nihil",
+    title: "Real-Time Collaboration",
     description:
-      "Dolorem est fugiat occaecati voluptate velit esse. Dicta veritatis dolor quod et vel dire leno para dest",
+      "Work together with your team through instant updates, comments, and activity tracking—no more endless email threads.",
   },
   {
     id: 3,
     number: "03",
-    title: "Ad ad velit qui",
+    title: "Visual Project Tracking",
     description:
-      "Molestiae officiis omnis illo asperiores. Aut doloribus vitae sunt debitis quo vel nam quis",
+      "Use Kanban boards, calendar views, and timelines to visualize progress and ensure deadlines are met on time.",
   },
   {
     id: 4,
     number: "04",
-    title: "Repellendus molestiae",
+    title: "Custom Workflows",
     description:
-      "Inventore quo sint a sint rerum. Distinctio blanditiis deserunt quod soluta quod nam mider lando casa",
+      "Adapt Task Flow to your team’s needs with customizable statuses, labels, and workflows that match your process.",
   },
   {
     id: 5,
     number: "05",
-    title: "Sapiente Magnam",
+    title: "Progress Insights",
     description:
-      "Vitae dolorem in deleniti ipsum omnis tempore voluptatem. Qui possimus est repellendus est quibusdam",
+      "Generate reports and view analytics to gain insights into productivity, task completion rates, and team efficiency.",
   },
   {
     id: 6,
     number: "06",
-    title: "Facilis Impedit",
+    title: "Secure & Reliable",
     description:
-      "Quis eum numquam veniam ea voluptatibus voluptas. Excepturi aut nostrum repudiandae voluptatibus corporis sequi",
+      "Your data is protected with robust authentication, encryption, and regular backups—so you can focus on what matters.",
   },
 ];
 
