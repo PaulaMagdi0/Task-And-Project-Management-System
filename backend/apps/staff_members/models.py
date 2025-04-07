@@ -1,11 +1,5 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.core.validators import RegexValidator
-from django.core.exceptions import ValidationError
-
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.db import models
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -131,26 +125,26 @@ class StaffMember(AbstractUser):
     def is_admin(self):
         return self.role == self.Role.ADMIN or self.is_superuser
     
-        @property
-        def managed_branch(self):
-            """Returns the branch this user manages, if any"""
-            if self.is_branch_manager and hasattr(self, 'branch'):
-                return self.branch
-            return None
+    @property
+    def managed_branch(self):
+        """Returns the branch this user manages, if any"""
+        if self.is_branch_manager and hasattr(self, 'branch'):
+            return self.branch
+        return None
 
-        def get_full_name(self):
-            """Return full name with fallback to username"""
-            full_name = f'{self.first_name} {self.last_name}'.strip()
-            return full_name if full_name else self.username
+    def get_full_name(self):
+        """Return full name with fallback to username"""
+        full_name = f'{self.first_name} {self.last_name}'.strip()
+        return full_name if full_name else self.username
 
-        def get_branch_location(self):
-            """Helper method to get branch location details"""
-            if self.branch:
-                return {
-                    'id': self.branch.id,
-                    'name': self.branch.name,
-                    'address': self.branch.address,
-                    'phone': self.branch.phone,
-                    'is_active': self.branch.is_active
-                }
-            return None
+    def get_branch_location(self):
+        """Helper method to get branch location details"""
+        if self.branch:
+            return {
+                'id': self.branch.id,
+                'name': self.branch.name,
+                'address': self.branch.address,
+                'phone': self.branch.phone,
+                'is_active': self.branch.is_active
+            }
+        return None
