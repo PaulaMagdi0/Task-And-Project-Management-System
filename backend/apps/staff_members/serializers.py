@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from .models import StaffMember
 from apps.branch_location.models import Branch
+import secrets       # Add this import
+import string        # And this import
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField(read_only=True)
@@ -100,6 +102,7 @@ class StaffMemberListSerializer(serializers.ModelSerializer):
             return None
         return obj.branch.name
 
+
 class CreateSupervisorSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
@@ -125,6 +128,9 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        # Remove any role that might have been passed in (to avoid duplicates)
+        validated_data.pop('role', None)
+        
         password = validated_data.pop('password', None)
         branch = validated_data.pop('branch')
         
@@ -136,7 +142,7 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
             
         supervisor = StaffMember(
             **validated_data,
-            role=StaffMember.Role.SUPERVISOR
+            role=StaffMember.Role.SUPERVISOR  # Explicitly assign the supervisor role
         )
         
         try:
@@ -144,9 +150,6 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
             supervisor.set_password(password)
             supervisor.branch = branch
             supervisor.save()
-            
-            # Note: We don't update branch.manager since this is a supervisor
-            
             return supervisor
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})

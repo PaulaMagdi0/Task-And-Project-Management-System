@@ -6,4 +6,7 @@ export default defineConfig({
   css: {
     postcss: "./postcss.config.js",
   },
+  optimizeDeps: {
+    include: ['jwt-decode']
+  },
 });

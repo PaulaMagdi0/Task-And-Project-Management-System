@@ -1,8 +1,9 @@
+// File: src/components/SignIn.jsx
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser } from '../redux/authSlice';
 import { useNavigate } from 'react-router-dom';
-import heroBg from "/src/assets/img/newCapital.png"; // Fixed import syntax
+import heroBg from '/src/assets/img/newCapital.png';
 import {
   Box,
   Button,
@@ -17,6 +18,25 @@ import {
 } from '@mui/material';
 import { Lock, Email } from '@mui/icons-material';
 
+// Define animation keyframes outside the component
+const pulse = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+`;
+
+// Define styled component outside the SignIn function
+const AnimatedPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(4),
+  width: '100%',
+  maxWidth: 400,
+  animation: `${pulse} 3s ease-in-out infinite`,
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    boxShadow: theme.shadows[10]
+  }
+}));
+
 const SignIn = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -24,31 +44,11 @@ const SignIn = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Animation keyframes
-  const pulse = keyframes`
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-  `;
-
-  // Styled components
-  const AnimatedPaper = styled(Paper)(({ theme }) => ({
-    padding: theme.spacing(4),
-    width: '100%',
-    maxWidth: 400,
-    animation: `${pulse} 3s ease-in-out infinite`,
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      boxShadow: theme.shadows[10]
-    }
-  }));
-
   const handleLogin = async (e) => {
     e.preventDefault();
     const resultAction = await dispatch(loginUser({ email, password }));
     if (loginUser.fulfilled.match(resultAction)) {
       const { userType, role } = resultAction.payload;
-      // Redirect based on the token payload
       if (userType === 'student') {
         navigate('/student/dashboard');
       } else if (userType === 'staff') {
