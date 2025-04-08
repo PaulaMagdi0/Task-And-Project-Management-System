@@ -7,6 +7,10 @@ from apps.staff_members.models import StaffMember
 from apps.staff_members.permissions import IsAdminOrBranchManager
 from rest_framework.exceptions import ValidationError
 
+class StaffMemberDeleteView(generics.DestroyAPIView):
+    queryset = StaffMember.objects.all()
+    serializer_class = StaffMemberSerializer
+    permission_classes = [IsAdminOrBranchManager] 
 class StaffMemberListCreateView(generics.ListCreateAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer  # Change to StaffMemberSerializer for detail view

@@ -110,7 +110,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",
         "USER": "postgres",
-        "PASSWORD": "2580",  # Keep this secure
+        "PASSWORD": "1234",  # Keep this secure
         "HOST": "localhost",
         "PORT": "5432",
     }

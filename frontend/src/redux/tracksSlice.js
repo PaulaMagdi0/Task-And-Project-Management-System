@@ -2,12 +2,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
-
 export const createTrack = createAsyncThunk(
   'tracks/createTrack',
   async (trackData, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/tracks/create/', trackData);
+      // Using the updated URL endpoint for tracks
+      const response = await apiClient.post('/tracks/', trackData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data || error.message);

@@ -1,122 +1,103 @@
+// File: src/components/BranchManagerDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { FiMenu, FiX, FiMap, FiUserPlus, FiUserMinus, FiLink, FiList } from 'react-icons/fi';
 import AddTrack from '../components/AddTrack';
 import AddSupervisor from '../components/AddSupervisor';
-import BulkUploadSupervisors from '../components/BulkUploadSupervisors';
 import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
 import TracksTable from '../components/TracksTable';
 import DeleteSupervisor from '../components/DeleteSupervisor';
 import './BranchManagerDashboard.css';
 
 const BranchManagerDashboard = () => {
-  // Retrieve username from Redux auth slice
   const { username } = useSelector((state) => state.auth);
-  
-  // Options: "addTrack", "addSupervisors", "deleteSupervisor", "assignSupervisor", "viewTracks"
   const [selectedOption, setSelectedOption] = useState('addTrack');
-  // For "addSupervisors" sub-options: "manual" or "bulk"
-  const [supervisorOption, setSupervisorOption] = useState('manual');
-  // Sidebar state (closed by default)
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const menuItems = [
+    { id: 'addTrack', icon: <FiMap />, label: 'Add Track' },
+    { id: 'addSupervisors', icon: <FiUserPlus />, label: 'Add Supervisor' },
+    { id: 'deleteSupervisor', icon: <FiUserMinus />, label: 'Delete Supervisor' },
+    { id: 'assignSupervisor', icon: <FiLink />, label: 'Assign Supervisor' },
+    { id: 'viewTracks', icon: <FiList />, label: 'View Tracks' },
+  ];
 
   return (
     <div className="dashboard-container">
-      {/* Collapsible Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <button 
-          className="sidebar-toggle" 
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          {sidebarOpen ? '<' : '>'}
-        </button>
-        {sidebarOpen && (
-          <>
-            <h2>Welcome, {username || 'User'}</h2>
-            <hr />
-            <button 
-              className={`sidebar-button ${selectedOption === 'addTrack' ? 'active' : ''}`}
-              onClick={() => setSelectedOption('addTrack')}
-            >
-              Add Track
+        <div className="sidebar-header">
+          {sidebarOpen && (
+            <>
+              <div className="welcome-message">
+                <h3>Welcome back,</h3>
+                <h2>{username || 'User'}</h2>
+              </div>
+              <button className="toggle-btn" onClick={() => setSidebarOpen(false)}>
+                <FiX size={24} />
+              </button>
+            </>
+          )}
+          {!sidebarOpen && (
+            <button className="toggle-btn" onClick={() => setSidebarOpen(true)}>
+              <FiMenu size={24} />
             </button>
-            <button 
-              className={`sidebar-button ${selectedOption === 'addSupervisors' ? 'active' : ''}`}
-              onClick={() => setSelectedOption('addSupervisors')}
+          )}
+        </div>
+
+        <div className="menu-items">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              className={`menu-item ${selectedOption === item.id ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedOption(item.id);
+                if (!sidebarOpen) setSidebarOpen(true);
+              }}
             >
-              Add Supervisors
+              {item.icon}
+              {sidebarOpen && <span>{item.label}</span>}
             </button>
-            <button 
-              className={`sidebar-button ${selectedOption === 'deleteSupervisor' ? 'active' : ''}`}
-              onClick={() => setSelectedOption('deleteSupervisor')}
-            >
-              Delete Supervisor
-            </button>
-            <button 
-              className={`sidebar-button ${selectedOption === 'assignSupervisor' ? 'active' : ''}`}
-              onClick={() => setSelectedOption('assignSupervisor')}
-            >
-              Assign Supervisor
-            </button>
-            <button 
-              className={`sidebar-button ${selectedOption === 'viewTracks' ? 'active' : ''}`}
-              onClick={() => setSelectedOption('viewTracks')}
-            >
-              View Tracks
-            </button>
-          </>
-        )}
+          ))}
+        </div>
       </div>
 
-      {/* Main Content */}
       <div className="main-content">
-        {selectedOption === 'addTrack' && (
-          <div>
-            <h1>Add Track</h1>
-            <AddTrack />
-          </div>
-        )}
+        <div className="content-card">
+          {selectedOption === 'addTrack' && (
+            <>
+              <h1 className="section-title"><FiMap /> Track Management</h1>
+              <AddTrack />
+            </>
+          )}
 
-        {selectedOption === 'addSupervisors' && (
-          <div>
-            <h1>Add Supervisors</h1>
-            <div className="subnav">
-              <button 
-                className={`subnav-button ${supervisorOption === 'manual' ? 'active' : ''}`}
-                onClick={() => setSupervisorOption('manual')}
-              >
-                Add Single Supervisor
-              </button>
-              <button 
-                className={`subnav-button ${supervisorOption === 'bulk' ? 'active' : ''}`}
-                onClick={() => setSupervisorOption('bulk')}
-              >
-                Upload Excel
-              </button>
-            </div>
-            {supervisorOption === 'manual' ? <AddSupervisor /> : <BulkUploadSupervisors />}
-          </div>
-        )}
+          {selectedOption === 'addSupervisors' && (
+            <>
+              <h1 className="section-title"><FiUserPlus /> Supervisor Management</h1>
+              <AddSupervisor />
+            </>
+          )}
 
-        {selectedOption === 'deleteSupervisor' && (
-          <div>
-            <h1>Delete Supervisor</h1>
-            <DeleteSupervisor />
-          </div>
-        )}
+          {selectedOption === 'deleteSupervisor' && (
+            <>
+              <h1 className="section-title"><FiUserMinus /> Remove Supervisor</h1>
+              <DeleteSupervisor />
+            </>
+          )}
 
-        {selectedOption === 'assignSupervisor' && (
-          <div>
-            <h1>Assign Supervisor to Track</h1>
-            <AssignSupervisorToTrack />
-          </div>
-        )}
+          {selectedOption === 'assignSupervisor' && (
+            <>
+              <h1 className="section-title"><FiLink /> Assign Supervisor</h1>
+              <AssignSupervisorToTrack />
+            </>
+          )}
 
-        {selectedOption === 'viewTracks' && (
-          <div>
-            <h1>Current Tracks</h1>
-            <TracksTable />
-          </div>
-        )}
+          {selectedOption === 'viewTracks' && (
+            <>
+              <h1 className="section-title"><FiList /> Current Tracks</h1>
+              <TracksTable />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
