@@ -8,9 +8,11 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = []
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
+            name="Course",
             name="Course",
             fields=[
                 (
@@ -25,8 +27,22 @@ class Migration(migrations.Migration):
                 ("name", models.CharField(max_length=255)),
                 ("description", models.TextField()),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
+                "db_table": "courses",
+                "ordering": ["-created_at"],
                 "db_table": "courses",
                 "ordering": ["-created_at"],
             },

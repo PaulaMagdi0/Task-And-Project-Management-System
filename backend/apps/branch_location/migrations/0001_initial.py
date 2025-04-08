@@ -8,9 +8,11 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = []
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
+            name="Branch",
             name="Branch",
             fields=[
                 (
@@ -49,8 +51,48 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Official name of the branch location",
+                        max_length=100,
+                        unique=True,
+                        verbose_name="branch name",
+                    ),
+                ),
+                (
+                    "code",
+                    models.CharField(
+                        blank=True,
+                        help_text="Short unique code for the branch",
+                        max_length=10,
+                        unique=True,
+                        verbose_name="branch code",
+                    ),
+                ),
+                ("address", models.TextField(verbose_name="full address")),
+                ("city", models.CharField(max_length=100, verbose_name="city")),
+                (
+                    "state",
+                    models.CharField(max_length=100, verbose_name="state/province"),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
+                "verbose_name": "branch",
+                "verbose_name_plural": "branches",
+                "ordering": ["name"],
+                "permissions": [("can_manage_branches", "Can manage branch locations")],
                 "verbose_name": "branch",
                 "verbose_name_plural": "branches",
                 "ordering": ["name"],

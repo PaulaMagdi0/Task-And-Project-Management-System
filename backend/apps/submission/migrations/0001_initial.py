@@ -12,10 +12,14 @@ class Migration(migrations.Migration):
         ("assignments", "0001_initial"),
         ("courses", "0002_initial"),
         ("student", "0001_initial"),
+        ("assignments", "0001_initial"),
+        ("courses", "0002_initial"),
+        ("student", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
+            name="AssignmentSubmission",
             name="AssignmentSubmission",
             fields=[
                 (
@@ -54,8 +58,45 @@ class Migration(migrations.Migration):
                         to="student.student",
                     ),
                 ),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "file",
+                    models.FileField(blank=True, null=True, upload_to="submissions/"),
+                ),
+                ("file_url", models.URLField(blank=True, null=True)),
+                ("submission_date", models.DateTimeField(auto_now_add=True)),
+                (
+                    "assignment",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="assignments.assignment",
+                    ),
+                ),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="courses.course"
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="submissions",
+                        to="student.student",
+                    ),
+                ),
             ],
             options={
+                "ordering": ["-submission_date"],
                 "ordering": ["-submission_date"],
             },
         ),

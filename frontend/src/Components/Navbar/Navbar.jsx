@@ -1,76 +1,178 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import "./Navbar.css";
-import useCustomScripts from "../../Hooks/useCustomScripts";
+// // // File: src/components/Navbar.jsx
+// // import React from 'react';
+// // import { Link, useNavigate } from 'react-router-dom';
+// // import { useSelector, useDispatch } from 'react-redux';
+// // import './Navbar.css';
+// // import { logout } from '../redux/authSlice';
 
-const Navbar = () => {
-  useCustomScripts();
-  const location = useLocation();
+// // const Navbar = () => {
+// //   const navigate = useNavigate();
+// //   const dispatch = useDispatch();
+// //   const { token, username } = useSelector((state) => state.auth);
 
-  const navItems = [
-    { name: "Home", href: "/" },
-    { name: "About", href: "/about" },
-    { name: "Services", href: "/services" },
-    { name: "Contact", href: "/contact" },
-    {
-      name: "User",
-      dropdown: [
-        { name: "Register", href: "/register" },
-        { name: "Login", href: "/login" },
-      ],
-    },
-  ];
+// //   const handleLogout = () => {
+// //     dispatch(logout());
+// //     navigate('/signin');
+// //   };
 
+// //   return (
+// //     <nav className="navbar">
+// //       <div className="navbar-logo">
+// //         <Link to="/">TaskManager</Link>
+// //       </div>
+// //       <ul className="navbar-links">
+// //         <li><Link to="/">Home</Link></li>
+// //         {token ? (
+// //           <>
+// //             <li className="welcome-message"> {username}</li>
+// //             <li>
+// //               <button className="logout-button" onClick={handleLogout}>
+// //                 Sign Out
+// //               </button>
+// //             </li>
+// //             <li><Link to="/instructor/tasks">Instructor Tasks</Link></li>
+// //           </>
+// //         ) : (
+// //           <>
+// //             <li><Link to="/signin">Sign In</Link></li>
+// //             <li><Link to="/signup">Sign Up</Link></li>
+// //           </>
+// //         )}
+// //       </ul>
+// //     </nav>
+// //   );
+// // };
+
+// // export default Navbar;
+// import React from 'react';
+// import { 
+//   AppBar, 
+//   Box, 
+//   Toolbar, 
+//   Typography, 
+//   InputBase, 
+//   IconButton,
+//   Badge,
+//   styled
+// } from '@mui/material';
+// import { Search, Bell, Settings, Grid } from 'lucide-react';
+
+// const SearchInput = styled(InputBase)(({ theme }) => ({
+//   color: '#666',
+//   padding: theme.spacing(1, 1, 1, 5),
+//   width: '100%',
+//   '& input': {
+//     color: '#666',
+//   }
+// }));
+
+// function Navbar() {
+//   return (
+//     <nav className="navbar">
+//       <div className="navbar-logo">
+//         <Link to="/">TaskManager</Link>
+//       </div>
+//       <ul className="navbar-links">
+//         <li><Link to="/">Home</Link></li>
+//         {token ? (
+//           <>
+//             <li className="welcome-message"> {username}</li>
+//             <li>
+//               <button className="logout-button" onClick={handleLogout}>
+//                 Sign Out
+//               </button>
+//             </li>
+//             <li><Link to="/instructor/tasks">Instructor Tasks</Link></li>
+//           </>
+//         ) : (
+//           <>
+//             <li><Link to="/signin">Sign In</Link></li>
+//             {/* <li><Link to="/signup">Sign Up</Link></li> */}
+//           </>
+//         )}
+//       </ul>
+//     </nav>
+//   );
+// }
+
+// export default Navbar;
+import React from 'react';
+import { 
+  AppBar, 
+  Box, 
+  Toolbar, 
+  Typography, 
+  InputBase, 
+  IconButton,
+  Badge,
+  styled
+} from '@mui/material';
+import { Search, Bell, Settings, Grid } from 'lucide-react';
+
+const SearchInput = styled(InputBase)(({ theme }) => ({
+  color: '#666',
+  padding: theme.spacing(1, 1, 1, 5),
+  width: '100%',
+  '& input': {
+    color: '#666',
+  }
+}));
+
+function Navbar() {
   return (
-    <header id="header" className="branding header fixed-top py-3">
-      <div className="d-flex align-items-center">
-        <div className="container position-relative d-flex align-items-center justify-content-between">
-          <Link to="/" className="logo d-flex align-items-center">
-            <h1 className="sitename">Task Flow</h1>
-          </Link>
-          <nav id="navmenu" className="navmenu">
-            <ul className="nav-list gap-2">
-              {navItems.map((item, index) => (
-                <li key={index} className={item.dropdown ? "dropdown" : ""}>
-                  {item.dropdown ? (
-                    <span className="fs-4 ms-3 user-icon">
-                      <i className="bi bi-person-circle"></i>
-                    </span>
-                  ) : (
-                    <Link
-                      to={item.href}
-                      className={
-                        location.pathname === item.href ? "active" : ""
-                      }
-                    >
-                      {item.name}
-                    </Link>
-                  )}
-                  {item.dropdown && (
-                    <ul className="mt-2">
-                      {item.dropdown.map((subItem, subIndex) => (
-                        <li key={subIndex}>
-                          <Link
-                            to={subItem.href}
-                            className={
-                              location.pathname === subItem.href ? "active" : ""
-                            }
-                          >
-                            {subItem.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <i className="mobile-nav-toggle d-xl-none bi bi-list"></i>
-          </nav>
-        </div>
-      </div>
-    </header>
+    <AppBar 
+      position="fixed" 
+      sx={{ 
+        ml: '260px', 
+        width: 'calc(100% - 260px)',
+        bgcolor: 'background.paper',
+        boxShadow: 'none',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
+      }}
+    >
+      <Toolbar>
+        <Typography
+          variant="h6"
+          component="div"
+          sx={{ color: 'text.secondary', flexGrow: 0, minWidth: 160 }}
+        >
+          Dashboard
+        </Typography>
+
+        <Box sx={{ flexGrow: 1, position: 'relative' }}>
+          <Box sx={{ position: 'relative', maxWidth: 400 }}>
+            <Search 
+              size={20} 
+              style={{ 
+                position: 'absolute', 
+                left: 8, 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                color: '#666' 
+              }} 
+            />
+            <SearchInput
+              placeholder="Search..."
+            />
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton size="large">
+            <Grid size={20} color="#666" />
+          </IconButton>
+          <IconButton size="large">
+            <Badge badgeContent={4} color="error">
+              <Bell size={20} color="#666" />
+            </Badge>
+          </IconButton>
+          <IconButton size="large">
+            <Settings size={20} color="#666" />
+          </IconButton>
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
-};
+}
 
 export default Navbar;

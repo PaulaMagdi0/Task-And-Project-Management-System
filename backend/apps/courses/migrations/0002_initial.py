@@ -2,6 +2,7 @@
 
 import django.db.models.deletion
 from django.conf import settings
+from django.conf import settings
 from django.db import migrations, models
 
 
@@ -10,6 +11,9 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ("courses", "0001_initial"),
+        ("tracks", "0001_initial"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("courses", "0001_initial"),
         ("tracks", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -35,6 +39,8 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AlterUniqueTogether(
+            name="course",
+            unique_together={("name", "track")},
             name="course",
             unique_together={("name", "track")},
         ),

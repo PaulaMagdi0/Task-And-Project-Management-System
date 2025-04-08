@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("branch_location", "0001_initial"),
+        ("branch_location", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -27,8 +28,28 @@ class Migration(migrations.Migration):
                 to=settings.AUTH_USER_MODEL,
                 verbose_name="branch manager",
             ),
+            model_name="branch",
+            name="manager",
+            field=models.OneToOneField(
+                blank=True,
+                limit_choices_to={"role": "branch_manager"},
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="managed_branch",
+                to=settings.AUTH_USER_MODEL,
+                verbose_name="branch manager",
+            ),
         ),
         migrations.AddField(
+            model_name="branch",
+            name="supervisors",
+            field=models.ManyToManyField(
+                blank=True,
+                limit_choices_to={"role": "supervisor"},
+                related_name="supervised_branches",
+                to=settings.AUTH_USER_MODEL,
+                verbose_name="supervisors",
+            ),
             model_name="branch",
             name="supervisors",
             field=models.ManyToManyField(

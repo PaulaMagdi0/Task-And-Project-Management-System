@@ -12,6 +12,9 @@ class Migration(migrations.Migration):
         ("assignments", "0001_initial"),
         ("courses", "0002_initial"),
         ("student", "0001_initial"),
+        ("assignments", "0001_initial"),
+        ("courses", "0002_initial"),
+        ("student", "0001_initial"),
     ]
 
     operations = [
@@ -25,8 +28,22 @@ class Migration(migrations.Migration):
                 related_name="assignments",
                 to="student.student",
             ),
+            model_name="assignment",
+            name="assigned_to",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="assignments",
+                to="student.student",
+            ),
         ),
         migrations.AddField(
+            model_name="assignment",
+            name="course",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, to="courses.course"
+            ),
             model_name="assignment",
             name="course",
             field=models.ForeignKey(

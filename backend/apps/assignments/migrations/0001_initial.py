@@ -9,9 +9,11 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = []
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
+            name="Assignment",
             name="Assignment",
             fields=[
                 (
@@ -42,8 +44,38 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("file", models.URLField(blank=True, null=True)),
                 ("file_url", models.URLField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=255)),
+                ("due_date", models.DateTimeField(default=django.utils.timezone.now)),
+                ("end_date", models.DateTimeField(default=None)),
+                (
+                    "assignment_type",
+                    models.CharField(
+                        choices=[
+                            ("task", "Task"),
+                            ("project", "Project"),
+                            ("exam", "Exam"),
+                        ],
+                        default="homework",
+                        max_length=50,
+                    ),
+                ),
+                ("description", models.TextField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("file", models.URLField(blank=True, null=True)),
+                ("file_url", models.URLField(blank=True, null=True)),
             ],
             options={
+                "db_table": "assignments",
+                "ordering": ["-created_at"],
                 "db_table": "assignments",
                 "ordering": ["-created_at"],
             },
