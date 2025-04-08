@@ -8,15 +8,10 @@ from apps.courses.serializers import CourseSerializer  # Ensure you have a Cours
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 
-from rest_framework import generics, status
-from rest_framework.response import Response
-from apps.tracks.models import Track
-from .serializers import TrackSerializer
-
 class TrackListView(generics.ListCreateAPIView):
     """
     GET: List all tracks (public access)
-    POST: Create a new track (bypasses permissions for now)
+    POST: Create new track (bypasses permissions for now)
     """
     queryset = Track.objects.select_related('supervisor').prefetch_related('courses')
     serializer_class = TrackSerializer
@@ -26,14 +21,9 @@ class TrackListView(generics.ListCreateAPIView):
         return []  # Empty list bypasses permissions
 
     def create(self, request, *args, **kwargs):
-        """
-        Custom create method to handle track creation
-        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        
-        # Return a custom response
         return Response(
             {
                 'status': 'success',
@@ -42,15 +32,6 @@ class TrackListView(generics.ListCreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
-
-    def perform_create(self, serializer):
-        """
-        Custom method to save the object to the database
-        """
-        # Create and save the Track object using the validated data from the serializer
-        serializer.save()
-
-
 
 
 class TrackDetailView(generics.RetrieveUpdateDestroyAPIView):
