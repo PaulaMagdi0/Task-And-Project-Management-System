@@ -1,0 +1,100 @@
+.create-assignment {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-family: 'Arial', sans-serif;
+  }
+  
+  .create-assignment h2 {
+    text-align: center;
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .create-assignment form {
+    display: grid;
+    gap: 20px;
+  }
+  
+  .create-assignment label {
+    font-weight: bold;
+    color: #555;
+    font-size: 1rem;
+  }
+  
+  .create-assignment input[type="text"],
+  .create-assignment input[type="datetime-local"],
+  .create-assignment textarea,
+  .create-assignment select {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    transition: border 0.3s ease;
+  }
+  
+  .create-assignment input[type="text"]:focus,
+  .create-assignment input[type="datetime-local"]:focus,
+  .create-assignment textarea:focus,
+  .create-assignment select:focus {
+    border-color: #5d5d5d;
+    background-color: #fff;
+    outline: none;
+  }
+  
+  .create-assignment button {
+    background-color: #4CAF50;
+    color: #fff;
+    padding: 12px 20px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .create-assignment button:hover {
+    background-color: #45a049;
+  }
+  
+  .create-assignment .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .create-assignment .form-group div {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  
+  .create-assignment .form-group input[type="radio"] {
+    margin-right: 8px;
+  }
+  
+  .create-assignment .form-group select {
+    width: 50%;
+  }
+  
+  .create-assignment .form-group label {
+    font-size: 1rem;
+    color: #333;
+  }
+  
+  .create-assignment .error {
+    color: red;
+    font-size: 0.875rem;
+  }
+  
+  .create-assignment .loading {
+    font-size: 1rem;
+    color: #999;
+  }
+  

@@ -1,0 +1,62 @@
+.assignments-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  .assignments-container h2 {
+    text-align: center;
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .assignments-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  
+  .assignments-table th,
+  .assignments-table td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #ddd;
+    font-size: 1rem;
+  }
+  
+  .assignments-table th {
+    background-color: #4CAF50;
+    color: white;
+  }
+  
+  .assignments-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+  }
+  
+  .assignments-table tr:hover {
+    background-color: #ddd;
+  }
+  
+  .assignments-table td {
+    color: #555;
+  }
+  
+  .assignments-table td:last-child {
+    font-weight: bold;
+    color: #00796b;
+  }
+  
+  .loading {
+    font-size: 1.2rem;
+    text-align: center;
+    color: #999;
+  }
+  
+  .error {
+    font-size: 1.2rem;
+    text-align: center;
+    color: red;
+  }
+  
