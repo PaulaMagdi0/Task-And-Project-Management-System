@@ -1,0 +1,104 @@
+/* Container for the entire landing page */
+.home-container {
+  font-family: Arial, sans-serif;
+  color: #333;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  /* This makes the container take the full viewport height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hero section with a dark-blue background */
+.home-hero {
+  background-color: #005baa;
+  /* Fallback */
+  background:
+    linear-gradient(rgba(0, 91, 170, 0.7), rgba(0, 91, 170, 0.7)),
+    url('../../assets/img/newCapital.png') center/cover no-repeat;
+  color: #fff;
+  text-align: center;
+  padding: 4rem 1rem;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-hero h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  /* Responsive font */
+  margin-bottom: 1rem;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.home-hero p {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  /* Responsive font */
+  max-width: 800px;
+  margin: 0 auto 2rem;
+}
+
+.hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.hero-content h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.hero-content p {
+  font-size: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+/* Call-to-action button */
+.hero-btn {
+  background-color: #ffcc00;
+  /* A contrasting yellow */
+  color: #005baa;
+  padding: 1rem 2rem;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.hero-btn:hover {
+  background-color: #e6b800;
+}
+
+/* Info section for additional website details */
+.home-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  padding: 3rem 1rem;
+  background-color: #f8f8f8;
+}
+
+.info-block {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 2rem;
+  width: 280px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.info-block h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.info-block p {
+  font-size: 1rem;
+  line-height: 1.5;
+}
