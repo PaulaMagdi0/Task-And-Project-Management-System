@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FiUserPlus, FiLock, FiSmartphone, FiMail } from 'react-icons/fi';
 import { createSupervisor, clearSupervisorState } from '../redux/supervisorsSlice';
-import './AddSupervisor.css'; // Assuming you have a CSS file for styling
+// import './AddSupervisor.css'; // Assuming you have a CSS file for styling
 const AddSupervisor = () => {
   const dispatch = useDispatch();
   const { loading, error, message } = useSelector((state) => state.supervisors);
