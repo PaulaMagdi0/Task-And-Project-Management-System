@@ -1,8 +1,0 @@
-.user-icon i {
-    font-size: 1.5rem;
-    transition: color 0.3s ease-in-out;
-}
-
-.user-icon:hover i {
-    color: #cc1616;
-}
