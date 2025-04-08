@@ -9,10 +9,12 @@ import StudentDashboard from './pages/StudentDashboard';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import BranchManagerDashboard from './pages/BranchManagerDashboard';
 import InstructorDashboard from './pages/Instructor/Dashboard';
-import Assignments from './pages/Instructor/Assignments';
-import Submissions from './pages/Instructor/Submissions';
-import Grades from './pages/Instructor/Grades';
-import CreateTask from './pages/Instructor/CreateAssignment';
+// Assignment Submission Greade Creat_Assignment Course
+import Course from "./pages/DashBoard/Courses"
+import Assignments from './pages/DashBoard/Assignments';
+import Submissions from './pages/DashBoard/Submissions';
+import Grades from './pages/DashBoard/Grades';
+import CreateAssignment from './pages/DashBoard/CreateAssignment';
 import UploadStudentPage from './components/AddStudent';
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
@@ -29,11 +31,14 @@ import Footer from './Components/Footer/Footer';
 import Home from './pages/Home/Home';
 import Team from './Components/Team/Team';
 import Dashboard from "./pages/DashBoard/Dashboard"
-
+import Hello from './pages/DashBoard/hello';
+import AccessDenied from "./Components/Denied/Denied"
 const App = () => {
   useCustomScripts();
+  const userType = 'staff';  // Dummy data
+  const role = 'instructor'; // Dummy role (can be dynamic)
 
-  const { userType, role } = useSelector((state) => state.auth);
+  // const { userType, role } = useSelector((state) => state.auth);
 
   return (
     <BrowserRouter>
@@ -47,7 +52,7 @@ const App = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/terms" element={<TermsOfService />} />
           {/* <Route path="/privacy" element={<PrivacyPolicy />} /> */}
-          <Route path="/dashboard" element={<Dashboard />} />
+          {/* <Route path="/dashboard" element={<Dashboard />} /> */}
 
           <Route path="/signin" element={<SignIn />} />
           {/* <Route path="/home2" element={<Home />} /> */}
@@ -58,14 +63,35 @@ const App = () => {
           <Route path="/Team" element={<Team />} />
 
 
-          {/* Instructor Dashboard Routes */}
+          {/* Main Dashboard Layout */}
+          <Route path="/dashboard" element={<Dashboard />}>
+
+          {/* If an instructor tries to access "Hello", show AccessDenied */}
+          <Route 
+            path="/dashboard/hello" 
+            element={userType === 'staff' && role === 'instructor' ? <AccessDenied /> : <Hello />} 
+          />
+
+          <Route path="/dashboard/courses" element={<Course />} />
+          <Route path="student" element={<StudentDashboard />} />
+          <Route path="supervisor" element={<SupervisorDashboard />} />
+          <Route path="branchmanager" element={<BranchManagerDashboard />} />
+
+          {/* Instructor-specific routes */}
           {userType === 'staff' && role === 'instructor' && (
-            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+            <>
+              <Route path="instructor" element={<InstructorDashboard />} />
+              <Route path="/dashboard/assignments" element={<Assignments />} />
+              <Route path="/dashboard/submissions" element={<Submissions />} />
+              <Route path="/dashboard/createassignment" element={<CreateAssignment />} />
+              <Route path="instructor/grades" element={<Grades />} />
+            </>
           )}
-          <Route path="/instructor/assignments" element={<Assignments />} />
-          <Route path="/instructor/submissions" element={<Submissions />} />
-          <Route path="/instructor/grades" element={<Grades />} />
-          <Route path="/instructor/createTask" element={<CreateTask />} />
+
+          {/* Fallback Route */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
+          
           <Route path="/chat" element={<Chatting users={dummyUsers} />} />
 
           <Route path="/*" element={<NotFound />} />
