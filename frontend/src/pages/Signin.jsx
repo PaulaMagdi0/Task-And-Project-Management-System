@@ -1,7 +1,7 @@
 // File: src/components/SignIn.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '../redux/authSlice';
+import { loginUser, logout } from '../redux/authSlice';
 import { useNavigate } from 'react-router-dom';
 import heroBg from '/src/assets/img/newCapital.png';
 import {
@@ -25,7 +25,7 @@ const pulse = keyframes`
   100% { transform: scale(1); }
 `;
 
-// Define styled component outside the SignIn function
+// Define styled component for the Paper outside the component
 const AnimatedPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
   width: '100%',
@@ -43,6 +43,11 @@ const SignIn = () => {
   const { loading, error } = useSelector((state) => state.auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // When the SignIn page mounts, force logout to clear any token.
+  useEffect(() => {
+    dispatch(logout());
+  }, [dispatch]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -96,7 +101,6 @@ const SignIn = () => {
               <Typography variant="h4" component="h1" gutterBottom>
                 Sign In
               </Typography>
-
               <Box
                 component="form"
                 onSubmit={handleLogin}
@@ -122,7 +126,6 @@ const SignIn = () => {
                     )
                   }}
                 />
-
                 <TextField
                   fullWidth
                   label="Password"
@@ -137,7 +140,6 @@ const SignIn = () => {
                     )
                   }}
                 />
-
                 <Zoom in timeout={1000}>
                   <Button
                     fullWidth
@@ -157,7 +159,6 @@ const SignIn = () => {
                     {loading ? 'Logging in...' : 'Log In'}
                   </Button>
                 </Zoom>
-
                 {error && (
                   <Fade in timeout={500}>
                     <Typography color="error" align="center" sx={{ mt: 2 }}>
