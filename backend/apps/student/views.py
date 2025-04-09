@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes,parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
 from rest_framework import generics
@@ -10,8 +11,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
-
 logger = logging.getLogger(__name__)
+from apps.tracks.models import Track  # Adjust based on your app structure
 
 
 @api_view(['POST'])
@@ -81,11 +82,50 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])  # Supports FormData
+def create_student_from_form(request):
+    """
+    Accepts FormData input and creates a new student.
+    Expected FormData fields:
+    - first_name
+    - second_name
+    - email
+    - role
+    - track_id
+    - password (optional)
+    """
+    # Collecting form data
+    data = {
+        "first_name": request.data.get("first_name"),
+        "last_name": request.data.get("last_name"),
+        "email": request.data.get("email"),
+        "role": request.data.get("role"),
+        "track_id": request.data.get("track_id"),
+        # "password": request.data.get("password", None),  # Optional
+    }
 
+    # Check if the track_id is valid
+    try:
+        track = Track.objects.get(id=data.get('track_id'))
+    except Track.DoesNotExist:
+        return Response({"error": "Invalid track_id provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Add the track object to the data instead of just the track_id
+    data["track"] = track
+
+    # Validate the serializer with the data
+    serializer = StudentSerializer(data=data)
+    
+    if serializer.is_valid():
+        serializer.save()  # Save the student object
+        return Response({"message": "Student created successfully"}, status=status.HTTP_201_CREATED)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 @api_view(['GET'])
 # @permission_classes([IsAuthenticated])
 @permission_classes([AllowAny])
-
 def list_students(request):
     """List students with optimized querying and pagination"""
     try:

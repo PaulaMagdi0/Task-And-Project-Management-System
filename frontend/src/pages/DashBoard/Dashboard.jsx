@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Container } from '@mui/material';
 import { Outlet } from 'react-router-dom'; // Used to render child routes
 import Sidebar from '../../Components/Sidebar/Sidebar'; // Import Sidebar
-import Navbar from '../../Components/NavBar/Navbar'; // Import Navbar
+import Navbar from '../../Components/Navbar/Navbar'; // Import Navbar
 
 function Dashboard() {
   return (

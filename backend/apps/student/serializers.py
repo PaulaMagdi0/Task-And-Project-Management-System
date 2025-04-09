@@ -344,6 +344,7 @@ class ExcelUploadSerializer(serializers.Serializer):
             except Exception as e:
                 logger.error(f"Failed to send email to {student.email}: {str(e)}")
 
+from .models import Student, Track  # Import Track model
 
 class StudentSerializer(serializers.ModelSerializer):
     track = serializers.StringRelatedField(read_only=True)
@@ -377,7 +378,7 @@ class StudentSerializer(serializers.ModelSerializer):
         """Validate email uniqueness."""
         if self.instance and self.instance.email == value:
             return value
-            
+         
         if Student.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
         return value
@@ -421,7 +422,7 @@ class StudentSerializer(serializers.ModelSerializer):
 
     def _generate_verification_code(self):
         """Generate verification code."""
-        return secrets.token_urlsafe(32)
+        return secrets.token_urlsafe(24)
 
     def _send_verification_email(self, student, password):
         """Send verification email."""
@@ -447,7 +448,7 @@ class StudentSerializer(serializers.ModelSerializer):
             )
         except Exception as e:
             logger.error(f"Failed to send verification email: {str(e)}")
-            
+
 class DashboardSerializer(serializers.ModelSerializer):
     upcoming_assignments = serializers.SerializerMethodField()
     courses = serializers.SerializerMethodField()

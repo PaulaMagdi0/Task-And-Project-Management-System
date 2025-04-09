@@ -151,6 +151,9 @@ from rest_framework.permissions import AllowAny  # AllowAny allows public access
 from apps.tracks.models import Track
 from apps.tracks.serializers import TrackSerializer
 from apps.staff_members.permissions import IsAdminOrBranchManager
+from apps.courses.serializers import CourseSerializer  # Ensure you have a CourseSerializer for courses
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 
 class TrackListView(generics.ListCreateAPIView):
     """
@@ -217,3 +220,17 @@ class TrackDetailView(generics.RetrieveUpdateDestroyAPIView):
             },
             status=status.HTTP_204_NO_CONTENT
         )
+        
+class TrackCoursesView(APIView):
+    def get(self, request, track_id):
+        # Fetch the track using the track_id, or return 404 if not found
+        track = get_object_or_404(Track, id=track_id)
+        
+        # Get all courses assigned to this track
+        courses = track.courses.all()
+        
+        # Serialize the courses
+        serializer = CourseSerializer(courses, many=True)
+        
+        # Return the serialized data
+        return Response(serializer.data)

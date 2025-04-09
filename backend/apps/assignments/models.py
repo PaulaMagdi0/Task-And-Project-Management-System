@@ -1,7 +1,22 @@
+# In apps/assignments/models.py
 from django.db import models
 from django.utils import timezone
-from apps.courses.models import Course  # ✅ Ensure correct import
-from apps.student.models import Student  # Import Student model
+from apps.student.models import Student
+from apps.courses.models import Course
+from apps.tracks.models import Track
+
+# Through model to hold the additional `course` field in the relationship
+class AssignmentStudent(models.Model):
+    assignment = models.ForeignKey('Assignment', on_delete=models.CASCADE)
+    course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
+    student = models.ForeignKey('student.Student', on_delete=models.CASCADE)
+    track = models.ForeignKey('tracks.Track', null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        unique_together = ('assignment', 'student')
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.assignment.title} ({self.course.name})"
 
 class Assignment(models.Model):
     ASSIGNMENT_TYPES = (
@@ -11,50 +26,49 @@ class Assignment(models.Model):
     )
 
     title = models.CharField(max_length=255)
-    due_date = models.DateTimeField(default=timezone.now)  # Default is current time (when announced)
-    end_date = models.DateTimeField(default=None)  # Temporarily set default as None
+    due_date = models.DateTimeField(default=timezone.now)
+    end_date = models.DateTimeField(default=None)
     assignment_type = models.CharField(
         max_length=50, choices=ASSIGNMENT_TYPES, default="homework"
     )
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    file = models.URLField(null=True, blank=True)  # This is the file URL field
-    file_url = models.URLField(null=True, blank=True)  # Add this if needed as a separate field
+    file = models.URLField(null=True, blank=True)
+    file_url = models.URLField(null=True, blank=True)
 
-    # Renamed the student field to assigned_to for clarity
-    assigned_to = models.ForeignKey(
-        Student, on_delete=models.SET_NULL, null=True, blank=True, related_name='assignments'
+    # Use the `through` model to link students to assignments with a course field
+    assigned_to = models.ManyToManyField(
+        Student, through='AssignmentStudent', related_name='assignments', blank=True
     )
 
     class Meta:
-        ordering = ["-created_at"]  # Latest first
-        db_table = "assignments" 
+        ordering = ["-created_at"]
+        db_table = "assignments"
 
     def __str__(self):
-        # Logic to return "Assigned to All" or the student's name
         assigned_display = self.get_assigned_to_display()
         return f"{self.title} ({self.get_assignment_type_display()} - {assigned_display})"
 
     def get_assigned_to_display(self):
-        if self.assigned_to:
-            return f"Assigned to {self.assigned_to.full_name}"
+        if self.assigned_to.exists():
+            assigned_students = [
+                f"{student.full_name} ({student.assignmentstudent_set.first().course.name})"
+                for student in self.assigned_to.all()
+            ]
+            return f"Assigned to {', '.join(assigned_students)}"
         return "Assigned to All"
 
     def save(self, *args, **kwargs):
-        # If end_date is None, set it to the end of the current day
         if not self.end_date:
             self.end_date = self.get_default_end_date()
 
-        # Ensure that the end_date is after the due_date
         if self.end_date and self.due_date and self.end_date < self.due_date:
             raise ValueError("End date must be after the due date.")
         
         super().save(*args, **kwargs)
 
     def get_default_end_date(self):
-        """Compute the default end date to be the end of the current day."""
-        # Ensure the date is timezone-aware
         return timezone.make_aware(
             timezone.datetime.combine(timezone.now().date(), timezone.datetime.min.time()) + timezone.timedelta(days=1)
         )
