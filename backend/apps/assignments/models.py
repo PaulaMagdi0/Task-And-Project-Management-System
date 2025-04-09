@@ -1,21 +1,22 @@
 # In apps/assignments/models.py
 from django.db import models
 from django.utils import timezone
-from apps.courses.models import Course, Track  # Assuming Track is in courses
 from apps.student.models import Student
+from apps.courses.models import Course
+from apps.tracks.models import Track
 
 # Through model to hold the additional `course` field in the relationship
 class AssignmentStudent(models.Model):
     assignment = models.ForeignKey('Assignment', on_delete=models.CASCADE)
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
+    student = models.ForeignKey('student.Student', on_delete=models.CASCADE)
+    track = models.ForeignKey('tracks.Track', null=True, blank=True, on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ('assignment', 'student')
 
     def __str__(self):
         return f"{self.student.full_name} - {self.assignment.title} ({self.course.name})"
-
 
 class Assignment(models.Model):
     ASSIGNMENT_TYPES = (

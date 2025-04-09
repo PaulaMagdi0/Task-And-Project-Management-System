@@ -16,53 +16,65 @@ from .models import Assignment  # Import the Assignment model
 #         super().save_model(request, obj, form, change)
 
 # admin.site.register(Assignment, AssignmentAdmin)  # Register the Assignment model with the custom admin class
+# In apps/assignments/admin.py
 from django.contrib import admin
 from .models import Assignment, AssignmentStudent
-from .forms import AssignmentAdminForm  # Import the form we created
-from apps.student.models import Student  # Ensure you import the Student model here
-from apps.courses.models import Course  # Ensure you import the Course model here
+from django.utils.html import format_html
+from .forms import AssignmentAdminForm
+from apps.student.models import Student
+
+# Inline for AssignmentStudent to link with Assignment
+class AssignmentStudentInline(admin.TabularInline):
+    model = AssignmentStudent
+    extra = 1  # Number of empty forms to show by default in the inline
+    fields = ['student', 'course', 'track']  # Fields to display
 
 class AssignmentAdmin(admin.ModelAdmin):
-    form = AssignmentAdminForm  # Use the custom form to handle dynamic student assignment
-    list_display = ['title', 'course', 'due_date', 'created_at']
+    form = AssignmentAdminForm  # Link the custom form to the model
+    list_display = ('title', 'course', 'due_date', 'end_date', 'created_at', 'assigned_students')
+    search_fields = ('title', 'course__name', 'description')
+    list_filter = ('assignment_type', 'course', 'due_date')
+
+    # Add custom field to display assigned students in list view
+    def assigned_students(self, obj):
+        return format_html(
+            ", ".join([f"{student.student.full_name} ({student.course.name})" for student in obj.assignmentstudent_set.all()])
+        )
+    assigned_students.short_description = "Assigned Students"
+
+    # Include inline for AssignmentStudent
+    inlines = [AssignmentStudentInline]
+
+    def get_queryset(self, request):
+        # Override to make sure we can access the related AssignmentStudent data
+        queryset = super().get_queryset(request)
+        queryset = queryset.prefetch_related('assignmentstudent_set')
+        return queryset
 
     def save_model(self, request, obj, form, change):
-        # Save the assignment first
+        # Handle the case when the 'assigned_to_all' checkbox is checked
+        assigned_students = form.cleaned_data.get('assigned_to')
+        if form.cleaned_data.get('assigned_to_all'):
+            track = form.cleaned_data.get('track')
+            if track:
+                # Assign all students from the selected track to the assignment
+                assigned_students = Student.objects.filter(track=track)
+        
+        # Remove old students and add the new ones
         obj.save()
 
-        # Get form fields for assigning students
-        assigned_to_all = form.cleaned_data['assigned_to_all']
-        course = form.cleaned_data['course']  # Get the course from the form
+        # Clear previous assignments
+        obj.assignmentstudent_set.all().delete()
 
-        if assigned_to_all:
-            # If 'Assign to All Students' is selected, assign all students in the selected track
-            track = form.cleaned_data['track']  # Get the track from the form
-            students_in_track = Student.objects.filter(track=track)
-            for student in students_in_track:
-                # Ensure each student is associated with the correct course
-                AssignmentStudent.objects.create(
-                    assignment=obj,
-                    student=student,
-                    course=course  # Assign the course to the student
-                )
-        else:
-            # Otherwise, assign the selected students
-            selected_students = form.cleaned_data['assigned_to']
-            for student in selected_students:
-                AssignmentStudent.objects.create(
-                    assignment=obj,
-                    student=student,
-                    course=course  # Assign the course to the student
-                )
+        # Add new assignments
+        for student in assigned_students:
+            AssignmentStudent.objects.create(
+                assignment=obj,
+                student=student,
+                course=obj.course,
+                track=student.track
+            )
+        super().save_model(request, obj, form, change)
 
-        # Save the updated assignment
-        obj.save()
-
-    def get_fieldsets(self, request, obj=None):
-        return [
-            (None, {'fields': ['title', 'course', 'description', 'due_date', 'assigned_to', 'assigned_to_all', 'track']}),
-        ]
-
-# Register the admin
 admin.site.register(Assignment, AssignmentAdmin)
 admin.site.register(AssignmentStudent)
