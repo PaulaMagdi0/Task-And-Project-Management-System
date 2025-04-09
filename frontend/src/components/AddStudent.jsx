@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import { Close, CheckCircle, Error } from '@mui/icons-material';
 import CloudUpload from '@mui/icons-material/CloudUpload';
-import axios from 'axios';
+import apiClient from '../services/api';
 
 const StyledCard = styled(Card)(({ theme }) => ({
     padding: theme.spacing(4),
@@ -57,7 +57,9 @@ const UploadStudentPage = () => {
     const [studentData, setStudentData] = useState({
         first_name: '',
         last_name: '',
-        email: ''
+        email: '',
+        role: 'student', // Default role
+        track_id: '', // Track ID
     });
     const [excelFile, setExcelFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -103,42 +105,34 @@ const UploadStudentPage = () => {
     };
 
     const handleSubmitManualStudent = async () => {
-        if (!studentData.first_name || !studentData.last_name || !studentData.email) {
+        if (!studentData.first_name || !studentData.last_name || !studentData.email || !studentData.track_id) {
             showErrorModal('Please fill all required fields');
             return;
         }
-
+    
         setLoading(true);
         try {
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/student/upload/`,
-                {
-                    first_name: studentData.first_name,
-                    last_name: studentData.last_name,
-                    email: studentData.email,
-                    role: 'student' // Default role
-                },
+            const formData = new FormData();
+            formData.append('first_name', studentData.first_name);
+            formData.append('last_name', studentData.last_name);
+            formData.append('email', studentData.email);
+            formData.append('role', 'student'); // Default role
+            formData.append('track_id', studentData.track_id); // Include Track ID
+
+            const response = await apiClient.post(
+                '/student/create/',
+                formData,
                 {
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'multipart/form-data', // Automatically set for FormData
                     },
                 }
             );
-
-            showSuccessModal(
-                'Student added successfully! ' +
-                'A verification email has been sent to the student.'
-            );
-
-            setStudentData({
-                first_name: '',
-                last_name: '',
-                email: ''
-            });
+    
+            showSuccessModal('Student added successfully! A verification email has been sent to the student.');
+            setStudentData({ first_name: '', last_name: '', email: '', track_id: '' });
         } catch (error) {
-            const errorMsg = error.response?.data?.error ||
-                error.response?.data?.message ||
-                'Failed to add student';
+            const errorMsg = error.response?.data?.error || 'Failed to add student';
             console.error('Error submitting student data:', error);
             showErrorModal(errorMsg);
         } finally {
@@ -147,18 +141,19 @@ const UploadStudentPage = () => {
     };
 
     const handleUploadExcel = async () => {
-        if (!excelFile) {
-            showErrorModal('Please select a file first');
+        if (!excelFile || !studentData.track_id) {
+            showErrorModal('Please upload a file and provide a Track ID.');
             return;
         }
 
         setLoading(true);
-        const formData = new FormData();
-        formData.append('excel_file', excelFile);
-
         try {
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/student/upload/`,
+            const formData = new FormData();
+            formData.append('file', excelFile);
+            formData.append('track_id', studentData.track_id); // Add Track ID to the form data
+
+            const response = await apiClient.post(
+                '/student/upload/',
                 formData,
                 {
                     headers: {
@@ -166,16 +161,18 @@ const UploadStudentPage = () => {
                     },
                 }
             );
-            showSuccessModal(`${response.data.count || 'Students'} added successfully!`);
+    
+            showSuccessModal('Students uploaded successfully!');
             setExcelFile(null);
         } catch (error) {
-            console.error('Error uploading file:', error);
-            showErrorModal(error.response?.data?.error || 'Failed to upload students');
+            const errorMsg = error.response?.data?.error || 'Failed to upload students';
+            console.error('Error uploading students:', error);
+            showErrorModal(errorMsg);
         } finally {
             setLoading(false);
         }
     };
-
+    
     return (
         <Box sx={{ p: 3, background: '#f5f7fa', minHeight: '100vh' }}>
             <StyledCard>
@@ -246,6 +243,16 @@ const UploadStudentPage = () => {
                                     sx={{ mb: 3 }}
                                 />
                             </Grid>
+                            <Grid item xs={12}>
+                                <StyledTextField
+                                    label="Track ID *"
+                                    fullWidth
+                                    name="track_id"
+                                    value={studentData.track_id}
+                                    onChange={handleStudentInputChange}
+                                    sx={{ mb: 3 }}
+                                />
+                            </Grid>
                         </Grid>
 
                         <StyledButton
@@ -301,6 +308,15 @@ const UploadStudentPage = () => {
                             </Typography>
                         </Paper>
 
+                        <StyledTextField
+                            label="Track ID *"
+                            fullWidth
+                            name="track_id"
+                            value={studentData.track_id}
+                            onChange={handleStudentInputChange}
+                            sx={{ mb: 3 }}
+                        />
+
                         <StyledButton
                             variant="contained"
                             fullWidth
@@ -347,17 +363,13 @@ const UploadStudentPage = () => {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent>
-                    <Typography variant="body1">
+                    <Typography variant="body2" color="text.secondary">
                         {modalContent.message}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button
-                        onClick={handleCloseModal}
-                        variant="contained"
-                        color={modalContent.isSuccess ? 'success' : 'error'}
-                    >
-                        OK
+                    <Button onClick={handleCloseModal} color="primary">
+                        Close
                     </Button>
                 </DialogActions>
             </Dialog>
