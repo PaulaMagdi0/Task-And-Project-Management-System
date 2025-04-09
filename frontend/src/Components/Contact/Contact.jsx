@@ -9,6 +9,7 @@ const Contact = () => {
     message: "",
   });
   const [status, setStatus] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -16,6 +17,8 @@ const Contact = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setStatus("Sending your message...");
 
     try {
       const response = await fetch("http://127.0.0.1:8000/api/contact/", {
@@ -26,17 +29,18 @@ const Contact = () => {
         body: JSON.stringify(formData),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        setStatus(
-          "Your message has been sent successfully. We'll get back to you shortly."
-        );
+        setStatus("Message sent successfully!");
         setFormData({ name: "", email: "", subject: "", message: "" });
       } else {
-        const errorData = await response.json();
-        setStatus(`Error: ${errorData.error}`);
+        setStatus(data.error || "Failed to send message. Please try again.");
       }
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Network error: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
