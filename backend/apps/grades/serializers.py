@@ -6,12 +6,12 @@ class GradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grade
         fields = [
-            'id', 'student', 'assignment', 'submission', 'course',
+            'id', 'student', 'track', 'assignment', 'submission', 'course',
             'score', 'feedback', 'is_score_visible', 'is_feedback_visible',
             'graded_date', 'created_at'
         ]
         read_only_fields = [
-            'id', 'student', 'assignment', 'submission', 
+            'id', 'student', 'track', 'assignment', 'submission',
             'course', 'graded_date', 'created_at'
         ]
 
@@ -22,7 +22,7 @@ class GradeSerializer(serializers.ModelSerializer):
         
         # Check if user has permission to view hidden grades
         can_view_hidden = request and (request.user.is_staff or 
-                                     request.user == instance.assignment.instructor)
+                                      request.user == instance.assignment.instructor)
 
         # Handle score visibility
         if not instance.is_score_visible and not can_view_hidden:
@@ -39,14 +39,12 @@ class GradeSerializer(serializers.ModelSerializer):
     def validate(self, data):
         """Validate grade updates based on user permissions"""
         request = self.context.get('request')
+        
         if request and request.method == 'PATCH':
-            # Check if user is trying to modify restricted fields
-            if not request.user.is_staff:
-                restricted_fields = {'score', 'feedback', 'is_score_visible', 'is_feedback_visible'}
-                if any(field in data for field in restricted_fields):
-                    raise PermissionDenied(
-                        "Only instructors can modify grades and visibility settings"
-                    )
+            # Check if user has permission to grade
+            if not request.user.has_perm('assignments.grade_assignment'):
+                raise PermissionDenied("Only instructors or above can grade assignments.")
+        
         return data
 
     def update(self, instance, validated_data):
