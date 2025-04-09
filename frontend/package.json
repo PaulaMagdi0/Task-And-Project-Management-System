@@ -15,11 +15,13 @@
     "@mui/icons-material": "^6.4.8",
     "@mui/material": "^6.4.9",
     "@reduxjs/toolkit": "^2.6.1",
+    "@rollup/rollup-win32-x64-msvc": "^4.39.0",
     "@toolpad/core": "^0.13.0",
     "aos": "^2.3.4",
     "axios": "^1.8.4",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
+    "date-fns": "^4.1.0",
     "glightbox": "^3.3.1",
     "imagesloaded": "^5.0.0",
     "isotope-layout": "^3.0.6",
@@ -34,7 +36,8 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.4.1",
     "redux": "^5.0.1",
-    "swiper": "^11.2.6"
+    "swiper": "^11.2.6",
+    "websocket": "^1.0.35"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

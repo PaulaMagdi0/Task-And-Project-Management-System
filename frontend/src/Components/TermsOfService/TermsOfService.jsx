@@ -31,7 +31,7 @@ const termsData = [
 
 const TermsOfService = () => {
   return (
-    <div
+    <section
       className="container d-flex pt-5 mt-6rem justify-content-center"
       data-aos="fade-up"
       data-aos-delay="100"
@@ -62,7 +62,7 @@ const TermsOfService = () => {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '../redux/authSlice';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser } from "../redux/authSlice";
+import { useNavigate } from "react-router-dom";
 import heroBg from "/src/assets/img/newCapital.png"; // Fixed import syntax
 import {
   Box,
@@ -13,16 +13,16 @@ import {
   Slide,
   Zoom,
   styled,
-  keyframes
-} from '@mui/material';
-import { Lock, Email } from '@mui/icons-material';
+  keyframes,
+} from "@mui/material";
+import { Lock, Email } from "@mui/icons-material";
 
 const SignIn = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error } = useSelector((state) => state.auth);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   // Animation keyframes
   const pulse = keyframes`
@@ -34,13 +34,13 @@ const SignIn = () => {
   // Styled components
   const AnimatedPaper = styled(Paper)(({ theme }) => ({
     padding: theme.spacing(4),
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
     animation: `${pulse} 3s ease-in-out infinite`,
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      boxShadow: theme.shadows[10]
-    }
+    transition: "all 0.3s ease",
+    "&:hover": {
+      boxShadow: theme.shadows[10],
+    },
   }));
 
   const handleLogin = async (e) => {
@@ -49,20 +49,20 @@ const SignIn = () => {
     if (loginUser.fulfilled.match(resultAction)) {
       const { userType, role } = resultAction.payload;
       // Redirect based on the token payload
-      if (userType === 'student') {
-        navigate('/student/dashboard');
-      } else if (userType === 'staff') {
-        if (role === 'instructor') {
-          navigate('/instructor/dashboard');
-        } else if (role === 'supervisor') {
-          navigate('/supervisor/dashboard');
-        } else if (role === 'branch_manager') {
-          navigate('/branchmanager/dashboard');
+      if (userType === "student") {
+        navigate("/student/dashboard");
+      } else if (userType === "staff") {
+        if (role === "instructor") {
+          navigate("/instructor/dashboard");
+        } else if (role === "supervisor") {
+          navigate("/supervisor/dashboard");
+        } else if (role === "branch_manager") {
+          navigate("/branchmanager/dashboard");
         } else {
-          navigate('/');
+          navigate("/");
         }
       } else {
-        navigate('/');
+        navigate("/");
       }
     }
   };
@@ -70,15 +70,15 @@ const SignIn = () => {
   return (
     <Box
       sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        backgroundImage: `linear-gradient(rgba(0, 91, 170, 0.7), rgba(0, 91, 170, 0.7)), url(${heroBg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        p: 2
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+        backgroundImage: `linear-gradient(rgba(128, 128, 128, 0.7), rgba(128, 128, 128, 0.7)), url(${heroBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        p: 2,
       }}
     >
       <Slide in direction="up" timeout={500}>
@@ -86,13 +86,13 @@ const SignIn = () => {
           <Fade in timeout={800}>
             <Box
               sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 2
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
               }}
             >
-              <Lock sx={{ fontSize: 50, color: 'primary.main' }} />
+              <Lock sx={{ fontSize: 50, color: "primary.main" }} />
               <Typography variant="h4" component="h1" gutterBottom>
                 Sign In
               </Typography>
@@ -101,11 +101,11 @@ const SignIn = () => {
                 component="form"
                 onSubmit={handleLogin}
                 sx={{
-                  width: '100%',
+                  width: "100%",
                   mt: 3,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
                 }}
               >
                 <TextField
@@ -118,8 +118,8 @@ const SignIn = () => {
                   required
                   InputProps={{
                     startAdornment: (
-                      <Email sx={{ color: 'action.active', mr: 1 }} />
-                    )
+                      <Email sx={{ color: "action.active", mr: 1 }} />
+                    ),
                   }}
                 />
 
@@ -133,8 +133,8 @@ const SignIn = () => {
                   required
                   InputProps={{
                     startAdornment: (
-                      <Lock sx={{ color: 'action.active', mr: 1 }} />
-                    )
+                      <Lock sx={{ color: "action.active", mr: 1 }} />
+                    ),
                   }}
                 />
 
@@ -147,14 +147,14 @@ const SignIn = () => {
                     sx={{
                       mt: 2,
                       py: 1.5,
-                      fontSize: '1rem',
-                      transition: 'all 0.3s',
-                      '&:hover': {
-                        transform: 'translateY(-2px)'
-                      }
+                      fontSize: "1rem",
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                      },
                     }}
                   >
-                    {loading ? 'Logging in...' : 'Log In'}
+                    {loading ? "Logging in..." : "Log In"}
                   </Button>
                 </Zoom>
 

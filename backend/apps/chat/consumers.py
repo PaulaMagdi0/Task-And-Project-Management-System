@@ -2,96 +2,66 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
+from rest_framework_simplejwt.tokens import AccessToken
 from .models import ChatRoom, Message
 
 User = get_user_model()
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        """Handles WebSocket connection."""
-        user = self.scope["user"]
-        if user.is_anonymous:
-            await self.close()  # Reject anonymous users
-            return
+        try:
+            token = self.scope["query_string"].decode().split("=")[1]
+            access_token = AccessToken(token)
+            self.user = await self.get_user(access_token.payload['user_id'])
+            self.room_id = self.scope['url_route']['kwargs']['room_id']
+            self.room_group_name = f'chat_{self.room_id}'
 
-        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = f"chat_{self.room_name}"
+            if not await self.validate_room():
+                await self.close()
+                return
 
-        # Verify if user is part of this chat room
-        if not await self.user_in_room(user, self.room_name):
-            await self.send_error("Access denied: You are not a member of this chat room.")
+            await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+            await self.accept()
+        except Exception as e:
             await self.close()
-            return
 
-        # Add the user to the WebSocket group
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-        await self.accept()
+    @database_sync_to_async
+    def get_user(self, user_id):
+        return User.objects.get(id=user_id)
+
+    @database_sync_to_async
+    def validate_room(self):
+        return ChatRoom.objects.filter(id=self.room_id, participants=self.user).exists()
 
     async def disconnect(self, close_code):
-        """Handles WebSocket disconnection."""
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
-        """Handles incoming WebSocket messages."""
-        try:
-            data = json.loads(text_data)
-            sender_id = data.get("sender")
-            content = data.get("content")
-            room_id = data.get("room")
+        data = json.loads(text_data)
+        message = data['content']
+        sender = self.user
+        message_obj = await self.save_message(message, sender)
 
-            if not sender_id or not content or not room_id:
-                await self.send_error("Invalid message format: Missing sender, content, or room ID.")
-                return
-
-            sender, room = await self.get_user_and_room(sender_id, room_id)
-
-            # Ensure sender is part of the chat room
-            if sender != room.student and sender != room.instructor:
-                await self.send_error("Permission denied: You are not part of this chat room.")
-                return
-
-            # Save message to the database
-            message = await self.create_message(room, sender, content)
-
-            # Broadcast the message to the group
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    "type": "chat_message",
-                    "message": message.content,
-                    "sender": sender.username,
-                    "timestamp": message.timestamp.isoformat(),
-                },
-            )
-        except (json.JSONDecodeError, ObjectDoesNotExist) as e:
-            await self.send_error(str(e))
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message': message,
+                'sender_id': sender.id,
+                'sender_username': sender.username,
+                'timestamp': message_obj.timestamp.isoformat(),
+            }
+        )
 
     async def chat_message(self, event):
-        """Handles message broadcasting."""
         await self.send(text_data=json.dumps({
-            "message": event["message"],
-            "sender": event["sender"],
-            "timestamp": event["timestamp"],
+            'message': event['message'],
+            'sender_id': event['sender_id'],
+            'sender_username': event['sender_username'],
+            'timestamp': event['timestamp']
         }))
 
-    async def send_error(self, error_message):
-        """Sends error messages to the WebSocket."""
-        await self.send(text_data=json.dumps({"error": error_message}))
-
     @database_sync_to_async
-    def get_user_and_room(self, sender_id, room_id):
-        """Fetches user and room asynchronously with error handling."""
-        sender = User.objects.get(id=sender_id)
-        room = ChatRoom.objects.get(id=room_id)
-        return sender, room
-
-    @database_sync_to_async
-    def create_message(self, room, sender, content):
-        """Creates and saves a new message asynchronously."""
+    def save_message(self, content, sender):
+        room = ChatRoom.objects.get(id=self.room_id)
         return Message.objects.create(room=room, sender=sender, content=content)
-
-    @database_sync_to_async
-    def user_in_room(self, user, room_id):
-        """Checks if the user is a member of the chat room."""
-        return ChatRoom.objects.filter(id=room_id, student=user) or ChatRoom.objects.filter(id=room_id, instructor=user)

@@ -14,10 +14,10 @@ const footerInfo = {
   },
   usefulLinks: [
     { name: "Home", url: "/" },
+    { name: "Sign In", url: "/signin" },
     { name: "About Us", url: "/about" },
     { name: "Services", url: "/services" },
     { name: "Terms of Service", url: "/terms" },
-    { name: "Privacy Policy", url: "/privacy" },
   ],
 };
 

@@ -4,30 +4,34 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-class MessageSerializer(serializers.ModelSerializer):
-    sender = serializers.SerializerMethodField()  # Returns sender's details
-    room = serializers.PrimaryKeyRelatedField(queryset=ChatRoom.objects.all())  # Ensures valid room
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'email', 'image']
 
+class MessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
-        fields = ["id", "room", "sender", "content", "timestamp"]  # Essential fields only
-        read_only_fields = ["id", "sender", "timestamp"]  # Prevents manual input
-
-    def get_sender(self, obj):
-        """Returns sender's username and ID."""
-        return {"id": obj.sender.id, "username": obj.sender.username}
-
+        fields = ['id', 'sender', 'content', 'timestamp']
 
 class ChatRoomSerializer(serializers.ModelSerializer):
-    messages = serializers.SerializerMethodField()  # Orders messages by timestamp
-    student = serializers.StringRelatedField()  # Shows student username
-    instructor = serializers.StringRelatedField()  # Shows instructor username
+    participants = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    other_user = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatRoom
-        fields = ["id", "student", "instructor", "created_at", "messages"]
-        read_only_fields = ["id", "created_at"]
+        fields = ['id', 'participants', 'last_message', 'other_user']
 
-    def get_messages(self, obj):
-        """Returns messages ordered by timestamp."""
-        return MessageSerializer(obj.messages.order_by("timestamp"), many=True).data
+    def get_participants(self, obj):
+        # Define participants as student and instructor
+        return UserSerializer([obj.student, obj.instructor], many=True).data
+
+    def get_last_message(self, obj):
+        last_msg = obj.messages.last()
+        return MessageSerializer(last_msg).data if last_msg else None
+
+    def get_other_user(self, obj):
+        user = self.context['request'].user
+        return UserSerializer([obj.student, obj.instructor].exclude(id=user.id).first()).data

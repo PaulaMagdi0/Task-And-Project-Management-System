@@ -14,10 +14,7 @@ const Navbar = () => {
     { name: "Contact", href: "/contact" },
     {
       name: "User",
-      dropdown: [
-        { name: "Register", href: "/register" },
-        { name: "Login", href: "/login" },
-      ],
+      dropdown: [{ name: "Login", href: "/signin" }],
     },
   ];
 

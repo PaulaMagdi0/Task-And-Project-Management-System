@@ -4,3 +4,7 @@ body {
   padding: 0;
   height: 100%;
 }
+
+section {
+  margin: 6rem 0;
+}
