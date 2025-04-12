@@ -144,7 +144,6 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
 
 #Upcoming deadline
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def upcoming_assignments(request, student_id):
@@ -185,6 +184,7 @@ def upcoming_assignments(request, student_id):
                 },
                 "assignment_type": assignment.get_assignment_type_display(),
                 "description": assignment.description,
+                "file_url": assignment.file_url  # Add file_url to the response
             }
             for assignment in assignments
         ]

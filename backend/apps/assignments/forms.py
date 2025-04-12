@@ -7,10 +7,11 @@ from apps.tracks.models import Track
 class AssignmentAdminForm(forms.ModelForm):
     assigned_to_all = forms.BooleanField(required=False, label="Assign to all students from selected track")
     track = forms.ModelChoiceField(queryset=Track.objects.all(), required=False, label="Select Track")
+    file_url = forms.URLField(required=False, label="File URL", help_text="URL of the assignment file (e.g., PDF or DOCX)")
 
     class Meta:
         model = Assignment
-        fields = ['title', 'due_date', 'end_date', 'assignment_type', 'course', 'description', 'assigned_to', 'track']
+        fields = ['title', 'due_date', 'end_date', 'assignment_type', 'course', 'description', 'assigned_to', 'track', 'file_url']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
