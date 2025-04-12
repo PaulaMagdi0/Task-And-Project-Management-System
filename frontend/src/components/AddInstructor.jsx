@@ -66,12 +66,12 @@ const UploadInstructor = () => {
         email: '',
         phone: '',
         role: 'instructor',
-        branch_id: '',
+        course_id: '',
     });
-    const [branches, setBranches] = useState([]);
+    const [courses, setCourses] = useState([]);
     const [excelFile, setExcelFile] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [fetchingBranches, setFetchingBranches] = useState(false);
+    const [fetchingCourses, setFetchingCourses] = useState(false);
     const [openModal, setOpenModal] = useState(false);
     const [modalContent, setModalContent] = useState({
         title: '',
@@ -80,19 +80,19 @@ const UploadInstructor = () => {
     });
 
     useEffect(() => {
-        const fetchBranches = async () => {
-            setFetchingBranches(true);
+        const fetchCourses = async () => {
+            setFetchingCourses(true);
             try {
-                const response = await apiClient.get('/branches/');
-                setBranches(response.data);
+                const response = await apiClient.get('/courses/');
+                setCourses(response.data);
             } catch (error) {
-                console.error('Error fetching branches:', error);
-                showErrorModal('Failed to load branches');
+                console.error('Error fetching courses:', error);
+                showErrorModal('Failed to load courses');
             } finally {
-                setFetchingBranches(false);
+                setFetchingCourses(false);
             }
         };
-        fetchBranches();
+        fetchCourses();
     }, []);
 
     const handleStaffInputChange = (e) => {
@@ -131,7 +131,7 @@ const UploadInstructor = () => {
 
     const handleSubmitManualStaff = async () => {
         if (!staffData.username || !staffData.password || !staffData.first_name ||
-            !staffData.last_name || !staffData.email || !staffData.branch_id || !staffData.phone) {
+            !staffData.last_name || !staffData.email || !staffData.course_id || !staffData.phone) {
             showErrorModal('Please fill all required fields');
             return;
         }
@@ -146,7 +146,7 @@ const UploadInstructor = () => {
             formData.append('email', staffData.email);
             formData.append('phone', staffData.phone);
             formData.append('role', 'instructor');
-            formData.append('branch_id', staffData.branch_id);
+            formData.append('course_id', staffData.course_id);
 
             const response = await apiClient.post(
                 '/staff/create/',
@@ -158,7 +158,7 @@ const UploadInstructor = () => {
                 }
             );
 
-            showSuccessModal('Staff member added successfully!');
+            showSuccessModal('Instructor added successfully!');
             setStaffData({
                 username: '',
                 password: '',
@@ -166,11 +166,11 @@ const UploadInstructor = () => {
                 last_name: '',
                 email: '',
                 phone: '',
-                branch_id: ''
+                course_id: ''
             });
         } catch (error) {
-            const errorMsg = error.response?.data?.error || 'Failed to add staff member';
-            console.error('Error submitting staff data:', error);
+            const errorMsg = error.response?.data?.error || 'Failed to add instructor';
+            console.error('Error submitting instructor data:', error);
             showErrorModal(errorMsg);
         } finally {
             setLoading(false);
@@ -178,8 +178,8 @@ const UploadInstructor = () => {
     };
 
     const handleUploadExcel = async () => {
-        if (!excelFile || !staffData.branch_id) {
-            showErrorModal('Please upload a file and select a branch.');
+        if (!excelFile || !staffData.course_id) {
+            showErrorModal('Please upload a file and select a course.');
             return;
         }
 
@@ -187,7 +187,7 @@ const UploadInstructor = () => {
         try {
             const formData = new FormData();
             formData.append('file', excelFile);
-            formData.append('branch_id', staffData.branch_id);
+            formData.append('course_id', staffData.course_id);
 
             const response = await apiClient.post(
                 '/staff/upload/',
@@ -199,11 +199,11 @@ const UploadInstructor = () => {
                 }
             );
 
-            showSuccessModal('Staff members uploaded successfully!');
+            showSuccessModal('Instructors uploaded successfully!');
             setExcelFile(null);
         } catch (error) {
-            const errorMsg = error.response?.data?.error || 'Failed to upload staff members';
-            console.error('Error uploading staff:', error);
+            const errorMsg = error.response?.data?.error || 'Failed to upload instructors';
+            console.error('Error uploading instructors:', error);
             showErrorModal(errorMsg);
         } finally {
             setLoading(false);
@@ -219,10 +219,9 @@ const UploadInstructor = () => {
 
                 <Divider sx={{ my: 3, borderColor: 'rgba(0, 0, 0, 0.08)' }} />
 
-
                 <Box sx={{ maxWidth: '600px', mx: 'auto' }}>
                     <Typography variant="h6" mb={3} fontWeight="600" color="text.secondary">
-                        Staff Information
+                        Instructor Information
                     </Typography>
 
                     <Grid container spacing={2}>
@@ -290,22 +289,22 @@ const UploadInstructor = () => {
                         </Grid>
                         <Grid item xs={12}>
                             <FormControl fullWidth sx={{ mb: 3 }}>
-                                <InputLabel id="branch-label">Assigned Branch *</InputLabel>
+                                <InputLabel id="course-label">Assign To Course</InputLabel>
                                 <Select
-                                    labelId="branch-label"
-                                    id="branch-select"
-                                    name="branch_id"
-                                    value={staffData.branch_id}
+                                    labelId="course-label"
+                                    id="course-select"
+                                    name="course_id"
+                                    value={staffData.course_id}
                                     onChange={handleStaffInputChange}
-                                    label="Assigned Branch *"
-                                    disabled={fetchingBranches}
+                                    label="Assign To Course"
+                                    disabled={fetchingCourses}
                                 >
-                                    {fetchingBranches ? (
-                                        <MenuItem disabled>Loading branches...</MenuItem>
+                                    {fetchingCourses ? (
+                                        <MenuItem disabled>Loading courses...</MenuItem>
                                     ) : (
-                                        branches.map((branch) => (
-                                            <MenuItem key={branch.id} value={branch.id}>
-                                                {branch.name}
+                                        courses.map((course) => (
+                                            <MenuItem key={course.id} value={course.id}>
+                                                {course.name}
                                             </MenuItem>
                                         ))
                                     )}

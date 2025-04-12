@@ -57,7 +57,7 @@ const SignIn = () => {
         navigate('/student/dashboard');
       } else if (userType === 'staff') {
         if (role === 'instructor') {
-          navigate('/dashboard');
+          navigate('/instructor/dashboard');
         } else if (role === 'supervisor') {
           navigate('/supervisor/dashboard');
         } else if (role === 'branch_manager') {
