@@ -1,20 +1,26 @@
+import logging
+import os
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-import logging
-import os
 from django.utils import timezone
 from .models import Assignment,AssignmentStudent
 from .serializers import AssignmentSerializer
 from rest_framework.decorators import api_view, permission_classes
-logger = logging.getLogger(__name__)
 from rest_framework.permissions import IsAuthenticated
 from apps.student.models import Student
 from apps.courses.models import Course
+from apps.tracks.models import Track
+from apps.submission.models import AssignmentSubmission 
+from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
+from apps.tracks.serializers import TrackSerializer
+from apps.courses.serializers import CourseSerializer
+from apps.student.serializers import StudentSubmissionStatusSerializer
 
 
+logger = logging.getLogger(__name__)
 class AssignmentListView(generics.ListCreateAPIView):
     """
     GET: List all assignments
@@ -195,47 +201,215 @@ def upcoming_assignments(request, student_id):
         return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# views.py# views.py
+
+# @api_view(['GET'])
+# def track_course_assignments(request, track_id, course_id):
+#     """Retrieve assignments and submissions for a specific track and course."""
+#     try:
+#         logger.info(f"Fetching data for track_id: {track_id}, course_id: {course_id}")
+        
+#         # 1. Fetch track and validate
+#         try:
+#             track = Track.objects.get(id=track_id)
+#             logger.debug(f"Found track: {track}")
+#         except Track.DoesNotExist:
+#             logger.error(f"Track not found with id: {track_id}")
+#             return Response(
+#                 {"error": "Track not found."},
+#                 status=status.HTTP_404_NOT_FOUND
+#             )
+
+#         # 2. Fetch course and validate it belongs to track
+#         try:
+#             course = Course.objects.get(id=course_id, track=track)
+#             logger.debug(f"Found course: {course}")
+#         except Course.DoesNotExist:
+#             logger.error(f"Course not found with id: {course_id} in track {track_id}")
+#             return Response(
+#                 {"error": "Course not found in the specified track."},
+#                 status=status.HTTP_404_NOT_FOUND
+#             )
+
+#         # 3. Fetch assignments with optimization
+#         assignments = Assignment.objects.filter(course=course).select_related('course')
+#         logger.debug(f"Found {assignments.count()} assignments")
+        
+#         # 4. Fetch submissions with optimization
+#         submission_queryset = Submission.objects.filter(
+#             assignment__in=assignments
+#         ).select_related('student', 'assignment')
+#         logger.debug(f"Found {submission_queryset.count()} submissions")
+
+#         # 5. Serialize data with error handling
+#         try:
+#             response_data = {
+#                 "track": TrackSerializer(track).data,
+#                 "course": CourseSerializer(course).data,
+#                 "assignments": AssignmentSerializer(assignments, many=True).data,
+#                 "submissions": SubmissionSerializer(submission_queryset, many=True).data,
+#             }
+#             logger.debug("Serialization completed successfully")
+#         except Exception as e:
+#             logger.error(f"Serialization error: {str(e)}", exc_info=True)
+#             return Response(
+#                 {"error": "Data serialization failed."},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
+
+#         return Response(response_data, status=status.HTTP_200_OK)
     
+#     except       status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )Exception as e:
+#         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+#         return Response(
+#             {"error": "An unexpected error occurred."},
+# views.pyfrom rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Assignment, Course, Track
+from .serializers import SafeAssignmentSerializer
+import logging
+
+logger = logging.getLogger(__name__)
+
 @api_view(['GET'])
-def track_course_assignments(request, track_id):
-    """Retrieve assignments by track and course and their submissions."""
+def track_course_assignments(request, track_id, course_id):
+    """Retrieve assignments for a specific track and course without student assignments."""
     try:
-        # Get the track by its ID
-        track = get_object_or_404(Track, id=track_id)
-
-        # Get all courses related to the track
-        courses = track.courses.all()
-
-        result = []
-
-        for course in courses:
-            # Get all assignments for each course
-            assignments = course.assignments.all()
-
-            for assignment in assignments:
-                # Get all submissions for each assignment
-                submissions = assignment.submissions.all()
-
-                submission_data = []
-                for submission in submissions:
-                    submission_data.append({
-                        'student_name': submission.student.get_full_name(),
-                        'submission_date': submission.submission_date,
-                        'content': submission.content
-                    })
-
-                result.append({
-                    'course_name': course.name,
-                    'assignment_title': assignment.title,
-                    'assignment_description': assignment.description,
-                    'due_date': assignment.due_date,
-                    'submissions': submission_data
-                })
-
-        return Response(result, status=status.HTTP_200_OK)
-
+        logger.info(f"Fetching assignments for track {track_id}, course {course_id}")
+        
+        # Ensure the track exists
+        try:
+            track = Track.objects.get(id=track_id)
+        except Track.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Track not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Ensure the course exists and belongs to the track
+        try:
+            course = Course.objects.get(id=course_id, track=track)
+        except Course.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Course not found or does not belong to the provided track.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Retrieve assignments for the specific course and track, excluding assigned students
+        assignments = Assignment.objects.filter(course=course)
+        
+        # Serialize the assignments
+        assignment_serializer = SafeAssignmentSerializer(assignments, many=True)
+        
+        # Return response with assignments info
+        return Response({
+            'status': 'success',
+            'count': len(assignment_serializer.data),
+            'assignments': assignment_serializer.data
+        }, status=status.HTTP_200_OK)
+    
     except Exception as e:
-        return Response(
-            {"error": f"An error occurred: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error in track_course_assignments: {str(e)}", exc_info=True)
+        return Response({
+            'status': 'error',
+            'message': 'Failed to fetch assignments for the track and course',
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        
+@api_view(['GET'])
+def instructor_assignments(request, track_id, course_id, staff_id):
+    """Retrieve assignments for the track, course, and instructor."""
+    try:
+        logger.info(f"Fetching assignments for instructor {staff_id}, track {track_id}, course {course_id}")
+        
+        # Ensure the staff member exists
+        try:
+            staff_member = Staff.objects.get(id=staff_id)
+        except Staff.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Instructor not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Ensure the track and course exist
+        try:
+            track = Track.objects.get(id=track_id)
+            course = Course.objects.get(id=course_id, track=track)
+        except (Track.DoesNotExist, Course.DoesNotExist):
+            return Response({
+                'status': 'error',
+                'message': 'Track or course not found or does not belong to the provided track.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Ensure the instructor is teaching the course
+        if not staff_member in course.instructors.all():
+            return Response({
+                'status': 'error',
+                'message': 'Instructor is not teaching this course.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Retrieve assignments for the specific course and track
+        assignments = Assignment.objects.filter(course=course, course__track=track)
+        
+        # Serialize the assignments
+        assignment_serializer = SafeAssignmentSerializer(assignments, many=True)
+        
+        return Response({
+            'status': 'success',
+            'count': len(assignment_serializer.data),
+            'assignments': assignment_serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error in instructor_assignments: {str(e)}", exc_info=True)
+        return Response({
+            'status': 'error',
+            'message': 'Failed to fetch assignments for the instructor, track, or course',
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+
+@api_view(['GET'])
+def get_submitters(request, assignment_id, track_id, course_id):
+    # Get all submissions for this assignment in the specified track/course
+    submissions = AssignmentSubmission.objects.filter(
+        assignment_id=assignment_id,
+        track_id=track_id,
+        course_id=course_id
+    ).select_related('student')
+
+    # Get all students in the track who should have submitted
+    all_students = Student.objects.filter(track_id=track_id)
+    
+    # Prepare response data
+    submitters = [{
+        'student_id': sub.student.id,
+        'name': sub.student.full_name,
+        'email': sub.student.email,
+        'submitted': True,
+        'submission_date': sub.submission_date,
+        'file_url': sub.file_url or None
+    } for sub in submissions]
+
+    non_submitters = [{
+        'student_id': student.id,
+        'name': student.full_name,
+        'email': student.email,
+        'submitted': False
+    } for student in all_students.exclude(
+        id__in=[s.student.id for s in submissions]
+    )]
+
+    return Response({
+        'total_students': all_students.count(),
+        'submitted_count': len(submitters),
+        'not_submitted_count': len(non_submitters),
+        'submitters': submitters,
+        'non_submitters': non_submitters
+    })

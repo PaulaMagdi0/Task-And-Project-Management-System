@@ -1,11 +1,10 @@
-# In apps/assignments/models.py
 from django.db import models
 from django.utils import timezone
 from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
 
-# Through model to hold the additional `course` field in the relationship
+# Through model to hold the additional `course` and `track` fields in the relationship
 class AssignmentStudent(models.Model):
     assignment = models.ForeignKey('Assignment', on_delete=models.CASCADE)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
@@ -29,7 +28,7 @@ class Assignment(models.Model):
     due_date = models.DateTimeField(default=timezone.now)
     end_date = models.DateTimeField(default=None)
     assignment_type = models.CharField(
-        max_length=50, choices=ASSIGNMENT_TYPES, default="homework"
+        max_length=50, choices=ASSIGNMENT_TYPES, default="task"
     )
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     description = models.TextField()
@@ -37,7 +36,7 @@ class Assignment(models.Model):
     file = models.URLField(null=True, blank=True)
     file_url = models.URLField(null=True, blank=True)
 
-    # Use the `through` model to link students to assignments with a course field
+    # Use the `through` model to link students to assignments with a course and track field
     assigned_to = models.ManyToManyField(
         Student, through='AssignmentStudent', related_name='assignments', blank=True
     )
@@ -52,9 +51,10 @@ class Assignment(models.Model):
 
     def get_assigned_to_display(self):
         if self.assigned_to.exists():
+            # Optimized query to prevent multiple database hits
             assigned_students = [
                 f"{student.full_name} ({student.assignmentstudent_set.first().course.name})"
-                for student in self.assigned_to.all()
+                for student in self.assigned_to.all().select_related('assignmentstudent__course')
             ]
             return f"Assigned to {', '.join(assigned_students)}"
         return "Assigned to All"

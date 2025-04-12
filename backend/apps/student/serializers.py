@@ -11,13 +11,6 @@ import logging
 from django.db import transaction
 from django.core.validators import validate_email
 from io import BytesIO
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from apps.courses.models import Course
-from apps.staff_members.models import StaffMember
-from apps.courses.serializers import CourseSerializer  # Make sure this serializer exists
 
 logger = logging.getLogger(__name__)
 
@@ -389,17 +382,14 @@ class StudentSerializer(serializers.ModelSerializer):
         if Student.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
         return value
+
     def create(self, validated_data):
         """Create a new student account."""
         password = validated_data.pop('password', None)
         track = validated_data.get('track')
 
-        # Ensure username is derived from email if not provided
-        if 'username' not in validated_data:
-            validated_data['username'] = validated_data['email'].split('@')[0]
-
         student = Student(**validated_data)
-
+        
         if password:
             student.set_password(password)
         else:
@@ -411,6 +401,7 @@ class StudentSerializer(serializers.ModelSerializer):
 
         self._send_verification_email(student, password or temp_password)
         return student
+
     def update(self, instance, validated_data):
         """Update student information."""
         password = validated_data.pop('password', None)
@@ -436,7 +427,7 @@ class StudentSerializer(serializers.ModelSerializer):
     def _send_verification_email(self, student, password):
         """Send verification email."""
         try:
-            verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
+            verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
             
             subject = "Verify Your Student Account"
             message = f"""
@@ -474,3 +465,43 @@ class DashboardSerializer(serializers.ModelSerializer):
     def get_courses(self, obj):
         # Implement based on your Course model
         return []
+    
+class MinimalStudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = ['id', 'full_name', 'email']
+        
+class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
+    has_submitted = serializers.SerializerMethodField()
+    submission_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Student
+        fields = ['id', 'full_name', 'email', 'has_submitted', 'submission_details']
+    
+    def get_has_submitted(self, student):
+        assignment_id = self.context.get('assignment_id')
+        return AssignmentStudent.objects.filter(
+            student=student,
+            assignment_id=assignment_id,
+            submitted=True
+        ).exists()
+    
+    def get_submission_details(self, student):
+        assignment_id = self.context.get('assignment_id')
+        try:
+            assignment_student = AssignmentStudent.objects.get(
+                student=student,
+                assignment_id=assignment_id
+            )
+            if assignment_student.submitted:
+                submission = Submission.objects.filter(
+                    assignment_student=assignment_student
+                ).first()
+                return {
+                    'submitted_at': assignment_student.submission_date,
+                    'file_url': submission.file.url if submission else None
+                }
+        except AssignmentStudent.DoesNotExist:
+            return None
+        return None
