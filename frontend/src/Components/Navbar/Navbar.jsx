@@ -97,12 +97,12 @@
 
 // export default Navbar;
 import React from 'react';
-import { 
-  AppBar, 
-  Box, 
-  Toolbar, 
-  Typography, 
-  InputBase, 
+import {
+  AppBar,
+  Box,
+  Toolbar,
+  Typography,
+  InputBase,
   IconButton,
   Badge,
   styled
@@ -120,10 +120,10 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
 
 function Navbar() {
   return (
-    <AppBar 
-      position="fixed" 
-      sx={{ 
-        ml: '260px', 
+    <AppBar
+      position="fixed"
+      sx={{
+        ml: '260px',
         width: 'calc(100% - 260px)',
         bgcolor: 'background.paper',
         boxShadow: 'none',
@@ -141,15 +141,15 @@ function Navbar() {
 
         <Box sx={{ flexGrow: 1, position: 'relative' }}>
           <Box sx={{ position: 'relative', maxWidth: 400 }}>
-            <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: 8, 
-                top: '50%', 
+            <Search
+              size={20}
+              style={{
+                position: 'absolute',
+                left: 8,
+                top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#666' 
-              }} 
+                color: '#666'
+              }}
             />
             <SearchInput
               placeholder="Search..."

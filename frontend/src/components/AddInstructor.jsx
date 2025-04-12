@@ -1,0 +1,376 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Button,
+    Card,
+    Typography,
+    TextField,
+    Divider,
+    Grid,
+    CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    IconButton,
+    Paper,
+    styled,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel
+} from '@mui/material';
+import { Close, CheckCircle, Error } from '@mui/icons-material';
+import CloudUpload from '@mui/icons-material/CloudUpload';
+import apiClient from '../services/api';
+
+const StyledCard = styled(Card)(({ theme }) => ({
+    padding: theme.spacing(4),
+    borderRadius: '16px',
+    boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.1)',
+    maxWidth: '800px',
+    margin: '0 auto'
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+    padding: theme.spacing(1.5),
+    fontSize: '1rem',
+    fontWeight: 600,
+    textTransform: 'none',
+    borderRadius: '12px'
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+    '& .MuiOutlinedInput-root': {
+        borderRadius: '12px',
+        '& fieldset': {
+            borderColor: theme.palette.grey[300],
+        },
+        '&:hover fieldset': {
+            borderColor: theme.palette.primary.main,
+        },
+    },
+}));
+
+const FileInput = styled('input')({
+    display: 'none',
+});
+
+const UploadInstructor = () => {
+    const [isExcelUpload, setIsExcelUpload] = useState(false);
+    const [staffData, setStaffData] = useState({
+        username: '',
+        password: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        role: 'instructor',
+        branch_id: '',
+    });
+    const [branches, setBranches] = useState([]);
+    const [excelFile, setExcelFile] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [fetchingBranches, setFetchingBranches] = useState(false);
+    const [openModal, setOpenModal] = useState(false);
+    const [modalContent, setModalContent] = useState({
+        title: '',
+        message: '',
+        isSuccess: false
+    });
+
+    useEffect(() => {
+        const fetchBranches = async () => {
+            setFetchingBranches(true);
+            try {
+                const response = await apiClient.get('/branches/');
+                setBranches(response.data);
+            } catch (error) {
+                console.error('Error fetching branches:', error);
+                showErrorModal('Failed to load branches');
+            } finally {
+                setFetchingBranches(false);
+            }
+        };
+        fetchBranches();
+    }, []);
+
+    const handleStaffInputChange = (e) => {
+        const { name, value } = e.target;
+        setStaffData((prevData) => ({
+            ...prevData,
+            [name]: value,
+        }));
+    };
+
+    const handleFileChange = (e) => {
+        setExcelFile(e.target.files[0]);
+    };
+
+    const handleCloseModal = () => {
+        setOpenModal(false);
+    };
+
+    const showSuccessModal = (message) => {
+        setModalContent({
+            title: 'Success!',
+            message,
+            isSuccess: true
+        });
+        setOpenModal(true);
+    };
+
+    const showErrorModal = (message) => {
+        setModalContent({
+            title: 'Error',
+            message,
+            isSuccess: false
+        });
+        setOpenModal(true);
+    };
+
+    const handleSubmitManualStaff = async () => {
+        if (!staffData.username || !staffData.password || !staffData.first_name ||
+            !staffData.last_name || !staffData.email || !staffData.branch_id || !staffData.phone) {
+            showErrorModal('Please fill all required fields');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const formData = new FormData();
+            formData.append('username', staffData.username);
+            formData.append('password', staffData.password);
+            formData.append('first_name', staffData.first_name);
+            formData.append('last_name', staffData.last_name);
+            formData.append('email', staffData.email);
+            formData.append('phone', staffData.phone);
+            formData.append('role', 'instructor');
+            formData.append('branch_id', staffData.branch_id);
+
+            const response = await apiClient.post(
+                '/staff/create/',
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                }
+            );
+
+            showSuccessModal('Staff member added successfully!');
+            setStaffData({
+                username: '',
+                password: '',
+                first_name: '',
+                last_name: '',
+                email: '',
+                phone: '',
+                branch_id: ''
+            });
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Failed to add staff member';
+            console.error('Error submitting staff data:', error);
+            showErrorModal(errorMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUploadExcel = async () => {
+        if (!excelFile || !staffData.branch_id) {
+            showErrorModal('Please upload a file and select a branch.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', excelFile);
+            formData.append('branch_id', staffData.branch_id);
+
+            const response = await apiClient.post(
+                '/staff/upload/',
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                }
+            );
+
+            showSuccessModal('Staff members uploaded successfully!');
+            setExcelFile(null);
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Failed to upload staff members';
+            console.error('Error uploading staff:', error);
+            showErrorModal(errorMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Box sx={{ p: 3, background: '#f5f7fa', minHeight: '100vh' }}>
+            <StyledCard>
+                <Typography variant="h4" mb={3} fontWeight="bold" color="primary">
+                    Add New Instructor
+                </Typography>
+
+                <Divider sx={{ my: 3, borderColor: 'rgba(0, 0, 0, 0.08)' }} />
+
+
+                <Box sx={{ maxWidth: '600px', mx: 'auto' }}>
+                    <Typography variant="h6" mb={3} fontWeight="600" color="text.secondary">
+                        Staff Information
+                    </Typography>
+
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="Username *"
+                                fullWidth
+                                name="username"
+                                value={staffData.username}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="Password *"
+                                fullWidth
+                                name="password"
+                                type="password"
+                                value={staffData.password}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="First Name *"
+                                fullWidth
+                                name="first_name"
+                                value={staffData.first_name}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="Last Name *"
+                                fullWidth
+                                name="last_name"
+                                value={staffData.last_name}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="Email *"
+                                fullWidth
+                                name="email"
+                                type="email"
+                                value={staffData.email}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <StyledTextField
+                                label="Phone *"
+                                fullWidth
+                                name="phone"
+                                value={staffData.phone}
+                                onChange={handleStaffInputChange}
+                                sx={{ mb: 2 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth sx={{ mb: 3 }}>
+                                <InputLabel id="branch-label">Assigned Branch *</InputLabel>
+                                <Select
+                                    labelId="branch-label"
+                                    id="branch-select"
+                                    name="branch_id"
+                                    value={staffData.branch_id}
+                                    onChange={handleStaffInputChange}
+                                    label="Assigned Branch *"
+                                    disabled={fetchingBranches}
+                                >
+                                    {fetchingBranches ? (
+                                        <MenuItem disabled>Loading branches...</MenuItem>
+                                    ) : (
+                                        branches.map((branch) => (
+                                            <MenuItem key={branch.id} value={branch.id}>
+                                                {branch.name}
+                                            </MenuItem>
+                                        ))
+                                    )}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    </Grid>
+
+                    <StyledButton
+                        variant="contained"
+                        fullWidth
+                        onClick={handleSubmitManualStaff}
+                        disabled={loading}
+                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                        sx={{ py: 1.5 }}
+                    >
+                        {loading ? 'Processing...' : 'Add Instructor'}
+                    </StyledButton>
+                </Box>
+            </StyledCard>
+
+            {/* Success/Error Modal */}
+            <Dialog
+                open={openModal}
+                onClose={handleCloseModal}
+                PaperProps={{
+                    sx: {
+                        borderRadius: '16px',
+                        minWidth: '400px'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+                    {modalContent.isSuccess ? (
+                        <CheckCircle color="success" sx={{ mr: 1, fontSize: '28px' }} />
+                    ) : (
+                        <Error color="error" sx={{ mr: 1, fontSize: '28px' }} />
+                    )}
+                    {modalContent.title}
+                    <IconButton
+                        aria-label="close"
+                        onClick={handleCloseModal}
+                        sx={{
+                            position: 'absolute',
+                            right: 8,
+                            top: 8,
+                            color: (theme) => theme.palette.grey[500],
+                        }}
+                    >
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary">
+                        {modalContent.message}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseModal} color="primary">
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
+    );
+};
+
+export default UploadInstructor;
