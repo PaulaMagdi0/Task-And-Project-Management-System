@@ -78,3 +78,4 @@ class AssignmentAdmin(admin.ModelAdmin):
 
 admin.site.register(Assignment, AssignmentAdmin)
 admin.site.register(AssignmentStudent)
+#fix
