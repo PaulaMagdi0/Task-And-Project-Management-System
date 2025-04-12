@@ -8,7 +8,7 @@ from .views import (
     supervisor_instructor_by_id_view
 
 )
-
+# URL
 urlpatterns = [
     # List and create staff members
     path('', StaffMemberListCreateView.as_view(), name='staff-list'),
