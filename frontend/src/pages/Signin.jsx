@@ -1,4 +1,3 @@
-// File: src/components/SignIn.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser, logout } from '../redux/authSlice';
@@ -79,7 +78,7 @@ const SignIn = () => {
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
-        backgroundImage: `linear-gradient(rgba(0, 91, 170, 0.7), rgba(0, 91, 170, 0.7)), url(${heroBg})`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.57), rgba(0, 0, 0, 0.64)), url(${heroBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -97,7 +96,7 @@ const SignIn = () => {
                 gap: 2
               }}
             >
-              <Lock sx={{ fontSize: 50, color: 'primary.main' }} />
+              <Lock sx={{ fontSize: 50, color: 'rgba(211, 47, 47, 0.9)' }} />
               <Typography variant="h4" component="h1" gutterBottom>
                 Sign In
               </Typography>
@@ -122,8 +121,16 @@ const SignIn = () => {
                   required
                   InputProps={{
                     startAdornment: (
-                      <Email sx={{ color: 'action.active', mr: 1 }} />
+                      <Email sx={{ color: 'rgba(211, 47, 47, 0.7)', mr: 1 }} />
                     )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(211, 47, 47, 0.9)',
+                    },
+                    '& .MuiInputLabel-root.Mui-focused': {
+                      color: 'rgba(211, 47, 47, 0.9)',
+                    }
                   }}
                 />
                 <TextField
@@ -136,8 +143,16 @@ const SignIn = () => {
                   required
                   InputProps={{
                     startAdornment: (
-                      <Lock sx={{ color: 'action.active', mr: 1 }} />
+                      <Lock sx={{ color: 'rgba(211, 47, 47, 0.7)', mr: 1 }} />
                     )
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(211, 47, 47, 0.9)',
+                    },
+                    '& .MuiInputLabel-root.Mui-focused': {
+                      color: 'rgba(211, 47, 47, 0.9)',
+                    }
                   }}
                 />
                 <Zoom in timeout={1000}>
@@ -151,8 +166,13 @@ const SignIn = () => {
                       py: 1.5,
                       fontSize: '1rem',
                       transition: 'all 0.3s',
+                      backgroundColor: 'rgba(211, 47, 47, 0.9)',
                       '&:hover': {
-                        transform: 'translateY(-2px)'
+                        transform: 'translateY(-2px)',
+                        backgroundColor: 'rgba(211, 47, 47, 1)'
+                      },
+                      '&.Mui-disabled': {
+                        backgroundColor: 'rgba(211, 47, 47, 0.5)'
                       }
                     }}
                   >

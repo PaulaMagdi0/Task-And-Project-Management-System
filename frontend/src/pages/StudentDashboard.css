@@ -1,0 +1,124 @@
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f5f7fa;
+}
+
+.sidebar {
+    background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+    /* Red gradient */
+    color: white;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+
+.sidebar.open {
+    width: 280px;
+    padding: 20px;
+}
+
+.sidebar.closed {
+    width: 70px;
+    padding: 20px 10px;
+    align-items: center;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.welcome-message h3 {
+    margin: 0;
+    font-weight: 400;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.welcome-message h3 b {
+    font-weight: 600;
+    color: white;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+
+.toggle-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-grow: 1;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 12px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.menu-item.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-weight: 500;
+    border-left: 4px solid rgba(229, 57, 53, 0.9);
+    /* Yellow accent for active item */
+}
+
+.menu-item svg {
+    color: inherit;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 30px;
+    overflow-y: auto;
+    background-color: #f5f7fa;
+}
+
+.content-card {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .sidebar.open {
+        position: fixed;
+        z-index: 1000;
+        height: 100%;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+}
