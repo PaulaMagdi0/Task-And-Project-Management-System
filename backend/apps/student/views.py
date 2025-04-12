@@ -82,6 +82,13 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Track
+from .serializers import StudentSerializer
+
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])  # Supports FormData
 def create_student_from_form(request):
@@ -89,19 +96,28 @@ def create_student_from_form(request):
     Accepts FormData input and creates a new student.
     Expected FormData fields:
     - first_name
-    - second_name
+    - last_name
     - email
     - role
     - track_id
     - password (optional)
     """
+    email = request.data.get("email")
+    
+    if not email:
+        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Extract username from email
+    username = email.split("@")[0]
+
     # Collecting form data
     data = {
         "first_name": request.data.get("first_name"),
         "last_name": request.data.get("last_name"),
-        "email": request.data.get("email"),
+        "email": email,
         "role": request.data.get("role"),
         "track_id": request.data.get("track_id"),
+        "username": username,  # Add extracted username
         # "password": request.data.get("password", None),  # Optional
     }
 
@@ -120,9 +136,9 @@ def create_student_from_form(request):
     if serializer.is_valid():
         serializer.save()  # Save the student object
         return Response({"message": "Student created successfully"}, status=status.HTTP_201_CREATED)
-    else:
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 # @permission_classes([IsAuthenticated])
 @permission_classes([AllowAny])

@@ -382,14 +382,17 @@ class StudentSerializer(serializers.ModelSerializer):
         if Student.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
         return value
-
     def create(self, validated_data):
         """Create a new student account."""
         password = validated_data.pop('password', None)
         track = validated_data.get('track')
 
+        # Ensure username is derived from email if not provided
+        if 'username' not in validated_data:
+            validated_data['username'] = validated_data['email'].split('@')[0]
+
         student = Student(**validated_data)
-        
+
         if password:
             student.set_password(password)
         else:
@@ -401,7 +404,6 @@ class StudentSerializer(serializers.ModelSerializer):
 
         self._send_verification_email(student, password or temp_password)
         return student
-
     def update(self, instance, validated_data):
         """Update student information."""
         password = validated_data.pop('password', None)
@@ -427,7 +429,7 @@ class StudentSerializer(serializers.ModelSerializer):
     def _send_verification_email(self, student, password):
         """Send verification email."""
         try:
-            verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
+            verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
             
             subject = "Verify Your Student Account"
             message = f"""
