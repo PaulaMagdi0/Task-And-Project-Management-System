@@ -78,28 +78,20 @@ class StaffMember(AbstractUser):
         super().clean()
         if self.role not in self.Role.values:
             raise ValidationError({'role': _('Invalid role selected.')})
-        # Enforce that branch managers and supervisors must have a branch.
         if self.role in [self.Role.BRANCH_MANAGER, self.Role.SUPERVISOR] and not self.branch:
             raise ValidationError({'branch': _('Branch managers and supervisors must be assigned to a branch.')})
-        # For branch managers, ensure the branch doesn't already have another manager.
         if self.role == self.Role.BRANCH_MANAGER and self.branch:
             if self.branch.manager and self.branch.manager != self:
                 raise ValidationError({'branch': _('This branch already has a manager assigned.')})
 
     def save(self, *args, **kwargs):
-        # Run validation on the instance.
         self.full_clean()
-        # Save the staff member first so that self has a primary key.
         super().save(*args, **kwargs)
-
-        # Now update the branch's manager field.
         if self.role == self.Role.BRANCH_MANAGER and self.branch:
-            # If the branch's manager is not this staff member, update it.
             if self.branch.manager_id != self.pk:
                 self.branch.manager = self
                 self.branch.save()
         else:
-            # If this user is not a branch manager, clear them from any branch they might be managing.
             from apps.branch_location.models import Branch
             branches = Branch.objects.filter(manager=self)
             for branch in branches:
@@ -130,27 +122,22 @@ class StaffMember(AbstractUser):
     @property
     def is_admin(self):
         return self.role == self.Role.ADMIN or self.is_superuser
-    
-        @property
-        def managed_branch(self):
-            """Returns the branch this user manages, if any"""
-            if self.is_branch_manager and hasattr(self, 'branch'):
-                return self.branch
-            return None
 
-        def get_full_name(self):
-            """Return full name with fallback to username"""
-            full_name = f'{self.first_name} {self.last_name}'.strip()
-            return full_name if full_name else self.username
+    @property
+    def managed_branch(self):
+        """Returns the branch this user manages, if any"""
+        if self.is_branch_manager and hasattr(self, 'branch'):
+            return self.branch
+        return None
 
-        def get_branch_location(self):
-            """Helper method to get branch location details"""
-            if self.branch:
-                return {
-                    'id': self.branch.id,
-                    'name': self.branch.name,
-                    'address': self.branch.address,
-                    'phone': self.branch.phone,
-                    'is_active': self.branch.is_active
-                }
-            return None
+    def get_branch_location(self):
+        """Helper method to get branch location details"""
+        if self.branch:
+            return {
+                'id': self.branch.id,
+                'name': self.branch.name,
+                'address': self.branch.address,
+                # Replace 'is_active' with the actual field if there's an alternative,
+                # or remove the line if no such field exists.
+            }
+        return None

@@ -195,3 +195,47 @@ def upcoming_assignments(request, student_id):
         return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['GET'])
+def track_course_assignments(request, track_id):
+    """Retrieve assignments by track and course and their submissions."""
+    try:
+        # Get the track by its ID
+        track = get_object_or_404(Track, id=track_id)
+
+        # Get all courses related to the track
+        courses = track.courses.all()
+
+        result = []
+
+        for course in courses:
+            # Get all assignments for each course
+            assignments = course.assignments.all()
+
+            for assignment in assignments:
+                # Get all submissions for each assignment
+                submissions = assignment.submissions.all()
+
+                submission_data = []
+                for submission in submissions:
+                    submission_data.append({
+                        'student_name': submission.student.get_full_name(),
+                        'submission_date': submission.submission_date,
+                        'content': submission.content
+                    })
+
+                result.append({
+                    'course_name': course.name,
+                    'assignment_title': assignment.title,
+                    'assignment_description': assignment.description,
+                    'due_date': assignment.due_date,
+                    'submissions': submission_data
+                })
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

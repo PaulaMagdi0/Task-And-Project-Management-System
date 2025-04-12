@@ -6,6 +6,13 @@ from rest_framework.permissions import IsAuthenticated
 from apps.staff_members.models import StaffMember
 from apps.staff_members.permissions import IsAdminOrBranchManager
 from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import status
+from apps.tracks.models import Track
+from apps.courses.models import Course
+from apps.courses.serializers import CourseSerializer
+from django.shortcuts import get_object_or_404
+
 
 class StaffMemberDeleteView(generics.DestroyAPIView):
     queryset = StaffMember.objects.all()
@@ -82,3 +89,82 @@ class SupervisorBulkUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#Supervisor/instructor Courses and Tracks
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def supervisor_instructor_by_id_view(request, staff_id):
+    """Retrieve the track and courses assigned to a supervisor/instructor by staff member ID."""
+    
+    # Get the staff member by the provided ID
+    staff_member = get_object_or_404(StaffMember, id=staff_id)
+
+    # Check if the staff member is either a supervisor or an instructor
+    if staff_member.role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.INSTRUCTOR]:
+        return Response({"error": "You are not authorized to view this information."}, 
+                         status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        track_data = None
+        course_data = []
+
+        # Handle Supervisor Role: Retrieve tracks they are supervising
+        if staff_member.is_supervisor:
+            tracks = Track.objects.filter(supervisor=staff_member)
+            if tracks.exists():
+                track = tracks.first()  # Supervisor can supervise one or more tracks
+                track_data = {
+                    "id": track.id,
+                    "name": track.name,
+                    "description": track.description,
+                    "track_type": track.track_type,
+                    "supervisor": staff_member.get_full_name(),
+                    "supervisor_role": staff_member.get_role_display(),
+                }
+            else:
+                track_data = None
+
+        # Handle Instructor Role: Retrieve courses and the related track they are teaching
+        if staff_member.is_instructor:
+            courses = Course.objects.filter(instructor=staff_member)
+            if courses.exists():
+                # Extract the track from the courses
+                track = courses.first().track  # All courses will share the same track for this instructor
+                track_data = {
+                    "id": track.id,
+                    "name": track.name,
+                    "description": track.description,
+                    "track_type": track.track_type,
+                    "instructor": staff_member.get_full_name(),
+                    "instructor_role": staff_member.get_role_display(),
+                }
+                # Prepare course data for this instructor's courses
+                course_data = CourseSerializer(courses, many=True).data
+
+        # If track data exists, append courses to track data
+        if track_data:
+            track_data["courses"] = course_data
+
+        # If no track or course data is found, respond with an error
+        if not track_data:
+            return Response({"error": "No track or courses found for this staff member."}, 
+                             status=status.HTTP_404_NOT_FOUND)
+
+        # Respond with staff member and their track/course details
+        response_data = {
+            "staff_member": {
+                "id": staff_member.id,
+                "name": staff_member.get_full_name(),
+                "role": staff_member.get_role_display(),
+                "branch": staff_member.get_branch_location() if staff_member.branch else None
+            },
+            "track": track_data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
