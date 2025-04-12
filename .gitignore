@@ -52,3 +52,9 @@ env/
 # Misc
 *.bak
 *.tmp
+
+
+# Ignore Django migration files
+**/migrations/
+**/migrations/*.py
+**/migrations/*.pyc
