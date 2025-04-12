@@ -9,52 +9,38 @@ import logging
 logger = logging.getLogger(__name__)
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(
-        max_length=255,
-        help_text="User's email address"
-    )
-    password = serializers.CharField(
-        write_only=True,
-        trim_whitespace=False,
-        style={'input_type': 'password'},
-        help_text="User's password"
-    )
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        email = data.get('email', '').strip().lower()
+        email = data.get('email', '').lower().strip()
         password = data.get('password', '')
 
-        if not email or not password:
+        # First check default User model
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email).first()
+        
+        # If not found, check custom models
+        if not user:
+            user = Student.objects.filter(email__iexact=email).first() or \
+                   StaffMember.objects.filter(email__iexact=email).first()
+
+        if not user:
+            logger.error(f"Login attempt - email not found: {email}")
             raise serializers.ValidationError({
-                "detail": "Both email and password are required."
-            })
-
-        user = None
-        user_models = [Student, StaffMember]
-
-        for model in user_models:
-            try:
-                user = model.objects.get(email=email)
-                break
-            except ObjectDoesNotExist:
-                continue
-
-        if user is None:
-            logger.warning(f"Login attempt with non-existent email: {email}")
-            raise serializers.ValidationError({
-                "detail": "Invalid credentials."
+                "email": "No account found with this email."
             })
 
         if not user.check_password(password):
-            logger.warning(f"Invalid password attempt for user: {email}")
+            logger.error(f"Invalid password for: {email}")
             raise serializers.ValidationError({
-                "detail": "Invalid credentials."
+                "password": "Incorrect password."
             })
 
         if not user.is_active:
-            logger.warning(f"Login attempt for inactive account: {email}")
+            logger.error(f"Inactive account login attempt: {email}")
             raise serializers.ValidationError({
-                "detail": "Account is inactive."
+                "account": "Account is inactive."
             })
 
         data['user'] = user

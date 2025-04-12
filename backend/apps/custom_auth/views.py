@@ -14,51 +14,50 @@ logger = logging.getLogger(__name__)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """
-    Handle email/password authentication and JWT token generation.
-    Returns only the JWT access token in the response.
-    """
     try:
-        if not all(key in request.data for key in ['email', 'password']):
-            raise AuthenticationFailed(
-                {"detail": "Email and password are required."},
-                code="missing_credentials"
+        # Validate required fields first
+        if 'email' not in request.data or 'password' not in request.data:
+            return Response(
+                {"detail": "Both email and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Validate credentials using LoginSerializer
+
         login_serializer = LoginSerializer(data=request.data)
         login_serializer.is_valid(raise_exception=True)
+        
         user = login_serializer.validated_data['user']
-        
-        # Generate token using the custom token serializer
         token = MyTokenObtainPairSerializer.get_token(user)
-        access_token = str(token.access_token)
         
-        # Optionally, you can set the access token as an HTTP-only cookie
-        response = Response({"token": access_token}, status=200)
-        cookie_settings = {
-            "httponly": True,
-            "secure": not settings.DEBUG,
-            "samesite": "Strict",
-            "path": settings.JWT_AUTH['COOKIE_PATH'],
+        response_data = {
+            "token": str(token.access_token),
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "type": "student" if hasattr(user, 'student') else "staff"
+            }
         }
-        response.set_cookie(
-            key=settings.JWT_AUTH['ACCESS_TOKEN_COOKIE'],
-            value=access_token,
-            max_age=settings.JWT_AUTH['ACCESS_TOKEN_LIFETIME'].total_seconds(),
-            **cookie_settings
-        )
+        
+        response = Response(response_data, status=status.HTTP_200_OK)
+        
+        if settings.JWT_AUTH['USE_COOKIES']:
+            response.set_cookie(
+                key=settings.JWT_AUTH['ACCESS_TOKEN_COOKIE'],
+                value=str(token.access_token),
+                httponly=True,
+                secure=not settings.DEBUG,
+                samesite='Strict',
+                max_age=settings.JWT_AUTH['ACCESS_TOKEN_LIFETIME'].total_seconds()
+            )
+            
         return response
 
-    except AuthenticationFailed as e:
-        logger.warning(f"Authentication failed for email {request.data.get('email')}: {str(e)}")
-        raise
     except Exception as e:
-        logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
-        raise AuthenticationFailed(
-            {"detail": "An unexpected error occurred during login."},
-            code="login_error"
+        logger.error(f"Login error: {str(e)}")
+        return Response(
+            {"detail": "Authentication failed."},
+            status=status.HTTP_401_UNAUTHORIZED
         )
+        
 @api_view(['POST'])
 
 def logout_view(request):
