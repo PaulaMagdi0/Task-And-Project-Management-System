@@ -1,3 +1,4 @@
+import logging
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes,parser_classes
@@ -5,16 +6,18 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
 from rest_framework import generics
-from apps.student.models import Student
-import logging
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
-logger = logging.getLogger(__name__)
+from .models import Student
 from apps.tracks.models import Track  # Adjust based on your app structure
+from apps.courses.models import Course
+from apps.staff_members.models import StaffMember
+from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
 
-
+logger = logging.getLogger(__name__)
+#UPload Excel File View
 @api_view(['POST'])
 # @permission_classes([IsAuthenticated])  # ✅ Enforce authentication
 @permission_classes([AllowAny])
@@ -82,13 +85,7 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-from rest_framework.decorators import api_view, parser_classes
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Track
-from .serializers import StudentSerializer
-
+#Create Single Student View
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])  # Supports FormData
 def create_student_from_form(request):
@@ -139,6 +136,7 @@ def create_student_from_form(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# List All Student View 
 @api_view(['GET'])
 # @permission_classes([IsAuthenticated])
 @permission_classes([AllowAny])
@@ -178,7 +176,7 @@ def list_students(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
+# Verfiy View 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def verify_email(request, verification_code):
@@ -208,7 +206,69 @@ def verify_email(request, verification_code):
             {'status': 'invalid_code'},
             status=status.HTTP_400_BAD_REQUEST
         )
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  # Ensure only authenticated users can access
+def student_courses(request, student_id):
+    """Retrieve courses and track information for a specific student by their ID."""
+    try:
+        # Fetch student with related track info
+        student = Student.objects.filter(id=student_id).select_related("track").first()
+        
+        if not student:
+            logger.error(f"Student with ID {student_id} not found.")
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if not student.track:
+            logger.error(f"Student with ID {student_id} has no track assigned.")
+            return Response({"error": "Student is not assigned to any track"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fetch courses linked to the student's track
+        courses = Course.objects.filter(track=student.track).select_related('instructor')
+
+        # Get the supervisor of the student's track
+        supervisor = student.track.supervisor
+
+        # Serialize course data, including instructor info
+        course_data = CourseSerializer(courses, many=True).data
+        
+        # Prepare track information
+        track_data = {
+            "id": student.track.id,
+            "name": student.track.name,
+            "description": student.track.description,
+            "track_type": student.track.track_type,
+            "supervisor": {
+                "id": supervisor.id if supervisor else None,
+                "name": supervisor.get_full_name() if supervisor else "No Supervisor",
+                "email": supervisor.email if supervisor else None,
+            } if supervisor else None,
+            "branch": {
+                "id": student.track.branch.id if student.track.branch else None,
+                "name": student.track.branch.name if student.track.branch else "No Branch",
+            }
+        }
+
+        # Prepare student data
+        student_data = {
+            "id": student.id,
+            "name": student.full_name,
+            "email": student.email,
+            "track": track_data
+        }
+
+        return Response({
+            "student": student_data,
+            "courses": course_data  # Courses with instructor info included
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error retrieving student courses: {str(e)}")
+        return Response(
+            {"error": "Failed to retrieve student courses"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+#UPdate student Info View
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])

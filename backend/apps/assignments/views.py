@@ -5,12 +5,14 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 import logging
 import os
-
-from .models import Assignment
+from django.utils import timezone
+from .models import Assignment,AssignmentStudent
 from .serializers import AssignmentSerializer
-from apps.student.models import Student  # Make sure this import is at the top
-
+from rest_framework.decorators import api_view, permission_classes
 logger = logging.getLogger(__name__)
+from rest_framework.permissions import IsAuthenticated
+from apps.student.models import Student
+from apps.courses.models import Course
 
 
 class AssignmentListView(generics.ListCreateAPIView):
@@ -140,3 +142,56 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+#Upcoming deadline
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def upcoming_assignments(request, student_id):
+    """Retrieve all assignments with upcoming end dates for a specific student based on their course and track."""
+    
+    try:
+        # Fetch the student
+        student = Student.objects.get(id=student_id)
+
+        # Get the current date and time
+        now = timezone.now()
+
+        # Get the student's track
+        track = student.track
+
+        # Get the courses associated with the student's track
+        courses_in_track = Course.objects.filter(track=track)
+
+        # Filter assignments based on student, courses, and track
+        assignments = (
+            Assignment.objects.filter(
+                end_date__gt=now,  # Filter for assignments with a future end date
+                assigned_to=student,  # Ensure the student is assigned to the assignment
+                course__in=courses_in_track,  # Ensure the course is linked to the student's track
+            )
+            .order_by('end_date')  # Order by the end date (soonest first)
+        )
+
+        # Serialize the assignments
+        assignment_data = [
+            {
+                "id": assignment.id,
+                "title": assignment.title,
+                "end_date": assignment.end_date,
+                "course": {
+                    "id": assignment.course.id,
+                    "name": assignment.course.name,
+                },
+                "assignment_type": assignment.get_assignment_type_display(),
+                "description": assignment.description,
+            }
+            for assignment in assignments
+        ]
+
+        return Response(assignment_data, status=status.HTTP_200_OK)
+
+    except Student.DoesNotExist:
+        return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

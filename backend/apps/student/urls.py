@@ -7,7 +7,8 @@ from .views import (
     delete_student,
     StudentDashboardAPI,
     show_options,
-    create_student_from_form
+    create_student_from_form,
+    student_courses 
 )
 
 urlpatterns = [
@@ -19,5 +20,7 @@ urlpatterns = [
     path('<int:student_id>/delete/', delete_student, name='delete_student'),
     path('dashboard/', StudentDashboardAPI.as_view(), name='student_dashboard'),
     path('options/', show_options, name='show_options'),
+    path('student/<int:student_id>/courses/', student_courses, name='student_courses_by_id'), # By student ID
+
 
 ]

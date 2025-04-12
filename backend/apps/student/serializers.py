@@ -11,6 +11,13 @@ import logging
 from django.db import transaction
 from django.core.validators import validate_email
 from io import BytesIO
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from apps.courses.models import Course
+from apps.staff_members.models import StaffMember
+from apps.courses.serializers import CourseSerializer  # Make sure this serializer exists
 
 logger = logging.getLogger(__name__)
 
