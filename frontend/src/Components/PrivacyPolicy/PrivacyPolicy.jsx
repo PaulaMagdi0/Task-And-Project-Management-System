@@ -1,4 +1,5 @@
 import React from "react";
+import { Container, Card, Typography, Divider, Box } from "@mui/material";
 
 // Example dynamic data for Privacy Policy
 const privacyData = [
@@ -31,38 +32,50 @@ const privacyData = [
 
 const PrivacyPolicy = () => {
   return (
-    <div
-      className="container d-flex pt-5 mt-6rem justify-content-center"
+    <Container
+      sx={{ paddingTop: 5, paddingBottom: 5 }}
       data-aos="fade-up"
       data-aos-delay="100"
     >
-      <div className="card shadow-lg p-4 border-0">
-        <h1 className="text-center mb-4 fw-bold" data-aos="fade-up">
+      <Card sx={{ padding: 3, boxShadow: 3 }}>
+        <Typography
+          variant="h4"
+          align="center"
+          gutterBottom
+          sx={{ fontWeight: "bold" }}
+          data-aos="fade-up"
+        >
           Privacy Policy
-        </h1>
-        <p
-          className="text-muted text-center"
+        </Typography>
+        <Typography
+          variant="body2"
+          align="center"
+          color="text.secondary"
+          sx={{ marginBottom: 3 }}
           data-aos="fade-up"
           data-aos-delay="200"
         >
           Last Updated: April 2025
-        </p>
+        </Typography>
 
         {privacyData.map((section, index) => (
-          <div
+          <Box
             key={index}
-            className="mt-4"
+            sx={{ marginBottom: 3 }}
             data-aos="fade-up"
             data-aos-delay={300 + index * 100}
           >
-            <h4 className="fw-semibold term-color">
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               {index + 1}. {section.title}
-            </h4>
-            <p>{section.content}</p>
-          </div>
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {section.content}
+            </Typography>
+            {index < privacyData.length - 1 && <Divider sx={{ marginY: 2 }} />}
+          </Box>
         ))}
-      </div>
-    </div>
+      </Card>
+    </Container>
   );
 };
 

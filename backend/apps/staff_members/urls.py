@@ -4,6 +4,9 @@ from .views import (
     StaffMemberUpdateView,
     CreateSupervisorView,
     SupervisorBulkUploadView,
+    StaffMemberDeleteView,
+    supervisor_instructor_by_id_view
+
 )
 
 urlpatterns = [
@@ -18,4 +21,7 @@ urlpatterns = [
 
     # Update staff member by ID
     path('<int:pk>/', StaffMemberUpdateView.as_view(), name='staff-update'),
+    path('<int:pk>/delete/', StaffMemberDeleteView.as_view(), name='staff-delete'),
+    path('track-and-courses/<int:staff_id>/', supervisor_instructor_by_id_view, name='track_and_courses_by_id'),
+
 ]

@@ -21,7 +21,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     "rest_framework",
     "channels",
-    "apps.accounts",
     "apps.tracks",
     "apps.courses",
     "apps.assignments",
@@ -35,8 +34,6 @@ INSTALLED_APPS = [
     "apps.branch_location",
     "corsheaders",
     'django_extensions',
-
-
 ]
 # settings.py
 # Add this import at the top of settings.py

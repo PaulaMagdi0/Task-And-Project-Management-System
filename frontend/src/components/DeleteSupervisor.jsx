@@ -28,17 +28,19 @@ const DeleteSupervisor = () => {
     fetchSupervisors();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this supervisor?")) return;
-    try {
-      await apiClient.delete(`/staff/${id}/`);
-      setMsg("Supervisor deleted successfully.");
-      fetchSupervisors();
-    } catch (err) {
-      console.error("Error deleting supervisor:", err);
-      setMsg("Error deleting supervisor.");
-    }
-  };
+ // Assuming DeleteSupervisor.jsx or similar
+const handleDelete = async (supervisorId) => {
+  if (!window.confirm("Are you sure you want to delete this supervisor?")) return;
+  try {
+    await apiClient.delete(`/staff/${supervisorId}/delete/`); // Updated endpoint
+    setMsg("Supervisor deleted successfully.");
+    // Optionally refresh the list of supervisors here
+  } catch (err) {
+    console.error("Error deleting supervisor:", err);
+    setMsg("Error deleting supervisor.");
+  }
+};
+
 
   return (
     <div>

@@ -6,6 +6,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from apps.tracks.models import Track  # Adjust based on your app structure
 
 def get_default_track():
     """Returns the first available Track instance as default (if any)."""

@@ -1,15 +1,15 @@
 from django.db import models
-from django.conf import settings  # Import settings for possible future adjustments
+from django.utils import timezone
 from apps.courses.models import Course
 from apps.assignments.models import Assignment
-from apps.student.models import Student  # Import Student model directly
+from apps.student.models import Student
+from apps.tracks.models import Track  # Import Track to ensure students belong to a specific track
 
 class AssignmentSubmission(models.Model):
-    # Reference to the Student model directly
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="submissions")
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
-    
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="submissions")
+    track = models.ForeignKey(Track, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to='submissions/', null=True, blank=True)
     file_url = models.URLField(null=True, blank=True)  # URL for external file (e.g., Google Drive link)
     

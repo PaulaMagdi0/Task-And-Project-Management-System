@@ -1,15 +1,26 @@
 from django.urls import path
-from . import views
-from .views import StudentDashboardAPI
+from .views import (
+    upload_excel,
+    list_students,
+    verify_email,
+    update_student,
+    delete_student,
+    StudentDashboardAPI,
+    show_options,
+    create_student_from_form,
+    student_courses 
+)
 
 urlpatterns = [
-    path('upload/', views.update_student, name='upload_student'),
-    path('list/', views.list_students, name='list_students'),
-    path('options/', views.show_options, name='show_options'),
-    path('verify/<str:verification_code>/', views.verify_email, name='verify-email'),
-    path('students/', views.list_students, name='list_students'),  # Changed from 'list_students/' to 'students/'
-    path('dashboard/', StudentDashboardAPI.as_view(), name='student-dashboard'),
+    path('create/', create_student_from_form, name='create_student_form'), #Single
+    path('upload/', upload_excel, name='upload_excel'),#File
+    path('list/', list_students, name='list_students'),#Listing
+    path('verify/<str:verification_code>/', verify_email, name='verify_email'),#Verifiy
+    path('<int:student_id>/update/', update_student, name='update_student'),
+    path('<int:student_id>/delete/', delete_student, name='delete_student'),
+    path('dashboard/', StudentDashboardAPI.as_view(), name='student_dashboard'),
+    path('options/', show_options, name='show_options'),
+    path('student/<int:student_id>/courses/', student_courses, name='student_courses_by_id'), # By student ID
+
+
 ]
-#   File "/home/mano/ITI/Graduation Project/Task-And-Project-Management-System/backend/env/lib/python3.12/site-packages/django/db/migrations/loader.py", line 327, in check_consistent_history
-#     raise InconsistentMigrationHistory(
-# django.db.migrations.exceptions.InconsistentMigrationHistory: Migration staff_members.0001_initial is applied before its dependency branch_location.0001_initial on database 'default'.

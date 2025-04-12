@@ -1,0 +1,30 @@
+/* Styles for the Courses table */
+.courses-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    text-align: left;
+  }
+  
+  .courses-table th, .courses-table td {
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+  }
+  
+  .courses-table th {
+    background-color: #f4f4f4;
+    font-weight: bold;
+  }
+  
+  .courses-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  
+  .courses-table tr:hover {
+    background-color: #f1f1f1;
+  }
+  
+  .courses-table td {
+    font-size: 14px;
+  }
+  
