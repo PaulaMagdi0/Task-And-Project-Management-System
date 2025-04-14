@@ -27,7 +27,7 @@ export const loginUser = createAsyncThunk(
     try {
       // Use the correct login endpoint.
       const response = await apiClient.post('/auth/login/', { email: email.trim(), password });
-      const { token } = response.data;
+      const token = response.data.access;
       if (!token) {
         throw new Error("No token returned from server");
       }
