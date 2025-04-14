@@ -46,9 +46,12 @@ class Assignment(models.Model):
         db_table = "assignments"
 
     def __str__(self):
-        assigned_display = self.get_assigned_to_display()
-        return f"{self.title} ({self.get_assignment_type_display()} - {assigned_display})"
-
+        assigned_display = ""
+        for assignment_student in self.assignmentstudent_set.all():  # Access through the related AssignmentStudent
+            student = assignment_student.student  # Access the Student object
+            course = assignment_student.course  # Access the Course object through AssignmentStudent
+            assigned_display += f"{student.full_name} ({course.name}), "
+        return assigned_display[:-2]  # Remove trailing comma and space
     def get_assigned_to_display(self):
         if self.assigned_to.exists():
             # Optimized query to prevent multiple database hits

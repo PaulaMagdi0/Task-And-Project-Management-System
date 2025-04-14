@@ -1,4 +1,3 @@
-# apps/tracks/models.py
 from django.db import models
 from apps.staff_members.models import StaffMember
 from apps.branch_location.models import Branch  # Import Branch model
@@ -12,7 +11,12 @@ class Track(models.Model):
     ]
     
     name = models.CharField(max_length=255)
-    courses = models.ManyToManyField("courses.Course", related_name="tracks")  # ✅ Use string reference
+    courses = models.ManyToManyField(
+        "courses.Course", 
+        related_name="tracks_set",  # Renamed related_name to avoid clashes
+        blank=True,
+        through="courses.CourseTrack"  # Corrected to reference the model path explicitly
+    )
     description = models.TextField()
     track_type = models.CharField(
         max_length=10,

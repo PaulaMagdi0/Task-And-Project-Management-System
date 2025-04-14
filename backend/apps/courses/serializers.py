@@ -1,29 +1,28 @@
+
+from apps.tracks.models import Track  # Import Track model
 from rest_framework import serializers
 from .models import Course
-from apps.tracks.models import Track  # Import Track model
+from apps.tracks.models import Track
 
 class CourseSerializer(serializers.ModelSerializer):
-    track = serializers.PrimaryKeyRelatedField(queryset=Track.objects.all())  # Ensure queryset is provided
+    # Serialize the related Track instances for the Many-to-Many relationship
+    tracks = serializers.PrimaryKeyRelatedField(queryset=Track.objects.all(), many=True)
 
     class Meta:
         model = Course
         fields = "__all__"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Lazy import to avoid circular import issues
-        from apps.tracks.models import Track
-        self.fields["track"].queryset = Track.objects.all()
-
     def create(self, validated_data):
         # Create the course object
+        tracks_data = validated_data.pop('tracks')
         course = super().create(validated_data)
         
-        # Ensure the track's courses field gets updated
-        track = course.track
-        track.courses.add(course)  # Adds the new course to the track
-        
+        # Add related tracks to the course
+        for track in tracks_data:
+            course.tracks.add(track)
+
         return course
+
 class MinimalCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course

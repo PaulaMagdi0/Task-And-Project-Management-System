@@ -1,25 +1,22 @@
 from django.db import models
 from apps.staff_members.models import StaffMember
+from apps.branch_location.models import Branch  # Import Branch model
+from django.utils import timezone
 from apps.tracks.models import Track
 
 class Course(models.Model):
-    
     name = models.CharField(max_length=255)
     description = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)  # Set default to now
+    
+    # Many-to-many relationship through the `courses_tracks` table
+    tracks = models.ManyToManyField(
+        Track,
+        related_name="course_tracks",  # Change related_name here
+        through="CourseTrack",  # Custom intermediary model
+    )
 
-    # One track can have many courses (many courses per track)
-    track = models.ForeignKey(
-    "tracks.Track",
-    on_delete=models.CASCADE,
-    related_name="course_set",
-    null=False,  # Set null=False to make it non-nullable
-    default=1  # Replace with a valid default track ID or fetch it dynamically in migration
-)
-
-
-
-    # The instructor is a foreign key to StaffMember
+    # Instructor relationship
     instructor = models.ForeignKey(
         StaffMember,
         on_delete=models.SET_NULL,
@@ -27,23 +24,15 @@ class Course(models.Model):
         blank=True,
         related_name="courses"
     )
-
     class Meta:
-        unique_together = ("name", "track")  # Ensure each course is unique per track
-        ordering = ["-created_at"]  # Orders by created_at in descending order
-        db_table = 'courses'  # Custom table name
-
-    def save(self, *args, **kwargs):
-        # Allowed roles for an instructor
-        allowed_roles = ["instructor", "branch_manager", "supervisor"]
-
-        if self.instructor and self.instructor.role not in allowed_roles:
-            raise ValueError("Assigned user must have the role 'instructor', 'branch_manager', or 'supervisor'.")
-        
-        super().save(*args, **kwargs)
-
+        db_table = 'courses'  # Define the intermediary table name
     def __str__(self):
-        # Return course name with track and instructor information
-        track_name = self.track.name if self.track else "No Track"
-        instructor_name = (self.instructor.get_full_name() or self.instructor.username) if self.instructor else "No Instructor"
-        return f"{self.name} ({track_name}) - Instructor: {instructor_name}"
+        return self.name  # This ensures that the course name is shown in the admin panel
+    
+class CourseTrack(models.Model):
+    # This is the intermediary table
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    track = models.ForeignKey(Track, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now)  # Set default to now
+    class Meta:
+        db_table = 'courses_tracks'  # Define the intermediary table name

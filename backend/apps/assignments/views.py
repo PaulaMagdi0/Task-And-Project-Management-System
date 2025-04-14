@@ -162,11 +162,17 @@ def upcoming_assignments(request, student_id):
         # Get the current date and time
         now = timezone.now()
 
-        # Get the student's track
+        # Get the student's track (ensure the track exists)
         track = student.track
+        if not track:
+            return Response({"error": "Student is not assigned to any track"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get the courses associated with the student's track
-        courses_in_track = Course.objects.filter(track=track)
+        # Get the courses associated with the student's track via CourseTrack
+        courses_in_track = Course.objects.filter(coursetrack__track=track)
+
+        # Ensure there are courses in the track for the student
+        if not courses_in_track.exists():
+            return Response({"error": "No courses found for the student's track"}, status=status.HTTP_404_NOT_FOUND)
 
         # Filter assignments based on student, courses, and track
         assignments = (
@@ -177,6 +183,10 @@ def upcoming_assignments(request, student_id):
             )
             .order_by('end_date')  # Order by the end date (soonest first)
         )
+
+        # If no assignments are found
+        if not assignments.exists():
+            return Response({"message": "No upcoming assignments found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Serialize the assignments
         assignment_data = [
@@ -200,6 +210,7 @@ def upcoming_assignments(request, student_id):
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        logger.error(f"Error in upcoming_assignments: {str(e)}", exc_info=True)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # views.py# views.py
@@ -273,7 +284,6 @@ from .serializers import SafeAssignmentSerializer
 import logging
 
 logger = logging.getLogger(__name__)
-
 @api_view(['GET'])
 def track_course_assignments(request, track_id, course_id):
     """Retrieve assignments for a specific track and course without student assignments."""
@@ -289,16 +299,16 @@ def track_course_assignments(request, track_id, course_id):
                 'message': 'Track not found.'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Ensure the course exists and belongs to the track
+        # Ensure the course exists and belongs to the track via CourseTrack
         try:
-            course = Course.objects.get(id=course_id, track=track)
+            course = Course.objects.get(id=course_id, coursetrack__track=track)
         except Course.DoesNotExist:
             return Response({
                 'status': 'error',
                 'message': 'Course not found or does not belong to the provided track.'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Retrieve assignments for the specific course and track, excluding assigned students
+        # Retrieve assignments for the specific course
         assignments = Assignment.objects.filter(course=course)
         
         # Serialize the assignments
@@ -353,7 +363,7 @@ def instructor_assignments(request, track_id, course_id, staff_id):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Retrieve assignments for the specific course and track
-        assignments = Assignment.objects.filter(course=course, course__track=track)
+        assignments = Assignment.objects.filter(course=course)  # Adjusted filter if necessary
         
         # Serialize the assignments
         assignment_serializer = SafeAssignmentSerializer(assignments, many=True)
@@ -371,7 +381,7 @@ def instructor_assignments(request, track_id, course_id, staff_id):
             'message': 'Failed to fetch assignments for the instructor, track, or course',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 
 
 

@@ -212,8 +212,8 @@ def student_courses(request, student_id):
     """Retrieve courses and track information for a specific student by their ID."""
     try:
         # Fetch student with related track info
-        student = Student.objects.filter(id=student_id).select_related("track").first()
-        
+        student = Student.objects.filter(id=student_id).select_related('track').first()
+
         if not student:
             logger.error(f"Student with ID {student_id} not found.")
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -222,8 +222,8 @@ def student_courses(request, student_id):
             logger.error(f"Student with ID {student_id} has no track assigned.")
             return Response({"error": "Student is not assigned to any track"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Fetch courses linked to the student's track
-        courses = Course.objects.filter(track=student.track).select_related('instructor')
+        # Assuming 'tracks' is a ManyToManyField in the Course model
+        courses = Course.objects.filter(tracks=student.track).select_related('instructor')
 
         # Get the supervisor of the student's track
         supervisor = student.track.supervisor

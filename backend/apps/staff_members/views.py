@@ -7,7 +7,6 @@ from apps.staff_members.models import StaffMember
 from apps.staff_members.permissions import IsAdminOrBranchManager
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework import status
 from apps.tracks.models import Track
 from apps.courses.models import Course
 from apps.courses.serializers import CourseSerializer
@@ -89,8 +88,9 @@ class SupervisorBulkUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+   
 
-#Supervisor/instructor Courses and Tracks
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
@@ -128,40 +128,39 @@ def supervisor_instructor_by_id_view(request, staff_id):
         if staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
             if courses.exists():
-                # Extract the track from the courses
-                track = courses.first().track  # All courses will share the same track for this instructor
-                track_data = {
-                    "id": track.id,
-                    "name": track.name,
-                    "description": track.description,
-                    "track_type": track.track_type,
-                    "instructor": staff_member.get_full_name(),
-                    "instructor_role": staff_member.get_role_display(),
-                }
-                # Prepare course data for this instructor's courses
-                course_data = CourseSerializer(courses, many=True).data
+                course_data = CourseSerializer(courses, many=True).data  # Serialize courses
 
-        # If track data exists, append courses to track data
+                # Retrieve tracks for the courses assigned to the instructor
+                track_data = []
+                for course in courses:
+                    for track in course.tracks.all():  # Access the related tracks
+                        track_data.append({
+                            "id": track.id,
+                            "name": track.name,
+                            "description": track.description,
+                            "track_type": track.track_type,
+                            "instructor": staff_member.get_full_name(),
+                            "instructor_role": staff_member.get_role_display(),
+                        })
+
+        # If track data exists, include courses with the track details
         if track_data:
-            track_data["courses"] = course_data
+            response_data = {
+                "staff_member": {
+                    "id": staff_member.id,
+                    "name": staff_member.get_full_name(),
+                    "role": staff_member.get_role_display(),
+                    "branch": staff_member.get_branch_location() if staff_member.branch else None
+                },
+                "tracks": track_data,  # Include track details
+                "courses": course_data  # Include course details
+            }
 
-        # If no track or course data is found, respond with an error
-        if not track_data:
-            return Response({"error": "No track or courses found for this staff member."}, 
-                             status=status.HTTP_404_NOT_FOUND)
+            return Response(response_data, status=status.HTTP_200_OK)
 
-        # Respond with staff member and their track/course details
-        response_data = {
-            "staff_member": {
-                "id": staff_member.id,
-                "name": staff_member.get_full_name(),
-                "role": staff_member.get_role_display(),
-                "branch": staff_member.get_branch_location() if staff_member.branch else None
-            },
-            "track": track_data
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        # If no track or course data found, return an error message
+        return Response({"error": "No track or courses found for this staff member."}, 
+                         status=status.HTTP_404_NOT_FOUND)
 
     except Exception as e:
         return Response(
