@@ -1,7 +1,7 @@
-# apps/staff_members/admin.py
 from django.contrib import admin
 from .models import StaffMember
 from django.contrib.auth.admin import UserAdmin
+from django.core.exceptions import ValidationError
 
 class StaffMemberAdmin(UserAdmin):
     model = StaffMember
@@ -9,7 +9,8 @@ class StaffMemberAdmin(UserAdmin):
     list_filter = ('role', 'is_verified', 'branch')
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('-date_joined',)
-    
+
+    # Modify fieldsets by excluding 'date_joined' from your custom fieldsets
     fieldsets = (
         (None, {
             'fields': ('username', 'password', 'first_name', 'last_name', 'email', 'phone', 'role', 'branch')
@@ -18,7 +19,7 @@ class StaffMemberAdmin(UserAdmin):
             'fields': ('is_active', 'is_verified', 'is_superuser', 'groups', 'user_permissions')
         }),
         ('Important dates', {
-            'fields': ('date_joined',)
+            'fields': ()  # This is left empty because 'date_joined' is already part of UserAdmin.fieldsets
         }),
     )
 
