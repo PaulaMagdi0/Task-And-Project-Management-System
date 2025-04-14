@@ -26,7 +26,8 @@ import Courses from './Courses';
 import Assignments from './Assignments';
 import Submissions from './Submissions';
 import Grades from './Grades';
-import CreateAssignment from './CreateAssignment';
+// import CreateAssignment from './CreateAssignment';
+import CreateAssignment from '../../Components/CreateAssignments/CreateAssignments';
 
 const drawerWidth = 240;
 
@@ -38,7 +39,7 @@ const InstructorDashboard = () => {
   const menuItems = [
     { text: 'My Courses', icon: <CoursesIcon />, path: '/courses' },
     { text: 'Assignments', icon: <AssignmentsIcon />, path: '/assignments' },
-    { text: 'Create Assignment', icon: <CreateAssignmentIcon />, path: '/create-assignment' },
+    { text: 'Create Assignment', icon: <CreateAssignmentIcon />, path: '/instructor/dashboard/create-assignment' },
     { text: 'Submissions', icon: <SubmissionsIcon />, path: '/submissions' },
     { text: 'Grades', icon: <GradesIcon />, path: '/grades' },
   ];

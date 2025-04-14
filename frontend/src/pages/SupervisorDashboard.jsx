@@ -14,10 +14,13 @@ import './SupervisorDashboard.css';
 
 // Import your components
 import Courses from './Courses';
-import Assignments from '../pages/Instructor/Assignments';
+// import Assignments from '../pages/Instructor/Assignments';
+import Assignments from '../Components/Assignments/Assignments';
 import Submissions from '../pages/Instructor/Submissions';
 import Grades from '../pages/Instructor/Grades';
-import CreateAssignment from '../pages/Instructor/CreateAssignment';
+// import CreateAssignment from '../pages/Instructor/CreateAssignment';
+import CreateAssignment from '../Components/CreateAssignments/CreateAssignments';
+
 import UploadStudentPage from '../components/AddStudent';
 import UploadInstructor from '../components/AddInstructor';
 
@@ -30,6 +33,7 @@ const SupervisorDashboard = () => {
     { text: 'My Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
     { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
     { text: 'Create Assignment', icon: <FiCalendar />, path: '/supervisor/dashboard/create-assignment' },
+    { text: 'View My Assignment', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     // { text: 'Grades', icon: <FiAlertTriangle />, path: '/supervisor/dashboard/grades' },
   ];
@@ -86,6 +90,7 @@ const SupervisorDashboard = () => {
             <Route path="addstudent" element={<UploadStudentPage />} />
             <Route path="addinstructor" element={<UploadInstructor />} />
             <Route path="create-assignment" element={<CreateAssignment />} />
+            <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
             {/* <Route path="grades" element={<Grades />} /> */}
           </Routes>

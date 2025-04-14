@@ -1,0 +1,19 @@
+.create-assignment {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .create-assignment form {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .create-assignment .MuiTextField-root,
+  .create-assignment .MuiSelect-root {
+    margin-bottom: 16px;
+  }
+  

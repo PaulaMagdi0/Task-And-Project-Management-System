@@ -5,9 +5,9 @@ import apiClient from '../services/api';
 // Async thunk to fetch courses from the backend
 export const fetchCourses = createAsyncThunk(
   'courses/fetchCourses',
-  async (_, { rejectWithValue }) => {
+  async (user_id , { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/courses/');
+      const response = await apiClient.get(`/staff/track-and-courses/${user_id }/`);
       return response.data;
     } catch (error) {
       // You can customize error handling here
@@ -34,8 +34,8 @@ const coursesSlice = createSlice({
       })
       .addCase(fetchCourses.fulfilled, (state, action) => {
         state.loading = false;
-        state.data = action.payload;
-      })
+        state.data = action.payload; // Keep the full object
+      })      
       .addCase(fetchCourses.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to fetch courses';

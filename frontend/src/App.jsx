@@ -28,7 +28,7 @@ import SupervisorDashboard from './pages/SupervisorDashboard';
 import BranchManagerDashboard from './pages/BranchManagerDashboard';
 import InstructorDashboard from './pages/Instructor/Dashboard';
 import Course from "./pages/DashBoard/Courses";
-import Assignments from './pages/DashBoard/Assignments';
+import Assignments from './Components/Assignments/Assignments';
 import Submissions from './pages/DashBoard/Submissions';
 import Grades from './pages/DashBoard/Grades';
 import CreateAssignment from './pages/DashBoard/CreateAssignment';
@@ -53,6 +53,7 @@ const App = () => {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          
           <Route path="/about" element={<About />} />
           <Route path="/services" element={<Services />} />
           <Route path="/contact" element={<Contact />} />
@@ -62,6 +63,7 @@ const App = () => {
           <Route path="/chat" element={<Chatting users={dummyUsers} />} />
           <Route path="/upload-student" element={<UploadStudentPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/assignment" element={<Assignments />} />
 
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
