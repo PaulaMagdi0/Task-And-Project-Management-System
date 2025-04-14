@@ -58,3 +58,5 @@ env/
 **/migrations/
 **/migrations/*.py
 **/migrations/*.pyc
+**/migrations/__init__.py
+**/migrations/__pycache__/
