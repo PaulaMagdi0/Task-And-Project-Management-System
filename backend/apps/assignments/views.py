@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import Assignment,AssignmentStudent
-from .serializers import AssignmentSerializer
+from .serializers import AssignmentSerializer,SafeAssignmentSerializer
 from rest_framework.decorators import api_view, permission_classes
 from apps.student.models import Student
 from apps.courses.models import Course
