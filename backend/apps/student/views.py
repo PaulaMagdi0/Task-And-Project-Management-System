@@ -19,9 +19,9 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 #UPload Excel File View
-@api_view(['POST'])
-# @permission_classes([IsAuthenticated])  # ✅ Enforce authentication
+
 @permission_classes([AllowAny])
+@api_view(['POST'])
 def upload_excel(request):
     """Handle bulk student creation via Excel upload"""
     print(f"DEBUG: User Authenticated? {request.user.is_authenticated}, User: {request.user}")
@@ -86,9 +86,10 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+        
 #Create Single Student View
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])  # Supports FormData
+@parser_classes([MultiPartParser, FormParser])
 def create_student_from_form(request):
     """
     Accepts FormData input and creates a new student.
@@ -98,44 +99,96 @@ def create_student_from_form(request):
     - email
     - role
     - track_id
-    - password (optional)
     """
-    email = request.data.get("email")
+    email = request.data.get("email", "").strip().lower()
     
     if not email:
-        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Email is required.", "field": "email"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if student exists first to provide immediate feedback
+    if Student.objects.filter(email=email).exists():
+        return Response(
+            {
+                "error": f"A student with email '{email}' already exists",
+                "field": "email",
+                "email": email
+            },
+            status=status.HTTP_409_CONFLICT
+        )
 
     # Extract username from email
     username = email.split("@")[0]
 
     # Collecting form data
     data = {
-        "first_name": request.data.get("first_name"),
-        "last_name": request.data.get("last_name"),
+        "first_name": request.data.get("first_name", "").strip(),
+        "last_name": request.data.get("last_name", "").strip(),
         "email": email,
-        "role": request.data.get("role"),
+        "role": request.data.get("role", "student"),
         "track_id": request.data.get("track_id"),
-        "username": username,  # Add extracted username
-        # "password": request.data.get("password", None),  # Optional
+        "username": username,
     }
+
+    # Validate required fields
+    required_fields = ['first_name', 'last_name', 'track_id']
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        return Response(
+            {
+                "error": f"Missing required fields: {', '.join(missing_fields)}",
+                "fields": missing_fields
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Check if the track_id is valid
     try:
-        track = Track.objects.get(id=data.get('track_id'))
+        track = Track.objects.get(id=data['track_id'])
+        data["track"] = track
     except Track.DoesNotExist:
-        return Response({"error": "Invalid track_id provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Add the track object to the data instead of just the track_id
-    data["track"] = track
+        return Response(
+            {
+                "error": f"Invalid track_id provided: {data['track_id']}",
+                "field": "track_id"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Validate the serializer with the data
     serializer = StudentSerializer(data=data)
     
     if serializer.is_valid():
-        serializer.save()  # Save the student object
-        return Response({"message": "Student created successfully"}, status=status.HTTP_201_CREATED)
+        try:
+            serializer.save()
+            return Response(
+                {
+                    "message": "Student created successfully",
+                    "student": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            logger.error(f"Error saving student: {str(e)}")
+            return Response(
+                {"error": "Failed to create student due to server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Return serializer errors with field-specific information
+    errors = serializer.errors
+    for field in errors:
+        errors[field] = [str(msg) for msg in errors[field]]
+    return Response(
+        {
+            "error": "Validation failed",
+            "details": errors,
+            "fields": list(errors.keys())
+        },
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
 # List All Student View 
 @api_view(['GET'])

@@ -15,7 +15,7 @@ urlpatterns = [
     path("api/submission/", include("apps.submission.urls")),
     path("api/auth/", include("apps.custom_auth.urls")),
     path("api/branch_location/", include("apps.branch_location.urls")),
-    path('api/', include('apps.student.urls')),
+    # path('api/', include('apps.student.urls')),
     path("api/chat/", include("apps.chat.urls")),
     path("api/contact/", include("apps.contact.urls")),
 ]

@@ -44,10 +44,10 @@ JWT_AUTH = {
     'ACCESS_TOKEN_COOKIE': 'access_token',
     'REFRESH_TOKEN_COOKIE': 'refresh_token',
     'COOKIE_PATH': '/',
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
@@ -154,3 +154,4 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "m.nasr266@gmail.com"
 EMAIL_HOST_PASSWORD = "efvh pzab wslt upfq"  # Keep this secure
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
