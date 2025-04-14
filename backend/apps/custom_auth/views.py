@@ -33,9 +33,12 @@ def login_view(request):
         # Generate token using the custom token serializer
         token = MyTokenObtainPairSerializer.get_token(user)
         access_token = str(token.access_token)
-        
+        refresh_token = str(token)
         # Optionally, you can set the access token as an HTTP-only cookie
-        response = Response({"token": access_token}, status=200)
+        response = Response({
+    "access": access_token,
+    "refresh": refresh_token,
+}, status=200)
         cookie_settings = {
             "httponly": True,
             "secure": not settings.DEBUG,

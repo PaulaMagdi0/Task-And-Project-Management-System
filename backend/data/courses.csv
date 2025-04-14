@@ -1,0 +1,51 @@
+course_id,course_name,description,created_at,updated_at,track_id
+1,Python,"Learn Python programming from basics to advanced.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+2,Java,"Master Java for enterprise applications.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+3,React,"Build dynamic UIs with React.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+4,MERN Stack Development,"Full-stack development with MongoDB, Express, React, and Node.js.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+5,JavaScript,"Core JavaScript for web development.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+6,Node.js,"Server-side development with Node.js.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+7,.NET,"Develop applications using the .NET framework.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+8,Odoo (Open Source ERP),"Learn ERP development with Odoo.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+9,PHP,"Build dynamic websites with PHP.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+10,C/C++,"Master low-level programming with C and C++.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+11,Kotlin,"Modern Android development with Kotlin.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+12,Swift,"Develop iOS apps with Swift.",2025-04-01 10:00:00,2025-04-01 10:00:00,1
+13,Android Application Development,"Build Android apps from scratch.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+14,iOS Application Development,"Create iOS apps with Swift and Xcode.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+15,Cross-Platform Mobile Development,"Develop apps for multiple platforms.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+16,Front-End Development,"Design user interfaces for the web.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+17,Back-End Development,"Build server-side applications.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+18,Web & User Interface Development,"Create responsive web interfaces.",2025-04-01 10:00:00,2025-04-01 10:00:00,2
+19,Machine Learning (Beginner to Advanced),"Learn ML concepts and applications.",2025-04-01 10:00:00,2025-04-01 10:00:00,3
+20,Google Machine Learning Developer,"Become a certified ML developer with Google.",2025-04-01 10:00:00,2025-04-01 10:00:00,3
+21,MCIT/EPITA AI Engineer,"Advanced AI engineering course.",2025-04-01 10:00:00,2025-04-01 10:00:00,3
+22,Data Analysis,"Analyze data with modern tools.",2025-04-01 10:00:00,2025-04-01 10:00:00,3
+23,High Performance Computing (HPC),"Optimize computing for large-scale tasks.",2025-04-01 10:00:00,2025-04-01 10:00:00,3
+24,Cybersecurity,"Learn to secure systems and networks.",2025-04-01 10:00:00,2025-04-01 10:00:00,4
+25,Ethical Hacking,"Master ethical hacking techniques.",2025-04-01 10:00:00,2025-04-01 10:00:00,4
+26,Computer Networks,"Understand networking fundamentals.",2025-04-01 10:00:00,2025-04-01 10:00:00,4
+27,Linux Administration,"Manage Linux systems effectively.",2025-04-01 10:00:00,2025-04-01 10:00:00,4
+28,VMware Foundation,"Learn virtualization with VMware.",2025-04-01 10:00:00,2025-04-01 10:00:00,4
+29,Software Quality Assurance Tester,"Ensure software quality through testing.",2025-04-01 10:00:00,2025-04-01 10:00:00,5
+30,Automated Web Testing,"Automate testing for web applications.",2025-04-01 10:00:00,2025-04-01 10:00:00,5
+31,API Testing,"Test APIs for functionality and performance.",2025-04-01 10:00:00,2025-04-01 10:00:00,5
+32,User Experience (UX) Design,"Design intuitive user experiences.",2025-04-01 10:00:00,2025-04-01 10:00:00,6
+33,2D Graphic Design,"Create stunning 2D graphics.",2025-04-01 10:00:00,2025-04-01 10:00:00,6
+34,2D Game Artist,"Design art for 2D games.",2025-04-01 10:00:00,2025-04-01 10:00:00,6
+35,Business Application (CRM Functional Consultant),"Learn CRM consulting skills.",2025-04-01 10:00:00,2025-04-01 10:00:00,7
+36,ERP and Business Intelligence,"Master ERP and BI tools.",2025-04-01 10:00:00,2025-04-01 10:00:00,7
+37,Professional Development & BI-Infused CRM,"Combine BI with CRM for business growth.",2025-04-01 10:00:00,2025-04-01 10:00:00,7
+38,AWS Administration,"Manage cloud infrastructure with AWS.",2025-04-01 10:00:00,2025-04-01 10:00:00,8
+39,Azure AI and Data Science Engineer,"Leverage Azure for AI and data science.",2025-04-01 10:00:00,2025-04-01 10:00:00,8
+40,DevOps Azure Administration,"Implement DevOps practices on Azure.",2025-04-01 10:00:00,2025-04-01 10:00:00,8
+41,Cloud Infrastructure Architect,"Design scalable cloud architectures.",2025-04-01 10:00:00,2025-04-01 10:00:00,8
+42,Internet of Things (IoT),"Build IoT solutions.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+43,Embedded Systems,"Develop for embedded devices.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+44,Robotics,"Learn robotics programming and design.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+45,Digital Twin,"Explore digital twin technology.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+46,Blockchain,"Understand blockchain development.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+47,Digital Marketing,"Master digital marketing strategies.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+48,Freelancing,"Learn skills for successful freelancing.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+49,E-Learning,"Develop e-learning platforms.",2025-04-01 10:00:00,2025-04-01 10:00:00,9
+50,Sign Language for Tech Fields,"Learn sign language for tech communication.",2025-04-01 10:00:00,2025-04-01 10:00:00,9

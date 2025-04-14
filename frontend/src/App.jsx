@@ -19,7 +19,7 @@ import SignIn from './pages/Signin';
 import NotFound from './pages/NotFound';
 import AccessDenied from "./Components/Denied/Denied";
 import Chatting, { dummyUsers } from './pages/Chat/Chatting';
-
+import RecommendationForm from './Components/Recommendation/Recommendation';
 
 // Dashboard Components
 import Dashboard from "./pages/DashBoard/Dashboard";
@@ -64,7 +64,7 @@ const App = () => {
           <Route path="/upload-student" element={<UploadStudentPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
-
+          <Route path="/recommendation" element={<RecommendationForm />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />
