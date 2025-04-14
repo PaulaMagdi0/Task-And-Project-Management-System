@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     "apps.branch_location",
     "corsheaders",
     'django_extensions',
-    'ai_recommendations',
+    # 'ai_recommendations',
 
 ]
 # settings.py

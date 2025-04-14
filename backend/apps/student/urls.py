@@ -23,6 +23,4 @@ urlpatterns = [
     path('options/', show_options, name='show_options'),
     path('student/<int:student_id>/courses/', student_courses, name='student_courses_by_id'), # By student ID
     path('tracks/<int:track_id>/courses/<int:course_id>/students/', StudentsByTrackAndCourseView.as_view(), name='course_and_students_by_track'),
-
-
 ]
