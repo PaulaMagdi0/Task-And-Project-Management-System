@@ -1,13 +1,13 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import ctaBgImage from "../../assets/img/cta-bg.jpg";
+import heroBg from "/src/assets/img/newCapital.png";
 
 const callToActionData = {
   title: "Let's Get Things Done",
   description:
     "Ready to boost your team's productivity and keep every task on track? Join Task Flow today and start managing your projects with clarity and confidence.",
   buttonText: "Services",
-  imageUrl: ctaBgImage,
+  imageUrl: heroBg,
 };
 
 const CallToAction = () => {

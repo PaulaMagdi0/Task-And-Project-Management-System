@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import AssignmentSubmission
 from apps.courses.models import Course
 from apps.assignments.models import Assignment
-
+from apps.assignments.serializers import AssignmentStudentSerializer
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentSubmission
@@ -64,3 +64,9 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
             return super().create(validated_data)
         except Exception as e:
             raise serializers.ValidationError(str(e))
+class AssignmentDetailSerializer(serializers.ModelSerializer):
+    assigned_students = AssignmentStudentSerializer(source='assignmentstudent_set', many=True)
+
+    class Meta:
+        model = Assignment
+        fields = ['id', 'title', 'due_date', 'end_date', 'assignment_type', 'description', 'assigned_students']

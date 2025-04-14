@@ -54,13 +54,13 @@ class Assignment(models.Model):
         return assigned_display[:-2]  # Remove trailing comma and space
     def get_assigned_to_display(self):
         if self.assigned_to.exists():
-            # Optimized query to prevent multiple database hits
             assigned_students = [
-                f"{student.full_name} ({student.assignmentstudent_set.first().course.name})"
-                for student in self.assigned_to.all().select_related('assignmentstudent__course')
+                f"{student.full_name} ({assignment_student.course.name})"
+                for assignment_student in self.assignmentstudent_set.select_related('course')
             ]
             return f"Assigned to {', '.join(assigned_students)}"
         return "Assigned to All"
+
 
     def save(self, *args, **kwargs):
         if not self.end_date:

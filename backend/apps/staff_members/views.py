@@ -89,17 +89,13 @@ class SupervisorBulkUploadView(APIView):
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-   
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
     """Retrieve the track and courses assigned to a supervisor/instructor by staff member ID."""
     
-    # Get the staff member by the provided ID
     staff_member = get_object_or_404(StaffMember, id=staff_id)
 
-    # Check if the staff member is either a supervisor or an instructor
     if staff_member.role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.INSTRUCTOR]:
         return Response({"error": "You are not authorized to view this information."}, 
                          status=status.HTTP_403_FORBIDDEN)
@@ -111,8 +107,9 @@ def supervisor_instructor_by_id_view(request, staff_id):
         # Handle Supervisor Role: Retrieve tracks they are supervising
         if staff_member.is_supervisor:
             tracks = Track.objects.filter(supervisor=staff_member)
+            track_data = None
             if tracks.exists():
-                track = tracks.first()  # Supervisor can supervise one or more tracks
+                track = tracks.first()
                 track_data = {
                     "id": track.id,
                     "name": track.name,
@@ -120,20 +117,61 @@ def supervisor_instructor_by_id_view(request, staff_id):
                     "track_type": track.track_type,
                     "supervisor": staff_member.get_full_name(),
                     "supervisor_role": staff_member.get_role_display(),
+                    "created_at": track.created_at
                 }
+
+                # Get courses that belong to the track
+                track_courses = Course.objects.filter(tracks=track)
+                track_courses_data = []
+
+                for course in track_courses:
+                    # Add the track names to the course data
+                    course_track_names = [
+                        {"id": t.id, "name": t.name} for t in course.tracks.all()  # Include both track ID and name
+                    ]
+                    
+                    # Add instructor details (name and ID)
+                    instructor_info = {
+                        "id": course.instructor.id if course.instructor else None,
+                        "name": course.instructor.get_full_name() if course.instructor else 'No Instructor'
+                    }
+
+                    track_courses_data.append({
+                        "id": course.id,
+                        "name": course.name,
+                        "description": course.description,
+                        "created_at": course.created_at,
+                        "instructor": instructor_info,  # Instructor details
+                        "tracks": course_track_names,   # Track details (ID and name)
+                    })
+
+                # Get courses directly taught by supervisor (instructor = staff_member)
+                taught_courses = Course.objects.filter(instructor=staff_member)
+                taught_courses_serialized = CourseSerializer(taught_courses, many=True).data
+
+                return Response({
+                    "status": "success",
+                    "track": track_data,
+                    "track_courses": track_courses_data,
+                    "taught_courses": taught_courses_serialized
+                })
+
             else:
-                track_data = None
+                return Response({
+                    "status": "error",
+                    "message": "Supervisor has no tracks assigned."
+                }, status=status.HTTP_404_NOT_FOUND)
 
         # Handle Instructor Role: Retrieve courses and the related track they are teaching
-        if staff_member.is_instructor:
+        elif staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
             if courses.exists():
-                course_data = CourseSerializer(courses, many=True).data  # Serialize courses
+                course_data = CourseSerializer(courses, many=True).data
 
                 # Retrieve tracks for the courses assigned to the instructor
                 track_data = []
                 for course in courses:
-                    for track in course.tracks.all():  # Access the related tracks
+                    for track in course.tracks.all():
                         track_data.append({
                             "id": track.id,
                             "name": track.name,
@@ -141,24 +179,15 @@ def supervisor_instructor_by_id_view(request, staff_id):
                             "track_type": track.track_type,
                             "instructor": staff_member.get_full_name(),
                             "instructor_role": staff_member.get_role_display(),
+                            "created_at": track.created_at
                         })
 
-        # If track data exists, include courses with the track details
-        if track_data:
-            response_data = {
-                "staff_member": {
-                    "id": staff_member.id,
-                    "name": staff_member.get_full_name(),
-                    "role": staff_member.get_role_display(),
-                    "branch": staff_member.get_branch_location() if staff_member.branch else None
-                },
-                "tracks": track_data,  # Include track details
-                "courses": course_data  # Include course details
-            }
+                return Response({
+                    "status": "success",
+                    "tracks": track_data,
+                    "courses": course_data
+                })
 
-            return Response(response_data, status=status.HTTP_200_OK)
-
-        # If no track or course data found, return an error message
         return Response({"error": "No track or courses found for this staff member."}, 
                          status=status.HTTP_404_NOT_FOUND)
 

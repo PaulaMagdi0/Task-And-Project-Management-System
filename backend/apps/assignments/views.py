@@ -18,49 +18,173 @@ from apps.submission.serializers import AssignmentSubmissionSerializer as Submis
 from apps.tracks.serializers import TrackSerializer
 from apps.courses.serializers import CourseSerializer
 from apps.student.serializers import StudentSubmissionStatusSerializer
+import logging
+import os
+from django.core.exceptions import ValidationError
+from rest_framework import generics, status
+from rest_framework.response import Response
+from .models import Assignment, Student
+logger = logging.getLogger(__name__)
+import os
+import json
+import logging
+from datetime import datetime
 
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
+
+from .models import Assignment, Student
+from .serializers import AssignmentSerializer
+
+import json
+import logging
+from rest_framework.exceptions import ValidationError
+from apps.student.models import Student
+from apps.assignments.models import AssignmentStudent
+logger = logging.getLogger(__name__)
+
+from rest_framework import generics
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+from rest_framework import status
+import json
+import logging
+from datetime import datetime
+from .models import Assignment, AssignmentStudent
+from apps.student.models import Student
+from apps.courses.models import Course
+from .serializers import AssignmentSerializer
 
 logger = logging.getLogger(__name__)
-class AssignmentListView(generics.ListCreateAPIView):
+from rest_framework import generics
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+from rest_framework import status
+import json
+from .models import Assignment, AssignmentStudent
+from apps.student.models import Student
+from apps.courses.models import Course
+from .serializers import AssignmentSerializer
+
+logger = logging.getLogger(__name__)
+
+class AssignmentListView(generics.ListAPIView):
     """
     GET: List all assignments
-    POST: Create new assignment with optional file upload (saved locally) or Google Drive URL
     """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    permission_classes = []  # Adjust as per your requirement
+    permission_classes = []  # Adjust as per your requirements
 
-    def perform_create(self, serializer):
-        file = self.request.FILES.get('file')
-        file_url = self.request.data.get('file_url')
-        assigned_to_id = self.request.data.get('assigned_to')  # Get the student ID
 
-        try:
-            assigned_to_instance = None
-            if assigned_to_id:
-                assigned_to_instance = Student.objects.get(id=assigned_to_id)
+class AssignmentCreateView(generics.CreateAPIView):
+    """
+    POST: Create new assignment with optional file URL
+    """
+    queryset = Assignment.objects.all()
+    serializer_class = AssignmentSerializer
+    permission_classes = []  # Adjust as per your requirements
 
-            if file:
-                file_path = self.save_file_locally(file)
-                logger.info(f"File saved locally: {file_path}")
-                serializer.save(file_url=file_path, assigned_to=assigned_to_instance)
-            elif file_url:
-                serializer.save(file_url=file_url, assigned_to=assigned_to_instance)
+def perform_create(self, serializer):
+    file_url = self.request.data.get('file_url')  # Get file URL from request data
+    assigned_to_ids = self.request.data.get('assigned_to')
+    course_id = self.request.data.get('course')  # Get course ID from request data
+
+    print("🔍 Raw assigned_to from request.data:", assigned_to_ids)
+    logger.debug(f"Raw assigned_to from request.data: {assigned_to_ids}")
+
+    try:
+        # Handle stringified list from frontend
+        if isinstance(assigned_to_ids, str):
+            try:
+                assigned_to_ids = json.loads(assigned_to_ids)
+                print("✅ Parsed assigned_to_ids from JSON string:", assigned_to_ids)
+            except json.JSONDecodeError as e:
+                print("❌ JSON decode error:", e)
+                raise ValidationError(f"Invalid assigned_to format: {e}")
+
+        assigned_to_instances = Student.objects.filter(id__in=assigned_to_ids or [])
+        course_instance = Course.objects.get(id=course_id)  # Get the course instance
+
+        print(f"🧠 Matched students: {[s.id for s in assigned_to_instances]}")
+        logger.debug(f"Matched students: {[s.id for s in assigned_to_instances]}")
+
+        # Save the assignment without file handling, only URL
+        if file_url:
+            assignment = serializer.save(file_url=file_url)
+        else:
+            assignment = serializer.save()
+
+        print(f"📦 Assignment created: {assignment.id}")
+
+        # Add entries to AssignmentStudent
+        for student in assigned_to_instances:
+            # Get the track related to the student
+            student_track = student.track  # The track the student is part of
+            if student_track:
+                # Check if the track is related to the course
+                if course_instance in student_track.courses.all():
+                    AssignmentStudent.objects.create(
+                        assignment=assignment,
+                        student=student,
+                        course=course_instance,  # Use the course from the request
+                        track=student_track  # Use the student's track
+                    )
+                    print(f"✅ Assigned student {student.id} to assignment {assignment.id}")
+                else:
+                    print(f"❌ Student {student.id} is not enrolled in the course {course_instance.name}")
+                    raise ValidationError(f"Student {student.id} is not enrolled in the course {course_instance.name}")
             else:
-                serializer.save(assigned_to=assigned_to_instance)
+                print(f"❌ Student {student.id} has no associated track")
+                raise ValidationError(f"Student {student.id} has no associated track")
 
-        except Student.DoesNotExist:
-            raise ValidationError(f"No student found with ID {assigned_to_id}")
-        except Exception as e:
-            logger.error(f"Error saving file: {str(e)}")
-            raise ValidationError(f"File upload failed: {str(e)}")
+    except Student.DoesNotExist:
+        raise ValidationError(f"One or more student IDs are invalid: {assigned_to_ids}")
+    except Course.DoesNotExist:
+        raise ValidationError(f"Course with ID {course_id} does not exist")
+    except Exception as e:
+        logger.error(f"Error saving assignment: {str(e)}")
+        print("❌ Exception occurred while creating assignment:", str(e))
+        raise ValidationError([f"Assignment creation failed: {str(e)}"])
+
 
     def create(self, request, *args, **kwargs):
         try:
+            print("📨 Incoming request data:", dict(request.data))
+            # Ensure that the request contains valid 'assigned_to' and 'course' data
+            assigned_to_ids = request.data.get('assigned_to')
+            course_id = request.data.get('course')
+
+            # Check if assigned_to and course are provided
+            if not assigned_to_ids or not course_id:
+                raise ValidationError("Missing required fields: 'assigned_to' or 'course'")
+
+            # Fetch course instance
+            course_instance = Course.objects.get(id=course_id)
+            
+            # Fetch student instances based on the provided IDs
+            assigned_to_instances = Student.objects.filter(id__in=assigned_to_ids)
+            
+            for student in assigned_to_instances:
+                # Fetch the student's track
+                student_track = student.track
+                
+                if student_track:
+                    # Check if the course is part of the student's track
+                    if course_instance not in student_track.courses.all():
+                        raise ValidationError(f"Student {student.id} is not enrolled in the course {course_instance.name}")
+
+                else:
+                    raise ValidationError(f"Student {student.id} has no associated track")
+
+            # Proceed with creating the assignment
             response = super().create(request, *args, **kwargs)
             response.data['message'] = "Assignment created successfully"
             return response
+
         except ValidationError as e:
+            logger.warning(f"Validation error: {str(e)}")
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
@@ -72,17 +196,6 @@ class AssignmentListView(generics.ListCreateAPIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def save_file_locally(self, file):
-        """Saves the file to the local `uploads` directory"""
-        uploads_dir = "uploads"
-        os.makedirs(uploads_dir, exist_ok=True)  # Ensure the directory exists
-        file_path = os.path.join(uploads_dir, file.name)
-
-        with open(file_path, "wb") as f:
-            for chunk in file.chunks():
-                f.write(chunk)
-
-        return file_path
 
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -212,76 +325,6 @@ def upcoming_assignments(request, student_id):
     except Exception as e:
         logger.error(f"Error in upcoming_assignments: {str(e)}", exc_info=True)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# views.py# views.py
-
-# @api_view(['GET'])
-# def track_course_assignments(request, track_id, course_id):
-#     """Retrieve assignments and submissions for a specific track and course."""
-#     try:
-#         logger.info(f"Fetching data for track_id: {track_id}, course_id: {course_id}")
-        
-#         # 1. Fetch track and validate
-#         try:
-#             track = Track.objects.get(id=track_id)
-#             logger.debug(f"Found track: {track}")
-#         except Track.DoesNotExist:
-#             logger.error(f"Track not found with id: {track_id}")
-#             return Response(
-#                 {"error": "Track not found."},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         # 2. Fetch course and validate it belongs to track
-#         try:
-#             course = Course.objects.get(id=course_id, track=track)
-#             logger.debug(f"Found course: {course}")
-#         except Course.DoesNotExist:
-#             logger.error(f"Course not found with id: {course_id} in track {track_id}")
-#             return Response(
-#                 {"error": "Course not found in the specified track."},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         # 3. Fetch assignments with optimization
-#         assignments = Assignment.objects.filter(course=course).select_related('course')
-#         logger.debug(f"Found {assignments.count()} assignments")
-        
-#         # 4. Fetch submissions with optimization
-#         submission_queryset = Submission.objects.filter(
-#             assignment__in=assignments
-#         ).select_related('student', 'assignment')
-#         logger.debug(f"Found {submission_queryset.count()} submissions")
-
-#         # 5. Serialize data with error handling
-#         try:
-#             response_data = {
-#                 "track": TrackSerializer(track).data,
-#                 "course": CourseSerializer(course).data,
-#                 "assignments": AssignmentSerializer(assignments, many=True).data,
-#                 "submissions": SubmissionSerializer(submission_queryset, many=True).data,
-#             }
-#             logger.debug("Serialization completed successfully")
-#         except Exception as e:
-#             logger.error(f"Serialization error: {str(e)}", exc_info=True)
-#             return Response(
-#                 {"error": "Data serialization failed."},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-
-#         return Response(response_data, status=status.HTTP_200_OK)
-    
-#     except       status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#         )Exception as e:
-#         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-#         return Response(
-#             {"error": "An unexpected error occurred."},
-# views.pyfrom rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Assignment, Course, Track
-from .serializers import SafeAssignmentSerializer
-import logging
 
 logger = logging.getLogger(__name__)
 @api_view(['GET'])
@@ -423,3 +466,109 @@ def get_submitters(request, assignment_id, track_id, course_id):
         'submitters': submitters,
         'non_submitters': non_submitters
     })
+    
+# views.py
+from rest_framework.views import APIView
+from apps.staff_members.models import StaffMember
+
+class AvailableTracksByInstructorIdView(APIView):
+    def get(self, request, instructor_id):
+        try:
+            # Get instructor
+            instructor = StaffMember.objects.get(id=instructor_id)
+        except StaffMember.DoesNotExist:
+            return Response({"error": "Instructor not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get courses assigned to this instructor
+        courses = Course.objects.filter(instructor=instructor)
+
+        # Get tracks assigned to these courses via the M2M relation
+        tracks = Track.objects.filter(courses__in=courses).distinct()
+
+        serializer = TrackSerializer(tracks, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+# views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from apps.tracks.models import Track
+from apps.courses.models import Course
+from apps.staff_members.models import StaffMember
+from apps.courses.serializers import CourseSerializer
+
+class InstructorTracksWithCoursesView(APIView):
+    def get(self, request, instructor_id):
+        # Try to fetch the instructor by ID
+        try:
+            instructor = StaffMember.objects.get(id=instructor_id)
+        except StaffMember.DoesNotExist:
+            return Response({"error": "Instructor not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Fetch courses taught by the instructor, and prefetch tracks for optimization
+        instructor_courses = Course.objects.filter(instructor=instructor).prefetch_related("tracks")
+
+        # Structure data for each track
+        track_data = {}
+
+        # Loop through courses and organize them under their respective tracks
+        for course in instructor_courses:
+            for track in course.tracks.all():
+                # Initialize the track data if it hasn't been added yet
+                if track.id not in track_data:
+                    track_data[track.id] = {
+                        "id": track.id,
+                        "name": track.name,
+                        "courses": []
+                    }
+                # Add the course data to the appropriate track
+                track_data[track.id]["courses"].append({
+                    "id": course.id,
+                    "name": course.name,
+                    "description": course.description,  # You can add more fields here as needed
+                })
+
+        # Serialize and prepare the final response
+        # Use TrackSerializer to format the track data
+        track_response_data = [
+            {
+                "id": track_info["id"],
+                "name": track_info["name"],
+                "courses": [
+                    {
+                        "id": course["id"],
+                        "name": course["name"],
+                        "description": course["description"]
+                    }
+                    for course in track_info["courses"]
+                ]
+            }
+            for track_info in track_data.values()
+        ]
+
+        return Response(track_response_data, status=status.HTTP_200_OK)
+    
+    from rest_framework.views import APIView
+# 
+class InstructorAssignmentsView(APIView):
+    def get(self, request, instructor_id, *args, **kwargs):
+        try:
+            # Fetch instructor (or supervisor) by their user ID
+            instructor = StaffMember.objects.get(id=instructor_id)
+            
+            # Ensure the user is an instructor or supervisor
+            if instructor.role not in ['instructor', 'supervisor']:
+                return Response({"error": "User is not an instructor or supervisor."}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Fetch assignments assigned by this instructor (either as an instructor or supervisor)
+            assignments = Assignment.objects.filter(course__instructor=instructor)
+
+            # Serialize the data
+            serialized_assignments = AssignmentSerializer(assignments, many=True)
+
+            return Response(serialized_assignments.data, status=status.HTTP_200_OK)
+
+        except StaffMember.DoesNotExist:
+            return Response({"error": "Instructor not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

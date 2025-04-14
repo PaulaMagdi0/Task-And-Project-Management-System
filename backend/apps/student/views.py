@@ -15,6 +15,7 @@ from apps.tracks.models import Track  # Adjust based on your app structure
 from apps.courses.models import Course
 from apps.staff_members.models import StaffMember
 from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 #UPload Excel File View
@@ -367,3 +368,36 @@ def show_options(request):
         }
     }
     return Response(options)        
+#Return The students For Track And Course
+# http://127.0.0.1:8000/api/student/tracks/track_id/courses/course_id/students/
+class StudentsByTrackAndCourseView(APIView):
+    def get(self, request, track_id, course_id):
+        # Get the track and course based on the provided IDs
+        track = get_object_or_404(Track, id=track_id)
+        course = get_object_or_404(Course, id=course_id)
+
+        # Check if the course is part of the track
+        if course not in track.courses.all():
+            return Response(
+                {"detail": "Course is not associated with the track."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filter students based on the track and course using the many-to-many relationship through CourseTrack
+        students_in_track_and_course = Student.objects.filter(
+            track=track,  # Students must be assigned to the track
+            track__courses=course  # Students must be linked to the course via the track
+        )
+
+        # Prepare the data for response
+        student_data = []
+        for student in students_in_track_and_course:
+            student_data.append({
+                "id": student.id,
+                "name": student.full_name,
+                "email": student.email,
+                "track": student.track.name,
+                "course": course.name,
+            })
+
+        return Response(student_data, status=status.HTTP_200_OK)

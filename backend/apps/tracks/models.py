@@ -38,6 +38,7 @@ class Track(models.Model):
         null=True,
         blank=True,
     )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
