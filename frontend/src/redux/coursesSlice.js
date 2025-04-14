@@ -7,7 +7,7 @@ export const fetchCourses = createAsyncThunk(
   'courses/fetchCourses',
   async (user_id , { rejectWithValue }) => {
     try {
-      const response = await apiClient.get(`/staff/track-and-courses/${user_id }/`);
+      const response = await apiClient.get(`/staff/track-and-courses/${user_id}/`);
       return response.data;
     } catch (error) {
       // You can customize error handling here

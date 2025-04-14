@@ -88,7 +88,6 @@ class SupervisorBulkUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
@@ -101,13 +100,12 @@ def supervisor_instructor_by_id_view(request, staff_id):
                          status=status.HTTP_403_FORBIDDEN)
 
     try:
-        track_data = None
+        track_data = []  # Default to an empty array instead of None
         course_data = []
 
         # Handle Supervisor Role: Retrieve tracks they are supervising
         if staff_member.is_supervisor:
             tracks = Track.objects.filter(supervisor=staff_member)
-            track_data = None
             if tracks.exists():
                 track = tracks.first()
                 track_data = {
@@ -158,9 +156,11 @@ def supervisor_instructor_by_id_view(request, staff_id):
 
             else:
                 return Response({
-                    "status": "error",
-                    "message": "Supervisor has no tracks assigned."
-                }, status=status.HTTP_404_NOT_FOUND)
+                    "status": "success",
+                    "message": "Supervisor has no tracks assigned.",
+                    "track": track_data,  # Return an empty array for tracks if none exist
+                    "track_courses": []
+                }, status=status.HTTP_200_OK)
 
         # Handle Instructor Role: Retrieve courses and the related track they are teaching
         elif staff_member.is_instructor:
@@ -188,8 +188,20 @@ def supervisor_instructor_by_id_view(request, staff_id):
                     "courses": course_data
                 })
 
-        return Response({"error": "No track or courses found for this staff member."}, 
-                         status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({
+                    "status": "success",
+                    "message": "Instructor has no courses assigned.",
+                    "tracks": [],  # Return an empty array for tracks if no courses are assigned
+                    "courses": []
+                }, status=status.HTTP_200_OK)
+
+        return Response({
+            "status": "success",
+            "track": [],
+            "track_courses": [],
+            "courses": []
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response(

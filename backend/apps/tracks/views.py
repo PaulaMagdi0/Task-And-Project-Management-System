@@ -103,6 +103,7 @@ class TrackCoursesView(APIView):
 
 # Avalible Track For Instructor 
 # http://127.0.0.1:8000/api/tracks/instructors/insturctor_id/available_tracks/
+
 class AvailableTracksView(APIView):
     def get(self, request, user_id):
         # Fetch the user (Instructor/Supervisor)
@@ -111,11 +112,16 @@ class AvailableTracksView(APIView):
         # Get the courses assigned to the user
         assigned_courses = Course.objects.filter(instructor=user)  # Modify based on your logic if needed
 
+        # If no courses are assigned, return an empty array for tracks
         if not assigned_courses:
-            return Response({"message": "No courses assigned to this user"}, status=status.HTTP_404_NOT_FOUND)
+            return Response([], status=status.HTTP_200_OK)
 
         # Fetch the tracks associated with the assigned courses
         tracks = Track.objects.filter(courses__in=assigned_courses).distinct()
+
+        # Return empty array if no tracks are found
+        if not tracks:
+            return Response([], status=status.HTTP_200_OK)
 
         # Serialize the tracks and return them
         track_data = TrackSerializer(tracks, many=True).data

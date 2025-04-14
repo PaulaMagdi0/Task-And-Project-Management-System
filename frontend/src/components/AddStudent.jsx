@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Button,
@@ -14,6 +14,7 @@ import {
     DialogActions,
     IconButton,
     Paper,
+    MenuItem,
     styled
 } from '@mui/material';
 import { Close, CheckCircle, Error } from '@mui/icons-material';
@@ -48,18 +49,14 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
     },
 }));
 
-const FileInput = styled('input')({
-    display: 'none',
-});
-
 const UploadStudentPage = () => {
     const [isExcelUpload, setIsExcelUpload] = useState(false);
     const [studentData, setStudentData] = useState({
         first_name: '',
         last_name: '',
         email: '',
-        role: 'student', // Default role
-        track_id: '', // Track ID
+        track_id: '',
+        role: 'student',
     });
     const [excelFile, setExcelFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -69,6 +66,19 @@ const UploadStudentPage = () => {
         message: '',
         isSuccess: false
     });
+    const [tracks, setTracks] = useState([]);
+
+    useEffect(() => {
+        const fetchTracks = async () => {
+            try {
+                const response = await apiClient.get('/tracks');
+                setTracks(response.data);
+            } catch (error) {
+                console.error('Failed to fetch tracks', error);
+            }
+        };
+        fetchTracks();
+    }, []);
 
     const handleStudentInputChange = (e) => {
         const { name, value } = e.target;
@@ -79,8 +89,10 @@ const UploadStudentPage = () => {
     };
 
     const handleFileChange = (e) => {
-        setExcelFile(e.target.files[0]);
+        const file = e.target.files[0];
+        setExcelFile(file);
     };
+    
 
     const handleCloseModal = () => {
         setOpenModal(false);
@@ -105,73 +117,69 @@ const UploadStudentPage = () => {
     };
 
     const handleSubmitManualStudent = async () => {
-        if (!studentData.first_name || !studentData.last_name || !studentData.email || !studentData.track_id) {
+        const { first_name, last_name, email, track_id } = studentData;
+
+        if (!first_name || !last_name || !email || !track_id) {
             showErrorModal('Please fill all required fields');
             return;
         }
-    
+
         setLoading(true);
         try {
             const formData = new FormData();
-            formData.append('first_name', studentData.first_name);
-            formData.append('last_name', studentData.last_name);
-            formData.append('email', studentData.email);
-            formData.append('role', 'student'); // Default role
-            formData.append('track_id', studentData.track_id); // Include Track ID
-
-            const response = await apiClient.post(
-                '/student/create/',
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data', // Automatically set for FormData
-                    },
-                }
+            Object.entries(studentData).forEach(([key, value]) =>
+                formData.append(key, value)
             );
-    
+
+            await apiClient.post('/student/create/', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
             showSuccessModal('Student added successfully! A verification email has been sent to the student.');
-            setStudentData({ first_name: '', last_name: '', email: '', track_id: '' });
+            setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
         } catch (error) {
             const errorMsg = error.response?.data?.error || 'Failed to add student';
-            console.error('Error submitting student data:', error);
+            console.error(error);
             showErrorModal(errorMsg);
         } finally {
             setLoading(false);
         }
     };
-
     const handleUploadExcel = async () => {
-        if (!excelFile || !studentData.track_id) {
-            showErrorModal('Please upload a file and provide a Track ID.');
+        if (!excelFile) {
+            showErrorModal('Excel file is required.');
             return;
         }
-
+        if (!studentData.track_id) {
+            showErrorModal('Please select a track.');
+            return;
+        }
+    
         setLoading(true);
         try {
             const formData = new FormData();
-            formData.append('file', excelFile);
-            formData.append('track_id', studentData.track_id); // Add Track ID to the form data
-
-            const response = await apiClient.post(
-                '/student/upload/',
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
+            formData.append('file', excelFile);  // Ensure the file is attached
+            formData.append('track_id', studentData.track_id);
+    
+            // Debug log: Ensure file is in FormData
+            console.log(formData.get('file')); // Should show the file object
+    
+            const response = await apiClient.post('/student/upload/', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
     
             showSuccessModal('Students uploaded successfully!');
             setExcelFile(null);
+            document.getElementById('file-upload').value = '';
         } catch (error) {
             const errorMsg = error.response?.data?.error || 'Failed to upload students';
-            console.error('Error uploading students:', error);
+            console.error(error);
             showErrorModal(errorMsg);
         } finally {
             setLoading(false);
         }
     };
+    
     
     return (
         <Box sx={{ p: 3, background: '#f5f7fa', minHeight: '100vh' }}>
@@ -219,7 +227,6 @@ const UploadStudentPage = () => {
                                     name="first_name"
                                     value={studentData.first_name}
                                     onChange={handleStudentInputChange}
-                                    sx={{ mb: 2 }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -229,7 +236,6 @@ const UploadStudentPage = () => {
                                     name="last_name"
                                     value={studentData.last_name}
                                     onChange={handleStudentInputChange}
-                                    sx={{ mb: 2 }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -240,18 +246,23 @@ const UploadStudentPage = () => {
                                     type="email"
                                     value={studentData.email}
                                     onChange={handleStudentInputChange}
-                                    sx={{ mb: 3 }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <StyledTextField
-                                    label="Track ID *"
+                                    select
+                                    label="Track *"
                                     fullWidth
                                     name="track_id"
                                     value={studentData.track_id}
                                     onChange={handleStudentInputChange}
-                                    sx={{ mb: 3 }}
-                                />
+                                >
+                                    {tracks.map((track) => (
+                                        <MenuItem key={track.id} value={track.id}>
+                                            {track.name}
+                                        </MenuItem>
+                                    ))}
+                                </StyledTextField>
                             </Grid>
                         </Grid>
 
@@ -261,7 +272,7 @@ const UploadStudentPage = () => {
                             onClick={handleSubmitManualStudent}
                             disabled={loading}
                             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-                            sx={{ py: 1.5 }}
+                            sx={{ mt: 3 }}
                         >
                             {loading ? 'Processing...' : 'Add Student'}
                         </StyledButton>
@@ -309,21 +320,27 @@ const UploadStudentPage = () => {
                         </Paper>
 
                         <StyledTextField
-                            label="Track ID *"
+                            select
+                            label="Track *"
                             fullWidth
                             name="track_id"
                             value={studentData.track_id}
                             onChange={handleStudentInputChange}
                             sx={{ mb: 3 }}
-                        />
+                        >
+                            {tracks.map((track) => (
+                                <MenuItem key={track.id} value={track.id}>
+                                    {track.name}
+                                </MenuItem>
+                            ))}
+                        </StyledTextField>
 
                         <StyledButton
                             variant="contained"
                             fullWidth
                             onClick={handleUploadExcel}
-                            disabled={loading || !excelFile}
+                            disabled={loading}
                             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-                            sx={{ py: 1.5 }}
                         >
                             {loading ? 'Uploading...' : 'Upload Students'}
                         </StyledButton>
@@ -331,7 +348,6 @@ const UploadStudentPage = () => {
                 )}
             </StyledCard>
 
-            {/* Success/Error Modal */}
             <Dialog
                 open={openModal}
                 onClose={handleCloseModal}

@@ -43,6 +43,15 @@ class StaffMemberCoursesView(APIView):
     
 #Courses Avalible By Track AND user ID
 # http://127.0.0.1:8000/api/courses/instructors/user_id/tracks/track_id/assigned_courses/
+import logging
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from .models import StaffMember, Track, Course
+from .serializers import CourseSerializer
+
+logger = logging.getLogger(__name__)
+
 class AssignedCoursesInTrackView(APIView):
     def get(self, request, user_id, track_id):
         # Fetch the user (Instructor/Supervisor)
@@ -54,8 +63,13 @@ class AssignedCoursesInTrackView(APIView):
         # Get the courses assigned to the user that belong to the track
         assigned_courses = Course.objects.filter(instructor=user, tracks=track)
 
+        # Log the results of the query
+        logger.info(f"Assigned courses for user {user_id} in track {track_id}: {assigned_courses}")
+
+        # Return an empty array if no courses are assigned to the user in the given track
         if not assigned_courses:
-            return Response({"message": "No courses assigned to this user in the given track"}, status=status.HTTP_404_NOT_FOUND)
+            logger.info(f"No courses found for user {user_id} in track {track_id}. Returning empty array.")
+            return Response([], status=status.HTTP_200_OK)
 
         # Serialize the courses and return them
         course_data = CourseSerializer(assigned_courses, many=True).data
