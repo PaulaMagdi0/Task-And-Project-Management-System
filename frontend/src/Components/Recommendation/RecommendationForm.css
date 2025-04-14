@@ -1,0 +1,123 @@
+/* Only targeting RecommendationForm component styles */
+.recommendation-form-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    width: 80%;
+    max-width: 600px;
+    animation: fadeIn 1s ease-out;
+    margin: 0 auto;
+  }
+  
+  .recommendation-form-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .recommendation-form-header h2 {
+    font-size: 2rem;
+    color: #333;
+    font-weight: bold;
+  }
+  
+  .recommendation-method-selector {
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+  }
+  
+  .recommendation-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .recommendation-input-field {
+    padding: 10px;
+    font-size: 1rem;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    outline: none;
+    transition: all 0.3s ease-in-out;
+  }
+  
+  .recommendation-input-field:focus {
+    border-color: #ff6f61;
+    box-shadow: 0 0 10px rgba(255, 111, 97, 0.7);
+  }
+  
+  .recommendation-submit-btn {
+    background-color: #ff6f61;
+    color: #fff;
+    font-size: 1.2rem;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    width: 100%;
+  }
+  
+  .recommendation-submit-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .recommendation-submit-btn:active {
+    transform: scale(0.98);
+  }
+  
+  /* Recommendations Section */
+  .recommendation-cards-container {
+    margin-top: 30px;
+  }
+  
+  .recommendation-card {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    transition: transform 0.3s ease;
+  }
+  
+  .recommendation-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .recommendation-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .recommendation-description {
+    font-size: 1rem;
+    margin-top: 10px;
+    color: #555;
+  }
+  
+  .recommendation-course,
+  .recommendation-difficulty {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #777;
+  }
+  
+  .no-recommendations {
+    text-align: center;
+    color: #999;
+    font-size: 1.2rem;
+  }
+  
+  /* Animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
