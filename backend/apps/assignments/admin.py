@@ -9,7 +9,7 @@ class AssignmentStudentInline(admin.TabularInline):
     model = AssignmentStudent
     extra = 1  # Number of empty forms to show by default in the inline
     fields = ['student', 'course', 'track']  # Fields to display
-    
+
 class AssignmentAdmin(admin.ModelAdmin):
     form = AssignmentAdminForm  # Link the custom form to the model
     list_display = ('title', 'course', 'due_date', 'end_date', 'created_at', 'assigned_students')
@@ -17,8 +17,9 @@ class AssignmentAdmin(admin.ModelAdmin):
     list_filter = ('assignment_type', 'course', 'due_date')
 
     def assigned_students(self, obj):
+        # Display the assigned students along with their courses and tracks
         return format_html(
-            ", ".join([f"{student.student.full_name} ({student.course.name})" for student in obj.assignmentstudent_set.all()])
+            ", ".join([f"{student.student.full_name} ({student.course.name} - {student.track.name if student.track else 'No Track'})" for student in obj.assignmentstudent_set.all()])
         )
     assigned_students.short_description = "Assigned Students"
 
@@ -31,19 +32,21 @@ class AssignmentAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        # Correcting prefetch_related usage
+        # Prefetch related data to optimize queries
         queryset = queryset.prefetch_related(
-            'assignmentstudent_set',        # Prefetch the related AssignmentStudent instances
-            'assignmentstudent_set__student',  # Prefetch related student for each AssignmentStudent
-            'assignmentstudent_set__course',   # Prefetch related course for each AssignmentStudent
-            'assignmentstudent_set__track'     # Prefetch related track for each AssignmentStudent
+            'assignmentstudent_set',           # Prefetch the related AssignmentStudent instances
+            'assignmentstudent_set__student',   # Prefetch related student for each AssignmentStudent
+            'assignmentstudent_set__course',    # Prefetch related course for each AssignmentStudent
+            'assignmentstudent_set__track'      # Prefetch related track for each AssignmentStudent
         )
         return queryset
 
     def save_model(self, request, obj, form, change):
         """Handle saving of the model and assignment of students based on conditions"""
-        # Check if 'assigned_to_all' was selected and assign students from the track
+        # Get the list of students assigned to this assignment
         assigned_students = form.cleaned_data.get('assigned_to', [])
+        
+        # Check if 'assigned_to_all' was selected and assign students from the track
         if form.cleaned_data.get('assigned_to_all'):
             track = form.cleaned_data.get('track')
             if track:

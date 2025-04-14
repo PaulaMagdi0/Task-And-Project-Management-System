@@ -3,6 +3,7 @@ from .models import Assignment
 from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
+
 class AssignmentAdminForm(forms.ModelForm):
     assigned_to_all = forms.BooleanField(required=False, label="Assign to all students from selected track")
     track = forms.ModelChoiceField(queryset=Track.objects.all(), required=False, label="Select Track")
@@ -31,6 +32,5 @@ class AssignmentAdminForm(forms.ModelForm):
             if track:
                 # Assign all students from the selected track to the assignment
                 assigned_students = Student.objects.filter(track=track)
-                print(f"Assigned Students: {assigned_students}")  # Add logging here for debugging
                 self.cleaned_data['assigned_to'] = assigned_students
         return assigned_students

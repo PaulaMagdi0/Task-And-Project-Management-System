@@ -192,11 +192,13 @@ const CreateAssignment = () => {
       return { ...prev, selectedStudents: newSelectedStudents };
     });
   };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
   
     if (!validateCurrentStep()) return;
   
+    // Prepare the main assignment data
     const assignmentData = {
       title: formData.title,
       description: formData.description,
@@ -204,7 +206,7 @@ const CreateAssignment = () => {
       end_date: formData.end_date.toISOString(),
       file_url: formData.file_url,
       course: formData.course,
-      track: formData.track,
+      track: formData.track, // Include track in the main assignment
       assignment_type: formData.assignment_type,
       assigned_to: formData.assignToAll
         ? students.map((s) => s.id) // All students if checkbox is checked
@@ -222,10 +224,10 @@ const CreateAssignment = () => {
           end_date: null,
           description: '',
           course: '',
-          track: '',
+          track: '', // Reset track
           file_url: '',
-          assignToAll: true, // Reset to default
-          selectedStudents: [], // Clear selections
+          assignToAll: true,
+          selectedStudents: [],
           assignment_type: 'task',
         });
         setActiveStep(0);

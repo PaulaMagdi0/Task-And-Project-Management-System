@@ -16,7 +16,6 @@ class AssignmentStudent(models.Model):
 
     def __str__(self):
         return f"{self.student.full_name} - {self.assignment.title} ({self.course.name})"
-
 class Assignment(models.Model):
     ASSIGNMENT_TYPES = (
         ("task", "Task"),
@@ -36,6 +35,9 @@ class Assignment(models.Model):
     file = models.URLField(null=True, blank=True)
     file_url = models.URLField(null=True, blank=True)
 
+    # Add a ForeignKey to Track to link each assignment with a track
+    track = models.ForeignKey('tracks.Track', on_delete=models.SET_NULL, null=True, blank=True)
+
     # Use the `through` model to link students to assignments with a course and track field
     assigned_to = models.ManyToManyField(
         Student, through='AssignmentStudent', related_name='assignments', blank=True
@@ -47,20 +49,11 @@ class Assignment(models.Model):
 
     def __str__(self):
         assigned_display = ""
-        for assignment_student in self.assignmentstudent_set.all():  # Access through the related AssignmentStudent
-            student = assignment_student.student  # Access the Student object
-            course = assignment_student.course  # Access the Course object through AssignmentStudent
+        for assignment_student in self.assignmentstudent_set.all():
+            student = assignment_student.student
+            course = assignment_student.course
             assigned_display += f"{student.full_name} ({course.name}), "
         return assigned_display[:-2]  # Remove trailing comma and space
-    def get_assigned_to_display(self):
-        if self.assigned_to.exists():
-            assigned_students = [
-                f"{student.full_name} ({assignment_student.course.name})"
-                for assignment_student in self.assignmentstudent_set.select_related('course')
-            ]
-            return f"Assigned to {', '.join(assigned_students)}"
-        return "Assigned to All"
-
 
     def save(self, *args, **kwargs):
         if not self.end_date:

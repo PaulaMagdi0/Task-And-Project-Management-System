@@ -9,10 +9,24 @@ from .models import Assignment, AssignmentStudent
 from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
+from rest_framework import serializers
+from .models import Assignment, AssignmentStudent
+from apps.tracks.models import  Track
+from apps.student.models import Student
+
+from rest_framework import serializers
+
+from rest_framework import serializers
+from .models import Assignment, Track, Student, AssignmentStudent
+
+from rest_framework import serializers
+from .models import Assignment, Track, Student, AssignmentStudent
+
 class AssignmentSerializer(serializers.ModelSerializer):
+    track = serializers.PrimaryKeyRelatedField(queryset=Track.objects.all(), write_only=True, required=True)
+    assigned_to_all = serializers.BooleanField(write_only=True, default=False)
     file = serializers.FileField(required=False, allow_null=True)
     file_url = serializers.URLField(required=False, allow_null=True)
-
     assigned_to = serializers.PrimaryKeyRelatedField(
         queryset=Student.objects.all(),
         many=True,
@@ -22,47 +36,22 @@ class AssignmentSerializer(serializers.ModelSerializer):
     )
 
     course_name = serializers.CharField(source='course.name', read_only=True)
-    track_name = serializers.SerializerMethodField()
+    track_name = serializers.CharField(source='track.name', read_only=True)
 
     class Meta:
         model = Assignment
         fields = [
-            'id',
-            'title',
-            'due_date',
-            'end_date',
-            'assignment_type',
-            'course',
-            'description',
-            'file',
-            'file_url',
-            'created_at',
-            'assigned_to',
-            'course_name',
-            'track_name',
+            'id', 'title', 'due_date', 'end_date', 'assignment_type', 'course', 'description', 
+            'file', 'file_url', 'created_at', 'assigned_to', 'course_name', 'track_name', 
+            'track', 'assigned_to_all'
         ]
         read_only_fields = ['created_at']
 
     def get_track_name(self, obj):
-        # Fetch all AssignmentStudent instances related to the given assignment
         assignment_students = AssignmentStudent.objects.filter(assignment=obj)
-        
-        track_names = set()  # Use a set to avoid duplicates
-
-        # Loop through each AssignmentStudent and fetch the track name
-        for assignment_student in assignment_students:
-            if assignment_student.track:
-                track_names.add(assignment_student.track.name)
-            else:
-                track_names.add("No track assigned")  # If no track is assigned, add a placeholder
-        
-        # If there are multiple track names, return them as a comma-separated list
-        if track_names:
-            return ", ".join(track_names)
-        
-        return "No track assigned"  # Return a default message if no tracks are found
-
-
+        track_names = {assignment_student.track.name if assignment_student.track else "No track assigned" 
+                       for assignment_student in assignment_students}
+        return ", ".join(track_names) if track_names else "No track assigned"
 
     def validate(self, data):
         file = data.get('file')
@@ -76,25 +65,50 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         assigned_to_data = validated_data.pop('assigned_to', [])
-        assignment = Assignment.objects.create(**validated_data)
+        track = validated_data.pop('track', None)
+        assigned_to_all = validated_data.pop('assigned_to_all', False)
 
+        # Create the assignment itself
+        assignment = Assignment.objects.create(track=track, **validated_data)
+
+        # Assign students if 'assigned_to_all' is True, else assign selected students
+        if assigned_to_all:
+            # Fetch all students in the given track and remove duplicates
+            students = Student.objects.filter(track=track).distinct()
+            assigned_to_data = students
+
+        # Create a set to track students already assigned to prevent duplicates
+        assigned_students = set()
+
+        # Loop through each student and check for duplicates before creating
         for student in assigned_to_data:
-            track = student.track
-            if not track:
-                raise serializers.ValidationError(f"Student {student.id} does not have an assigned track.")
+            # Log the check for duplicates
+            print(f"🔍 Checking if student {student.id} is already assigned to assignment {assignment.id}")
 
-            course = track.courses.first()
-            if not course:
-                raise serializers.ValidationError(f"Track {track.name} for student {student.id} has no courses.")
+            # If student is already assigned, skip
+            if student in assigned_students:
+                print(f"❌ Student {student.id} is already assigned, skipping...")
+                continue
+            
+            # Check if the student is already assigned to this assignment
+            if not AssignmentStudent.objects.filter(assignment=assignment, student=student).exists():
+                # Only create a new AssignmentStudent entry if it doesn't already exist
+                course = student.track.courses.first() if student.track else None
+                AssignmentStudent.objects.create(
+                    assignment=assignment,
+                    student=student,
+                    course=course,
+                    track=student.track
+                )
+                print(f"✅ Assigned student {student.id} to assignment {assignment.id}")
 
-            AssignmentStudent.objects.create(
-                assignment=assignment,
-                student=student,
-                course=course,
-                track=track  # Ensure the track is correctly assigned here
-            )
+                # Add the student to the set of assigned students
+                assigned_students.add(student)
+            else:
+                print(f"❌ Student {student.id} is already assigned to assignment {assignment.id}, skipping...")
 
         return assignment
+
 
 class AssignmentStudentSerializer(serializers.ModelSerializer):
     student = MinimalStudentSerializer()
