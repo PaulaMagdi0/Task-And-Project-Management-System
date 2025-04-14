@@ -61,120 +61,33 @@ class AssignmentListView(APIView):
             return Response(serialized_assignments.data, status=status.HTTP_200_OK)
         except Track.DoesNotExist:
             return Response({"error": "Track not found."}, status=status.HTTP_404_NOT_FOUND)
-
 class AssignmentCreateView(generics.CreateAPIView):
-    """
-    POST: Create new assignment with optional file URL
-    """
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
-    permission_classes = []  # Adjust as per your requirements
-
-    def perform_create(self, serializer):
-        # Get the track ID from the request
-        track_id = self.request.data.get('track')
-
-        if track_id:
-            try:
-                # Fetch the Track instance from the database
-                track_instance = Track.objects.get(id=track_id)
-            except Track.DoesNotExist:
-                raise ValidationError("Track with the given ID does not exist.")
-        else:
-            raise ValidationError("Track ID is required.")
-
-        # Proceed with handling file_url and assigned_to as before
-        file_url = self.request.data.get('file_url')
-        assigned_to_ids = self.request.data.get('assigned_to')
-        course_id = self.request.data.get('course')
-
-        print("🔍 Raw assigned_to from request.data:", assigned_to_ids)
-        logger.debug(f"Raw assigned_to from request.data: {assigned_to_ids}")
-
-        try:
-            # Handle stringified list from frontend
-            if isinstance(assigned_to_ids, str):
-                try:
-                    assigned_to_ids = json.loads(assigned_to_ids)
-                    print("✅ Parsed assigned_to_ids from JSON string:", assigned_to_ids)
-                except json.JSONDecodeError as e:
-                    print("❌ JSON decode error:", e)
-                    raise ValidationError(f"Invalid assigned_to format: {e}")
-
-            assigned_to_instances = Student.objects.filter(id__in=assigned_to_ids or [])
-            course_instance = Course.objects.get(id=course_id)  # Get the course instance
-
-            print(f"🧠 Matched students: {[s.id for s in assigned_to_instances]}")
-            logger.debug(f"Matched students: {[s.id for s in assigned_to_instances]}")
-
-            # Save the assignment with file_url if provided, otherwise without
-            if file_url:
-                assignment = serializer.save(track=track_instance, file_url=file_url)
-            else:
-                assignment = serializer.save(track=track_instance)
-
-            print(f"📦 Assignment created: {assignment.id}")
-
-            # Track already assigned students to prevent duplicates
-            assigned_students = set()
-
-            # Add entries to AssignmentStudent
-            for student in assigned_to_instances:
-                student_track = student.track
-                if student_track:
-                    if course_instance in student_track.courses.all():
-                        # Check if the student is already assigned to the assignment
-                        if student.id not in assigned_students:  # Check if the student is already added
-                            # Check if the student is already assigned to this assignment
-                            if not AssignmentStudent.objects.filter(assignment=assignment, student=student).exists():
-                                AssignmentStudent.objects.create(
-                                    assignment=assignment,
-                                    student=student,
-                                    course=course_instance,
-                                    track=student_track
-                                )
-                                print(f"✅ Assigned student {student.id} to assignment {assignment.id}")
-                                assigned_students.add(student.id)  # Add student to the set
-                            else:
-                                print(f"❌ Student {student.id} is already assigned to assignment {assignment.id}, skipping...")
-                        else:
-                            print(f"❌ Student {student.id} has already been processed for this assignment, skipping...")
-                    else:
-                        print(f"❌ Student {student.id} is not enrolled in the course {course_instance.name}")
-                        raise ValidationError(f"Student {student.id} is not enrolled in the course {course_instance.name}")
-                else:
-                    print(f"❌ Student {student.id} has no associated track")
-                    raise ValidationError(f"Student {student.id} has no associated track")
-
-        except Student.DoesNotExist:
-            raise ValidationError(f"One or more student IDs are invalid: {assigned_to_ids}")
-        except Course.DoesNotExist:
-            raise ValidationError(f"Course with ID {course_id} does not exist")
-        except Exception as e:
-            logger.error(f"Error saving assignment: {str(e)}")
-            print("❌ Exception occurred while creating assignment:", str(e))
-            raise ValidationError([f"Assignment creation failed: {str(e)}"])
+    permission_classes = []
 
     def create(self, request, *args, **kwargs):
         try:
             print("📨 Incoming request data:", dict(request.data))
-            # Proceed with creating the assignment
-            response = super().create(request, *args, **kwargs)
-            response.data['message'] = "Assignment created successfully"
-            return response
+
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                {**serializer.data, "message": "Assignment created successfully"},
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
 
         except ValidationError as e:
             logger.warning(f"Validation error: {str(e)}")
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
             logger.exception("Assignment creation failed")
-            return Response(
-                {"error": "Internal server error"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
