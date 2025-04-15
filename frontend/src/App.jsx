@@ -34,13 +34,13 @@ import Grades from './pages/DashBoard/Grades';
 import CreateAssignment from './pages/DashBoard/CreateAssignment';
 import UploadStudentPage from './components/AddStudent';
 import Hello from './pages/DashBoard/hello';
-
+import Jokes from './Components/Jokes/Jokes';
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
 import ProfilePage from './pages/ProfilePage';
-
+import ChatWithAI from './Components/ChatAI/ChatWithAI';
 const App = () => {
   useCustomScripts();
   const { userType, role } = useSelector((state) => state.auth);
@@ -65,6 +65,8 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
+          <Route path="/ChatAI" element={<ChatWithAI />} />
+          <Route path="/jokes" element={<Jokes />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />

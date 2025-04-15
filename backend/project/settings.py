@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+from decouple import config
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "your-secret-key"  # Keep this secure in production
@@ -35,6 +38,8 @@ INSTALLED_APPS = [
     "corsheaders",
     'django_extensions',
     'ai_recommendations',
+    'chat_ai',
+    'jokes',
 
 ]
 # settings.py
