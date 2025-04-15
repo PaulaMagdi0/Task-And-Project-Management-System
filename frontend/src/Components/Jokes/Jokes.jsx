@@ -7,6 +7,14 @@ const Jokes = () => {
   const [delivery, setDelivery] = useState("");
   const [error, setError] = useState("");
 
+  // List of inappropriate words or expressions to check
+  const inappropriateWords = ["sex", "porn", "explicit", "18+", "adult", "nude"];
+
+  // Function to check if joke contains inappropriate content
+  const containsInappropriateContent = (text) => {
+    return inappropriateWords.some((word) => text.toLowerCase().includes(word));
+  };
+
   // Fetch a joke from the backend
   const fetchJoke = async () => {
     try {
@@ -15,13 +23,21 @@ const Jokes = () => {
 
       if (response.ok) {
         if (data.setup && data.delivery) {
-          setSetup(data.setup);  // Two-part joke setup
-          setDelivery(data.delivery);  // Two-part joke delivery
-          setJoke("");  // Clear joke for two-part jokes
+          if (containsInappropriateContent(data.setup) || containsInappropriateContent(data.delivery)) {
+            fetchJoke(); // Force refresh if inappropriate content is found
+          } else {
+            setSetup(data.setup);
+            setDelivery(data.delivery);
+            setJoke(""); // Clear joke for two-part jokes
+          }
         } else if (data.joke) {
-          setJoke(data.joke);  // Single-part joke
-          setSetup("");  // Clear setup for single-part jokes
-          setDelivery("");  // Clear delivery for single-part jokes
+          if (containsInappropriateContent(data.joke)) {
+            fetchJoke(); // Force refresh if inappropriate content is found
+          } else {
+            setJoke(data.joke);
+            setSetup(""); // Clear setup for single-part jokes
+            setDelivery(""); // Clear delivery for single-part jokes
+          }
         } else {
           setError("Unexpected data format");
         }
