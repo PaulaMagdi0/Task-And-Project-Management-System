@@ -6,7 +6,7 @@ export const fetchAssignments = createAsyncThunk(
   'assignments/fetchAssignments',
   async (instructorId, thunkAPI) => {
     try {
-      const response = await apiClient.get(`/assignments/?instructor=${instructorId}`);
+      const response = await apiClient.get(`assignments/instructor/${instructorId}/assignments/`);//`/assignments/?instructor=${instructorId}`
       return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue('Failed to fetch assignments');
