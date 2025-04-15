@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer, LoginSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -11,6 +12,17 @@ from rest_framework.permissions import AllowAny
 import logging
 
 logger = logging.getLogger(__name__)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def verify_token(request):
+    """Simple endpoint to verify token validity"""
+    return Response({
+        'user_id': request.user.id,
+        'is_student': hasattr(request.user, 'student'),
+        'student_id': getattr(request.user.student, 'id', None) if hasattr(request.user, 'student') else None
+    })
+        
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
