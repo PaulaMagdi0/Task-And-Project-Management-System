@@ -3,7 +3,6 @@ import os
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import Assignment,AssignmentStudent
@@ -17,38 +16,17 @@ from apps.submission.serializers import AssignmentSubmissionSerializer as Submis
 from apps.tracks.serializers import TrackSerializer
 from apps.courses.serializers import CourseSerializer
 from apps.student.serializers import StudentSubmissionStatusSerializer
-import logging
-import os
-from django.core.exceptions import ValidationError
-from rest_framework import generics, status
 from rest_framework.response import Response
-logger = logging.getLogger(__name__)
-import os
 import json
-import logging
 from datetime import datetime
-
-
-import json
-import logging
-from apps.student.models import Student
-from apps.assignments.models import AssignmentStudent
-logger = logging.getLogger(__name__)
-
-from rest_framework import generics
 from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
-from rest_framework import status
-import json
-import logging
-from datetime import datetime
-from .models import Assignment, AssignmentStudent
-from apps.student.models import Student
-from apps.courses.models import Course
-from .serializers import AssignmentSerializer
-
-
 from rest_framework.views import APIView
+from apps.tracks.models import Track
+from apps.staff_members.models import StaffMember
+
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -360,8 +338,6 @@ def get_submitters(request, assignment_id, track_id, course_id):
     })
     
 # views.py
-from rest_framework.views import APIView
-from apps.staff_members.models import StaffMember
 
 class AvailableTracksByInstructorIdView(APIView):
     def get(self, request, instructor_id):
@@ -381,13 +357,6 @@ class AvailableTracksByInstructorIdView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 # views.py
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from apps.tracks.models import Track
-from apps.courses.models import Course
-from apps.staff_members.models import StaffMember
-from apps.courses.serializers import CourseSerializer
 
 class InstructorTracksWithCoursesView(APIView):
     def get(self, request, instructor_id):
@@ -440,7 +409,6 @@ class InstructorTracksWithCoursesView(APIView):
 
         return Response(track_response_data, status=status.HTTP_200_OK)
     
-    from rest_framework.views import APIView
 # 
 class InstructorAssignmentsView(APIView):
     def get(self, request, instructor_id, *args, **kwargs):
