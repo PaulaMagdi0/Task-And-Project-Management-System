@@ -62,7 +62,11 @@ const SignIn = () => {
           navigate('/supervisor/dashboard');
         } else if (role === 'branch_manager') {
           navigate('/branchmanager/dashboard');
-        } else {
+        }
+        else if (role === 'admin') {
+          navigate('/admin/dashboard');   
+        }
+         else {
           navigate('/');
         }
       } else {
