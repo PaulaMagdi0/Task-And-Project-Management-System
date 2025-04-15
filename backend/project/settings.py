@@ -46,8 +46,8 @@ JWT_AUTH = {
     'ACCESS_TOKEN_COOKIE': 'access_token',
     'REFRESH_TOKEN_COOKIE': 'refresh_token',
     'COOKIE_PATH': '/',
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
@@ -112,7 +112,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",
         "USER": "postgres",
-        "PASSWORD": "2625",  # Keep this secure
+        "PASSWORD": "Paula",  # Keep this secure
         "HOST": "localhost",
         "PORT": "5432",
     }
