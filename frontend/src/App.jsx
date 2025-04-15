@@ -1,3 +1,4 @@
+// File: src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -20,6 +21,8 @@ import NotFound from './pages/NotFound';
 import AccessDenied from "./Components/Denied/Denied";
 import Chatting, { dummyUsers } from './pages/Chat/Chatting';
 import RecommendationForm from './Components/Recommendation/Recommendation';
+import UploadStudentPage from './components/AddStudent';
+import ProfilePage from './pages/ProfilePage';
 
 // Dashboard Components
 import Dashboard from "./pages/DashBoard/Dashboard";
@@ -32,14 +35,15 @@ import Assignments from './Components/Assignments/Assignments';
 import Submissions from './pages/DashBoard/Submissions';
 import Grades from './pages/DashBoard/Grades';
 import CreateAssignment from './pages/DashBoard/CreateAssignment';
-import UploadStudentPage from './components/AddStudent';
 import Hello from './pages/DashBoard/hello';
+
+// **Admin Dashboard:**
+import AdminDashboard from './pages/AdminDashboard/Admin';
 
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
-import ProfilePage from './pages/ProfilePage';
 
 const App = () => {
   useCustomScripts();
@@ -53,7 +57,6 @@ const App = () => {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
-          
           <Route path="/about" element={<About />} />
           <Route path="/services" element={<Services />} />
           <Route path="/contact" element={<Contact />} />
@@ -65,6 +68,7 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
+
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />
@@ -76,9 +80,14 @@ const App = () => {
           {/* Supervisor Dashboard */}
           <Route path="/supervisor/dashboard/*" element={<SupervisorDashboard />} />
 
-          {/* Instructor-Specific Routes */}
+          {/* Instructor Dashboard */}
           {userType === 'staff' && role === 'instructor' && (
             <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+          )}
+
+          {/* Admin Dashboard */}
+          {userType === 'staff' && role === 'admin' && (
+            <Route path="/admin/dashboard/*" element={<AdminDashboard />} />
           )}
 
           {/* Fallback Route */}

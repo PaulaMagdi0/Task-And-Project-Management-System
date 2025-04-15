@@ -20,8 +20,7 @@ class BaseRolePermission(permissions.BasePermission):
         
         # Get role safely (avoid AnonymousUser issues)
         user_role = getattr(request.user, "role", None)
-        user_branch = getattr(request.user, "branch", None)
-
+        
         # Check if user has any of the allowed roles
         if user_role in self.allowed_roles:
             return True
@@ -59,19 +58,22 @@ class IsInstructor(BaseRolePermission):
 
 
 class IsAdminOrBranchManager(permissions.BasePermission):
-    """Allows access to admins or branch managers."""
-    message = _('Only administrators or branch managers can perform this action.')
+    """
+    Allows access to users with the admin, branch manager,
+    or supervisor role (and superusers).
+    """
+    message = _('Only administrators, branch managers, or supervisors can perform this action.')
     
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
         
         user_role = getattr(request.user, "role", None)
-
+        
         return (
-            request.user.is_superuser or 
-            user_role == StaffMember.Role.BRANCH_MANAGER or
-            request.user.groups.filter(name=StaffMember.Role.BRANCH_MANAGER).exists()
+            request.user.is_superuser or
+            user_role in [StaffMember.Role.BRANCH_MANAGER, StaffMember.Role.SUPERVISOR, StaffMember.Role.ADMIN] or
+            request.user.groups.filter(name__in=[StaffMember.Role.BRANCH_MANAGER, StaffMember.Role.SUPERVISOR, StaffMember.Role.ADMIN]).exists()
         )
 
     def has_object_permission(self, request, view, obj):
@@ -124,10 +126,11 @@ class IsStudentManager(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return self.has_permission(request, view)
 
+
 # ✅ FIXED FUNCTION: No more AnonymousUser issues
 def has_student_management_permission(user):
     print(f"User: {user}, Role: {user.role}, Superuser: {user.is_superuser}")
     return (
         user.is_superuser or 
-        user.role in ['admin', 'supervisor', 'branch_manager','']
+        user.role in ['admin', 'supervisor', 'branch_manager', '']
     )

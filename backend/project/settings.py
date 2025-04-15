@@ -41,18 +41,13 @@ INSTALLED_APPS = [
 # Add this import at the top of settings.py
 from datetime import timedelta
 
-# Then add your JWT configuration
-JWT_AUTH = {
-    'ACCESS_TOKEN_COOKIE': 'access_token',
-    'REFRESH_TOKEN_COOKIE': 'refresh_token',
-    'COOKIE_PATH': '/',
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
@@ -112,7 +107,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",
         "USER": "postgres",
-        "PASSWORD": "2625",  # Keep this secure
+        "PASSWORD": "1234",  # Keep this secure
         "HOST": "localhost",
         "PORT": "5432",
     }
