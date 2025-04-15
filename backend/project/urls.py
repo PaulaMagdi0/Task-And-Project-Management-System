@@ -18,6 +18,9 @@ urlpatterns = [
     # path('api/', include('apps.student.urls')),
     path("api/chat/", include("apps.chat.urls")),
     path("api/contact/", include("apps.contact.urls")),
-    # path('ai/', include('ai_recommendations.urls')),
-    
+    path('ai/', include('ai_recommendations.urls')),
+    path('api/', include('chat_ai.urls')),  # 👈 Add this line
+    path('api/', include('jokes.urls')),  # Include the 'jokes' app's URLs
+
+
 ]

@@ -39,12 +39,12 @@ import Hello from './pages/DashBoard/hello';
 
 // **Admin Dashboard:**
 import AdminDashboard from './pages/AdminDashboard/Admin';
-
+import Jokes from './Components/Jokes/Jokes';
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
-
+import ChatWithAI from './Components/ChatAI/ChatWithAI';
 const App = () => {
   useCustomScripts();
   const { userType, role } = useSelector((state) => state.auth);
@@ -68,6 +68,8 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
+          <Route path="/ChatAI" element={<ChatWithAI />} />
+          <Route path="/jokes" element={<Jokes />} />
 
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />

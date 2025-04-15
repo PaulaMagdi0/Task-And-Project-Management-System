@@ -1,0 +1,30 @@
+.jokes-container {
+    text-align: center;
+    margin: 20px;
+  }
+  
+  button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+  }
+  
+  button:hover {
+    background-color: #45a049;
+  }
+  
+  p {
+    font-size: 18px;
+    font-family: Arial, sans-serif;
+    margin: 10px;
+  }
+  
+  .error {
+    color: red;
+    font-size: 18px;
+  }
+  
