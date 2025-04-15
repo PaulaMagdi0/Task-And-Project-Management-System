@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'ai_recommendations',
     'chat_ai',
     'jokes',
+    'githubStat',
 
 ]
 # settings.py

@@ -21,6 +21,8 @@ urlpatterns = [
     path('ai/', include('ai_recommendations.urls')),
     path('api/', include('chat_ai.urls')),  # 👈 Add this line
     path('api/', include('jokes.urls')),  # Include the 'jokes' app's URLs
-
+    path('api/github/', include('githubStat.urls')),
+    path('book_search/', include('book_search.urls')),
+    path('movie_search/', include('movie_search.urls')),
 
 ]
