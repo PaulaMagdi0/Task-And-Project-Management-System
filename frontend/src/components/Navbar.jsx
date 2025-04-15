@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   AppBar,
   Box,
@@ -13,8 +13,8 @@ import {
   ListItemText,
   IconButton,
   Badge,
-  styled
-} from '@mui/material';
+  styled,
+} from "@mui/material";
 import {
   Home,
   FileText,
@@ -27,27 +27,27 @@ import {
   Users as UsersIcon,
   BookOpen,
   BarChart2,
-  ClipboardList
-} from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { logout } from '../redux/authSlice';
+  ClipboardList,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { logout } from "../redux/authSlice";
 
 const NavButton = styled(Button)(({ theme }) => ({
   color: theme.palette.common.white,
-  textTransform: 'none',
+  textTransform: "none",
   fontWeight: 500,
-  fontSize: '0.875rem',
+  fontSize: "0.875rem",
   margin: theme.spacing(0, 0.5),
   padding: theme.spacing(1, 1.5),
   borderRadius: theme.shape.borderRadius,
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  "&:hover": {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
-  '&.active': {
-    backgroundColor: '#d32f2f', // Blood red for active state
-    color: theme.palette.getContrastText('#d32f2f'),
-  }
+  "&.active": {
+    backgroundColor: "#d32f2f", // Blood red for active state
+    color: theme.palette.getContrastText("#d32f2f"),
+  },
 }));
 
 const Navbar = () => {
@@ -68,13 +68,13 @@ const Navbar = () => {
   const handleLogout = () => {
     dispatch(logout());
     handleClose();
-    navigate('/signin');
+    navigate("/signin");
   };
 
   // Role-specific navigation items
   const renderRoleSpecificLinks = () => {
     switch (role) {
-      case 'instructor':
+      case "instructor":
         return (
           <>
             <NavButton
@@ -82,18 +82,11 @@ const Navbar = () => {
               to="/instructor/dashboard"
               startIcon={<ClipboardList size={18} />}
             >
-              My Tasks
-            </NavButton>
-            <NavButton
-              component={Link}
-              to="/instructor/students"
-              startIcon={<UsersIcon size={18} />}
-            >
-              My Students
+              My Dashboard
             </NavButton>
           </>
         );
-      case 'supervisor':
+      case "supervisor":
         return (
           <>
             <NavButton
@@ -112,7 +105,7 @@ const Navbar = () => {
             </NavButton>
           </>
         );
-      case 'student':
+      case "student":
         return (
           <>
             <NavButton
@@ -131,7 +124,7 @@ const Navbar = () => {
             </NavButton>
           </>
         );
-      case 'branchmanager':
+      case "branchmanager":
         return (
           <>
             <NavButton
@@ -159,21 +152,22 @@ const Navbar = () => {
     <AppBar
       position="sticky"
       sx={{
-        bgcolor: 'rgba(18, 18, 18, 0.95)',
-        background: 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)',
-        boxShadow: 'none',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+        bgcolor: "rgba(18, 18, 18, 0.95)",
+        background:
+          "linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)",
+        boxShadow: "none",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
         top: 0,
         zIndex: 1200,
-        '@supports (backdrop-filter: blur(8px))': {
-          backdropFilter: 'blur(8px)',
-          bgcolor: 'rgba(18, 18, 18, 0.8)',
+        "@supports (backdrop-filter: blur(8px))": {
+          backdropFilter: "blur(8px)",
+          bgcolor: "rgba(18, 18, 18, 0.8)",
         },
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
+      <Toolbar sx={{ justifyContent: "space-between" }}>
         {/* Left side - Logo and Navigation buttons */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography
             variant="h6"
             component={Link}
@@ -181,21 +175,17 @@ const Navbar = () => {
             sx={{
               mr: 2,
               fontWeight: 700,
-              color: '#d32f2f',
-              textDecoration: 'none',
-              '&:hover': {
-                color: '#b71c1c'
-              }
+              color: "#d32f2f",
+              textDecoration: "none",
+              "&:hover": {
+                color: "#b71c1c",
+              },
             }}
           >
             TaskManager
           </Typography>
 
-          <NavButton
-            component={Link}
-            to="/"
-            startIcon={<Home size={18} />}
-          >
+          <NavButton component={Link} to="/" startIcon={<Home size={18} />}>
             Home
           </NavButton>
 
@@ -203,26 +193,30 @@ const Navbar = () => {
         </Box>
 
         {/* Right side - Icons and user dropdown */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           {token && (
             <>
               <IconButton
                 component={Link}
-                to={role === 'instructor' ? '/instructor/tasks/new' :
-                  role === 'student' ? '/student/assignments/new' :
-                    '/tasks/new'}
+                to={
+                  role === "instructor"
+                    ? "/instructor/tasks/new"
+                    : role === "student"
+                    ? "/student/assignments/new"
+                    : "/tasks/new"
+                }
                 sx={{
-                  backgroundColor: '#d32f2f', // Blood red
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: '#b71c1c', // Darker blood red on hover
-                  }
+                  backgroundColor: "#d32f2f", // Blood red
+                  color: "white",
+                  "&:hover": {
+                    backgroundColor: "#b71c1c", // Darker blood red on hover
+                  },
                 }}
               >
                 <Plus size={20} />
               </IconButton>
 
-              <IconButton size="medium" sx={{ color: 'common.white' }}>
+              <IconButton size="medium" sx={{ color: "common.white" }}>
                 <Badge badgeContent={4} color="error">
                   <Bell size={20} />
                 </Badge>
@@ -233,16 +227,16 @@ const Navbar = () => {
                 onClick={handleClick}
                 size="small"
                 sx={{ ml: 1 }}
-                aria-controls={open ? 'account-menu' : undefined}
+                aria-controls={open ? "account-menu" : undefined}
                 aria-haspopup="true"
-                aria-expanded={open ? 'true' : undefined}
+                aria-expanded={open ? "true" : undefined}
               >
                 <Avatar
                   sx={{
                     width: 32,
                     height: 32,
-                    bgcolor: '#d32f2f', // Blood red
-                    color: 'white'
+                    bgcolor: "#d32f2f", // Blood red
+                    color: "white",
                   }}
                 >
                   {username?.charAt(0)?.toUpperCase()}
@@ -258,53 +252,59 @@ const Navbar = () => {
                 PaperProps={{
                   elevation: 0,
                   sx: {
-                    overflow: 'visible',
-                    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                    overflow: "visible",
+                    filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.32))",
                     mt: 1.5,
-                    bgcolor: '#2d2d2d',
-                    color: 'white',
-                    '& .MuiAvatar-root': {
+                    bgcolor: "#2d2d2d",
+                    color: "white",
+                    "& .MuiAvatar-root": {
                       width: 32,
                       height: 32,
                       ml: -0.5,
                       mr: 1,
                     },
-                    '& .MuiListItemIcon-root': {
-                      color: 'inherit'
+                    "& .MuiListItemIcon-root": {
+                      color: "inherit",
                     },
-                    '&:before': {
+                    "&:before": {
                       content: '""',
-                      display: 'block',
-                      position: 'absolute',
+                      display: "block",
+                      position: "absolute",
                       top: 0,
                       right: 14,
                       width: 10,
                       height: 10,
-                      bgcolor: '#2d2d2d',
-                      transform: 'translateY(-50%) rotate(45deg)',
+                      bgcolor: "#2d2d2d",
+                      transform: "translateY(-50%) rotate(45deg)",
                       zIndex: 0,
                     },
                   },
                 }}
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                transformOrigin={{ horizontal: "right", vertical: "top" }}
+                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
               >
-                <MenuItem onClick={() => navigate('/profile')} sx={{
-                  '&:hover': {
-                    backgroundColor: 'rgba(211, 47, 47, 0.1)' // Semi-transparent blood red
-                  }
-                }}>
+                <MenuItem
+                  onClick={() => navigate("/profile")}
+                  sx={{
+                    "&:hover": {
+                      backgroundColor: "rgba(211, 47, 47, 0.1)", // Semi-transparent blood red
+                    },
+                  }}
+                >
                   <ListItemIcon>
                     <User size={20} />
                   </ListItemIcon>
                   <ListItemText>Profile</ListItemText>
                 </MenuItem>
-                <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.12)' }} />
-                <MenuItem onClick={handleLogout} sx={{
-                  '&:hover': {
-                    backgroundColor: 'rgba(211, 47, 47, 0.1)' // Semi-transparent blood red
-                  }
-                }}>
+                <Divider sx={{ bgcolor: "rgba(255, 255, 255, 0.12)" }} />
+                <MenuItem
+                  onClick={handleLogout}
+                  sx={{
+                    "&:hover": {
+                      backgroundColor: "rgba(211, 47, 47, 0.1)", // Semi-transparent blood red
+                    },
+                  }}
+                >
                   <ListItemIcon>
                     <LogOut size={20} />
                   </ListItemIcon>
@@ -320,7 +320,7 @@ const Navbar = () => {
                 component={Link}
                 to="/signin"
                 variant="text"
-                sx={{ color: 'white' }}
+                sx={{ color: "white" }}
               >
                 Sign In
               </Button>

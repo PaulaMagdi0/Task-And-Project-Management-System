@@ -1,94 +1,240 @@
-import React, { useEffect, useState } from 'react';
-import apiClient from '../../services/api'; // Assuming apiClient is set up
-import './Assignments.css';
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchAssignments } from "../../redux/viewassignmentSlice";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Tooltip,
+  IconButton,
+  useTheme,
+  useMediaQuery,
+} from "@mui/material";
+import {
+  School as SchoolIcon,
+  Assignment as AssignmentIcon,
+  CalendarToday as CalendarIcon,
+  Description as DescriptionIcon,
+  Info as InfoIcon,
+  Refresh as RefreshIcon,
+} from "@mui/icons-material";
 
 const Assignments = () => {
-  const [assignments, setAssignments] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [loadingAssignments, setLoadingAssignments] = useState(false);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [errorAssignments, setErrorAssignments] = useState(null);
-  const [errorStudents, setErrorStudents] = useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const dispatch = useDispatch();
+  const { assignments, loading, error } = useSelector(
+    (state) => state.listassignments
+  );
+  const { user_id } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    const fetchAssignments = async () => {
-      setLoadingAssignments(true);
-      try {
-        const response = await apiClient.get('/assignments');
-        setAssignments(response.data); // Assuming the API returns a list of assignments
-        setErrorAssignments(null);
-      } catch (error) {
-        setErrorAssignments('Failed to fetch assignments.');
-        console.error("Failed to fetch assignments", error);
-      } finally {
-        setLoadingAssignments(false);
-      }
-    };
+    if (user_id) {
+      dispatch(fetchAssignments(user_id));
+    }
+  }, [dispatch, user_id]);
 
-    fetchAssignments();
-  }, []); // Run once when component mounts
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      setLoadingStudents(true);
-      try {
-        const response = await apiClient.get('/students');
-        if (response.data.students) {
-          setStudents(response.data.students); // Store students in state
-          setErrorStudents(null);
-        } else {
-          setErrorStudents('No students found.');
-        }
-      } catch (error) {
-        setErrorStudents('Failed to fetch students.');
-        console.error("Failed to fetch students", error);
-      } finally {
-        setLoadingStudents(false);
-      }
-    };
-
-    fetchStudents();
-  }, []); // Run once when component mounts
-
-  if (loadingAssignments || loadingStudents) return <div className="loading">Loading...</div>;
-  if (errorAssignments) return <div className="error">Error: {errorAssignments}</div>;
-  if (errorStudents) return <div className="error">Error fetching students: {errorStudents}</div>;
-
-  const getStudentName = (studentId) => {
-    const student = students.find((student) => student.id === studentId);
-    return student ? `${student.first_name} ${student.last_name}` : "Not Assigned";
+  const getAssignmentTypeColor = (type) => {
+    switch (type) {
+      case "task":
+        return "primary";
+      case "project":
+        return "secondary";
+      case "exam":
+        return "error";
+      default:
+        return "default";
+    }
   };
 
+  const formatDate = (dateString) => {
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return "Invalid Date";
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ mt: 2 }}>
+        <Alert severity="error" sx={{ mb: 1 }}>
+          {error}
+          <IconButton
+            size="small"
+            onClick={() => dispatch(fetchAssignments(user_id))}
+            sx={{ ml: 1 }}
+            aria-label="Retry fetching assignments"
+          >
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
-    <div className="assignments-container">
-      <h2>Assignments</h2>
-      {assignments.length === 0 ? <p>No assignments available.</p> : (
-        <table className="assignments-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Due Date</th>
-              <th>End Date</th>
-              <th>Assignment Type</th>
-              <th>Description</th>
-              <th>Assigned To</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assignments.map(assignment => (
-              <tr key={assignment.id}>
-                <td>{assignment.title}</td>
-                <td>{new Date(assignment.due_date).toLocaleString()}</td>
-                <td>{new Date(assignment.end_date).toLocaleString()}</td>
-                <td>{assignment.assignment_type}</td>
-                <td>{assignment.description}</td>
-                <td>{getStudentName(assignment.assigned_to)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <Box sx={{ p: isMobile ? 2 : 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h4" component="h2" sx={{ fontWeight: "bold" }}>
+          Assignments
+        </Typography>
+        <Tooltip title="Refresh data">
+          <IconButton
+            onClick={() => dispatch(fetchAssignments(user_id))}
+            color="primary"
+            aria-label="Refresh assignments"
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {assignments.length === 0 ? (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          No assignments available. Create your first assignment to get started.
+        </Alert>
+      ) : (
+        <Box sx={{ overflowX: "auto" }}>
+          <TableContainer
+            component={Paper}
+            sx={{ borderRadius: 2, minWidth: 650 }}
+          >
+            <Table aria-label="assignments table">
+              <TableHead sx={{ bgcolor: theme.palette.primary.main }}>
+                <TableRow>
+                  <TableCell sx={{ color: "white" }}>Title</TableCell>
+                  <TableCell sx={{ color: "white" }}>Type</TableCell>
+                  <TableCell sx={{ color: "white" }}>Track & Course</TableCell>
+                  <TableCell sx={{ color: "white" }}>Due Date</TableCell>
+                  <TableCell sx={{ color: "white" }}>End Date</TableCell>
+                  <TableCell sx={{ color: "white" }}>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      Description
+                      <Tooltip title="Assignment details">
+                        <InfoIcon fontSize="small" sx={{ ml: 1 }} />
+                      </Tooltip>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {assignments.map((assignment) => (
+                  <TableRow
+                    key={assignment.id}
+                    hover
+                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                  >
+                    <TableCell component="th" scope="row">
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <AssignmentIcon color="action" sx={{ mr: 1 }} />
+                        {assignment.title}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={assignment.assignment_type}
+                        color={getAssignmentTypeColor(
+                          assignment.assignment_type
+                        )}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", flexDirection: "column" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            mb: 0.5,
+                          }}
+                        >
+                          <SchoolIcon
+                            color="primary"
+                            sx={{ fontSize: 16, mr: 1 }}
+                          />
+                          <Typography variant="body2">
+                            {assignment.track_name || "N/A"}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <DescriptionIcon
+                            color="secondary"
+                            sx={{ fontSize: 16, mr: 1 }}
+                          />
+                          <Typography variant="body2">
+                            {assignment.course_name || "N/A"}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <CalendarIcon
+                          color="action"
+                          sx={{ fontSize: 16, mr: 1 }}
+                        />
+                        {formatDate(assignment.due_date)}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <CalendarIcon
+                          color="action"
+                          sx={{ fontSize: 16, mr: 1 }}
+                        />
+                        {formatDate(assignment.end_date)}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={assignment.description}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 200,
+                          }}
+                        >
+                          {assignment.description}
+                        </Typography>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 
