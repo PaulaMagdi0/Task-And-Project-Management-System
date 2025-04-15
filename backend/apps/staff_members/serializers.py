@@ -307,15 +307,6 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
             logger.error(f'Bulk create failed: {e}')
             raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))
         
-from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
-from apps.staff_members.models import StaffMember
-from apps.courses.models import Course
-
-from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
-from apps.staff_members.models import StaffMember
-from apps.courses.models import Course
 
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password

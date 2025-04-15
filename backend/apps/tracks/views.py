@@ -126,37 +126,3 @@ class AvailableTracksView(APIView):
         # Serialize the tracks and return them
         track_data = TrackSerializer(tracks, many=True).data
         return Response(track_data, status=status.HTTP_200_OK)
-from rest_framework import generics
-from django.db.models import Q
-from apps.courses.models import Course
-from apps.courses.serializers import CourseSerializer
-
-class CourseFilterView(generics.ListAPIView):
-    serializer_class = CourseSerializer
-
-    def get_queryset(self):
-        queryset = Course.objects.all()
-        
-        # Get filter parameters
-        search = self.request.query_params.get('search', None)
-        instructor = self.request.query_params.get('instructor', None)
-        track = self.request.query_params.get('track', None)
-
-        # Build filters
-        if search:
-            queryset = queryset.filter(
-                Q(name__icontains=search) |
-                Q(description__icontains=search)
-            )
-
-        if instructor:
-            queryset = queryset.filter(
-                Q(instructor__first_name__icontains=instructor) |
-                Q(instructor__last_name__icontains=instructor) |
-                Q(instructor__username__icontains=instructor)
-            )
-
-        if track:
-            queryset = queryset.filter(tracks__name__icontains=track)
-
-        return queryset.distinct()

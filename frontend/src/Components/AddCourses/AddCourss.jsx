@@ -54,10 +54,11 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 
 const AddCourses = () => {
     const dispatch = useDispatch();
-
+    const { user_id,username } = useSelector((state) => state.auth);
     const { instructors, loading: instructorsLoading } = useSelector(state => state.supervisors);
     const { data: courseContextData, loading: tracksLoading } = useSelector(state => state.courses);
-    
+    console.log(user_id);
+
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -70,10 +71,8 @@ const AddCourses = () => {
 
     useEffect(() => {
         dispatch(fetchInstructors());
-
-        const loggedInUserId = 3; // Replace with actual dynamic ID if available
-        dispatch(fetchCourses(loggedInUserId));
-    }, [dispatch]);
+        dispatch(fetchCourses(user_id));
+    }, [dispatch, user_id]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -165,7 +164,11 @@ const AddCourses = () => {
                             <FormControl fullWidth>
                                 <Autocomplete
                                     options={instructors}
-                                    getOptionLabel={(option) => option.full_name || option.username}
+                                    getOptionLabel={(option) => {
+                                            const label = option.full_name || option.username;
+                                            return Number(option.id) === Number(user_id) ? `${label} (me)` : label;
+                                        }}
+
                                     isOptionEqualToValue={(option, value) => option.id === value.id}
                                     value={formState.instructor}
                                     onChange={handleInstructorSelect}

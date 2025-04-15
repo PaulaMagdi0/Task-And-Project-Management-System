@@ -234,21 +234,39 @@ def supervisor_instructor_by_id_view(request, staff_id):
         )
 
 #Return All Instructosfrom django.http import JsonResponse
+from django.http import JsonResponse
+from django.views import View
+from .models import StaffMember
 
 class InstructorListView(View):
     def get(self, request, *args, **kwargs):
-        instructors = StaffMember.objects.filter(role=StaffMember.Role.INSTRUCTOR)
+        # Check if the request is for the current user's own data
+        if request.GET.get('role') == 'me':
+            staff_members = StaffMember.objects.filter(id=request.user.id)
+        else:
+            # Get role parameter from the request to filter by instructor or supervisor
+            role = request.GET.get('role', None)
+            
+            # Filter staff based on role if provided, else return all instructors and supervisors
+            if role:
+                staff_members = StaffMember.objects.filter(role=role)
+            else:
+                staff_members = StaffMember.objects.filter(role__in=[StaffMember.Role.INSTRUCTOR, StaffMember.Role.SUPERVISOR])
+
+        # Format the response data
         data = [
             {
-                "id": instructor.id,
-                "username": instructor.username,
-                "full_name": instructor.get_full_name(),
-                "email": instructor.email,
-                "branch": instructor.branch.name if instructor.branch else None,
-                "phone": instructor.phone,
-                "is_verified": instructor.is_verified,
+                "id": staff.id,
+                "username": staff.username,
+                "full_name": staff.get_full_name(),
+                "email": staff.email,
+                "branch": staff.branch.name if staff.branch else None,
+                "phone": staff.phone,
+                "is_verified": staff.is_verified,
+                "role": staff.get_role_display()  # Display role name
             }
-            for instructor in instructors
+            for staff in staff_members
         ]
-        return JsonResponse(data, safe=False)
 
+        return JsonResponse(data, safe=False)
+1
