@@ -8,21 +8,24 @@ import {
   FiCalendar,
   FiAward,
   FiAlertTriangle,
-  FiClipboard
+  FiClipboard,
 } from 'react-icons/fi';
 import './SupervisorDashboard.css';
+import { NotebookText,ArchiveRestore } from 'lucide-react';
 
 // Import your components
 import Courses from './Courses';
 // import Assignments from '../pages/Instructor/Assignments';
 import Assignments from '../Components/Assignments/Assignments';
 import Submissions from '../pages/Instructor/Submissions';
+import AddCourses from '../Components/AddCourses/AddCourss';
+
 import Grades from '../pages/Instructor/Grades';
 // import CreateAssignment from '../pages/Instructor/CreateAssignment';
 import CreateAssignment from '../Components/CreateAssignments/CreateAssignments';
 
 import UploadStudentPage from '../components/AddStudent';
-import UploadInstructor from '../components/AddInstructor';
+import UploadInstructor from '../Components/AddInstructor/AddInstructor';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -32,9 +35,11 @@ const SupervisorDashboard = () => {
   const menuItems = [
     { text: 'My Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
     { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
-    { text: 'Create Assignment', icon: <FiCalendar />, path: '/supervisor/dashboard/create-assignment' },
+    { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
     { text: 'View My Assignment', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
+    { text: 'Add Courses', icon:<NotebookText />, path: '/supervisor/dashboard/addcourses' },
+
     // { text: 'Grades', icon: <FiAlertTriangle />, path: '/supervisor/dashboard/grades' },
   ];
 
@@ -92,6 +97,7 @@ const SupervisorDashboard = () => {
             <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
+            <Route path="addcourses" element={<AddCourses />} />
             {/* <Route path="grades" element={<Grades />} /> */}
           </Routes>
         </div>

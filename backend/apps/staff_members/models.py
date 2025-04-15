@@ -3,12 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
-
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.db import models
-from django.core.validators import RegexValidator
-from django.core.exceptions import ValidationError
-from django.utils.translation import gettext_lazy as _
+from apps.branch_location.models import Branch
 
 class StaffMember(AbstractUser):
     email = models.EmailField(unique=True, verbose_name=_('email'))
@@ -27,7 +22,7 @@ class StaffMember(AbstractUser):
     )
 
     branch = models.ForeignKey(
-        'branch_location.Branch',
+        Branch,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -92,7 +87,6 @@ class StaffMember(AbstractUser):
                 self.branch.manager = self
                 self.branch.save()
         else:
-            from apps.branch_location.models import Branch
             branches = Branch.objects.filter(manager=self)
             for branch in branches:
                 branch.manager = None
@@ -137,7 +131,5 @@ class StaffMember(AbstractUser):
                 'id': self.branch.id,
                 'name': self.branch.name,
                 'address': self.branch.address,
-                # Replace 'is_active' with the actual field if there's an alternative,
-                # or remove the line if no such field exists.
             }
         return None

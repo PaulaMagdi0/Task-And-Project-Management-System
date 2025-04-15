@@ -3,14 +3,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import StaffMemberSerializer, CreateSupervisorSerializer, ExcelUploadSupervisorSerializer,StaffMemberSerializer
 from rest_framework.permissions import IsAuthenticated
-from apps.staff_members.models import StaffMember
-from apps.staff_members.permissions import IsAdminOrBranchManager
+from .permissions import IsAdminOrBranchManager
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import api_view, permission_classes
 from apps.tracks.models import Track
-from apps.courses.models import Course
 from apps.courses.serializers import CourseSerializer
 from django.shortcuts import get_object_or_404
+from django.views import View
+from django.http import JsonResponse
+from rest_framework import generics
+from rest_framework.response import Response
+from .serializers import CreateInstructorSerializer
+from django.db import transaction
+from rest_framework.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
+from .models import StaffMember
+from apps.courses.models import Course  # Import Course model
+import logging
+logger = logging.getLogger(__name__)
 
 
 class StaffMemberDeleteView(generics.DestroyAPIView):
@@ -60,6 +70,22 @@ class CreateSupervisorView(generics.CreateAPIView):
         if not instance.branch:
             raise ValidationError("Supervisors must be assigned to a branch")
 
+
+
+class CreateInstructorView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = CreateInstructorSerializer(data=request.data)
+        if serializer.is_valid():
+            # Log the incoming request data for debugging
+            logger.debug(f"Received data: {request.data}")
+            # Save the new instructor
+            instructor = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            # Log the validation errors
+            logger.error(f"Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class SupervisorBulkUploadView(APIView):
     permission_classes = [IsAdminOrBranchManager]
 
@@ -88,87 +114,84 @@ class SupervisorBulkUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
     """Retrieve the track and courses assigned to a supervisor/instructor by staff member ID."""
-    
+
     staff_member = get_object_or_404(StaffMember, id=staff_id)
 
     if staff_member.role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.INSTRUCTOR]:
-        return Response({"error": "You are not authorized to view this information."}, 
-                         status=status.HTTP_403_FORBIDDEN)
+        return Response({"error": "You are not authorized to view this information."},
+                        status=status.HTTP_403_FORBIDDEN)
 
     try:
-        track_data = []  # Default to an empty array instead of None
-        course_data = []
-
-        # Handle Supervisor Role: Retrieve tracks they are supervising
+        # Supervisor logic
         if staff_member.is_supervisor:
             tracks = Track.objects.filter(supervisor=staff_member)
             if tracks.exists():
-                track = tracks.first()
-                track_data = {
-                    "id": track.id,
-                    "name": track.name,
-                    "description": track.description,
-                    "track_type": track.track_type,
-                    "supervisor": staff_member.get_full_name(),
-                    "supervisor_role": staff_member.get_role_display(),
-                    "created_at": track.created_at
-                }
-
-                # Get courses that belong to the track
-                track_courses = Course.objects.filter(tracks=track)
+                track_data = []
                 track_courses_data = []
 
-                for course in track_courses:
-                    # Add the track names to the course data
-                    course_track_names = [
-                        {"id": t.id, "name": t.name} for t in course.tracks.all()  # Include both track ID and name
-                    ]
-                    
-                    # Add instructor details (name and ID)
-                    instructor_info = {
-                        "id": course.instructor.id if course.instructor else None,
-                        "name": course.instructor.get_full_name() if course.instructor else 'No Instructor'
-                    }
-
-                    track_courses_data.append({
-                        "id": course.id,
-                        "name": course.name,
-                        "description": course.description,
-                        "created_at": course.created_at,
-                        "instructor": instructor_info,  # Instructor details
-                        "tracks": course_track_names,   # Track details (ID and name)
+                for track in tracks:
+                    track_data.append({
+                        "id": track.id,
+                        "name": track.name,
+                        "description": track.description,
+                        "track_type": track.track_type,
+                        "supervisor": staff_member.get_full_name(),
+                        "supervisor_role": staff_member.get_role_display(),
+                        "created_at": track.created_at
                     })
 
-                # Get courses directly taught by supervisor (instructor = staff_member)
+                    # Get courses in this track
+                    track_courses = Course.objects.filter(tracks=track)
+                    for course in track_courses:
+                        course_track_names = [
+                            {"id": t.id, "name": t.name} for t in course.tracks.all()
+                        ]
+                        instructor_info = {
+                            "id": course.instructor.id if course.instructor else None,
+                            "name": course.instructor.get_full_name() if course.instructor else 'No Instructor'
+                        }
+
+                        track_courses_data.append({
+                            "id": course.id,
+                            "name": course.name,
+                            "description": course.description,
+                            "created_at": course.created_at,
+                            "instructor": instructor_info,
+                            "tracks": course_track_names,
+                        })
+
                 taught_courses = Course.objects.filter(instructor=staff_member)
                 taught_courses_serialized = CourseSerializer(taught_courses, many=True).data
 
                 return Response({
                     "status": "success",
-                    "track": track_data,
+                    "tracks": track_data,
                     "track_courses": track_courses_data,
                     "taught_courses": taught_courses_serialized
-                })
+                }, status=status.HTTP_200_OK)
 
             else:
                 return Response({
                     "status": "success",
                     "message": "Supervisor has no tracks assigned.",
-                    "track": track_data,  # Return an empty array for tracks if none exist
-                    "track_courses": []
+                    "tracks": [],
+                    "track_courses": [],
+                    "taught_courses": []
                 }, status=status.HTTP_200_OK)
 
-        # Handle Instructor Role: Retrieve courses and the related track they are teaching
+        # Instructor logic
         elif staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
             if courses.exists():
                 course_data = CourseSerializer(courses, many=True).data
 
-                # Retrieve tracks for the courses assigned to the instructor
                 track_data = []
                 for course in courses:
                     for track in course.tracks.all():
@@ -186,21 +209,22 @@ def supervisor_instructor_by_id_view(request, staff_id):
                     "status": "success",
                     "tracks": track_data,
                     "courses": course_data
-                })
+                }, status=status.HTTP_200_OK)
 
             else:
                 return Response({
                     "status": "success",
                     "message": "Instructor has no courses assigned.",
-                    "tracks": [],  # Return an empty array for tracks if no courses are assigned
+                    "tracks": [],
                     "courses": []
                 }, status=status.HTTP_200_OK)
 
+        # Fallback if not supervisor or instructor
         return Response({
             "status": "success",
-            "track": [],
+            "tracks": [],
             "track_courses": [],
-            "courses": []
+            "taught_courses": []
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -208,3 +232,23 @@ def supervisor_instructor_by_id_view(request, staff_id):
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+#Return All Instructosfrom django.http import JsonResponse
+
+class InstructorListView(View):
+    def get(self, request, *args, **kwargs):
+        instructors = StaffMember.objects.filter(role=StaffMember.Role.INSTRUCTOR)
+        data = [
+            {
+                "id": instructor.id,
+                "username": instructor.username,
+                "full_name": instructor.get_full_name(),
+                "email": instructor.email,
+                "branch": instructor.branch.name if instructor.branch else None,
+                "phone": instructor.phone,
+                "is_verified": instructor.is_verified,
+            }
+            for instructor in instructors
+        ]
+        return JsonResponse(data, safe=False)
+
