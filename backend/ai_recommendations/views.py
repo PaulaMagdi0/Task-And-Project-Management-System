@@ -9,13 +9,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 print(os.getcwd())  # This will print the current working directory
 
-# Load CSV files Windows
-# assignments = pd.read_csv('E:/Graduation Project ITI/Task-And-Project-Management-System/backend/data/assignments.csv')
-# courses = pd.read_csv('E:/Graduation Project ITI/Task-And-Project-Management-System/backend/data/courses.csv')
-
-# Load CSV Files Linux
-assignments = pd.read_csv('data/assignments.csv')
-courses = pd.read_csv('data/courses.csv')
+# Load CSV files
+assignments = pd.read_csv('E:/Graduation Project ITI/Task-And-Project-Management-System/backend/data/assignments.csv')
+courses = pd.read_csv('E:/Graduation Project ITI/Task-And-Project-Management-System/backend/data/courses.csv')
 
 # Load pre-trained BERT model and tokenizer (CPU only)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')

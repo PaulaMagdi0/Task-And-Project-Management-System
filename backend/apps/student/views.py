@@ -19,9 +19,9 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 #UPload Excel File View
-@api_view(['POST'])
-# @permission_classes([IsAuthenticated])  # ✅ Enforce authentication
+
 @permission_classes([AllowAny])
+@api_view(['POST'])
 def upload_excel(request):
     """Handle bulk student creation via Excel upload"""
     print(f"DEBUG: User Authenticated? {request.user.is_authenticated}, User: {request.user}")
@@ -86,9 +86,10 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+        
 #Create Single Student View
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])  # Supports FormData
+@parser_classes([MultiPartParser, FormParser])
 def create_student_from_form(request):
     """
     Accepts FormData input and creates a new student.
@@ -98,45 +99,98 @@ def create_student_from_form(request):
     - email
     - role
     - track_id
-    - password (optional)
     """
-    email = request.data.get("email")
+    email = request.data.get("email", "").strip().lower()
     
     if not email:
-        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Email is required.", "field": "email"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if student exists first to provide immediate feedback
+    if Student.objects.filter(email=email).exists():
+        return Response(
+            {
+                "error": f"A student with email '{email}' already exists",
+                "field": "email",
+                "email": email
+            },
+            status=status.HTTP_409_CONFLICT
+        )
 
     # Extract username from email
     username = email.split("@")[0]
 
     # Collecting form data
     data = {
-        "first_name": request.data.get("first_name"),
-        "last_name": request.data.get("last_name"),
+        "first_name": request.data.get("first_name", "").strip(),
+        "last_name": request.data.get("last_name", "").strip(),
         "email": email,
-        "role": request.data.get("role"),
+        "role": request.data.get("role", "student"),
         "track_id": request.data.get("track_id"),
-        "username": username,  # Add extracted username
-        # "password": request.data.get("password", None),  # Optional
+        "username": username,
     }
+
+    # Validate required fields
+    required_fields = ['first_name', 'last_name', 'track_id']
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        return Response(
+            {
+                "error": f"Missing required fields: {', '.join(missing_fields)}",
+                "fields": missing_fields
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Check if the track_id is valid
     try:
-        track = Track.objects.get(id=data.get('track_id'))
+        track = Track.objects.get(id=data['track_id'])
+        data["track"] = track
     except Track.DoesNotExist:
-        return Response({"error": "Invalid track_id provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Add the track object to the data instead of just the track_id
-    data["track"] = track
+        return Response(
+            {
+                "error": f"Invalid track_id provided: {data['track_id']}",
+                "field": "track_id"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Validate the serializer with the data
     serializer = StudentSerializer(data=data)
     
     if serializer.is_valid():
-        serializer.save()  # Save the student object
-        return Response({"message": "Student created successfully"}, status=status.HTTP_201_CREATED)
+        try:
+            serializer.save()
+            return Response(
+                {
+                    "message": "Student created successfully",
+                    "student": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            logger.error(f"Error saving student: {str(e)}")
+            return Response(
+                {"error": "Failed to create student due to server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Return serializer errors with field-specific information
+    errors = serializer.errors
+    for field in errors:
+        errors[field] = [str(msg) for msg in errors[field]]
+    return Response(
+        {
+            "error": "Validation failed",
+            "details": errors,
+            "fields": list(errors.keys())
+        },
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
+# List All Student View 
 # List All Student View 
 @api_view(['GET'])
 # @permission_classes([IsAuthenticated])
@@ -207,68 +261,40 @@ def verify_email(request, verification_code):
             {'status': 'invalid_code'},
             status=status.HTTP_400_BAD_REQUEST
         )
+from rest_framework.permissions import IsAuthenticated
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])  # Ensure only authenticated users can access
+@permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
-    """Retrieve courses and track information for a specific student by their ID."""
     try:
-        # Fetch student with related track info
-        student = Student.objects.filter(id=student_id).select_related('track').first()
-
-        if not student:
-            logger.error(f"Student with ID {student_id} not found.")
-            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        if not student.track:
-            logger.error(f"Student with ID {student_id} has no track assigned.")
-            return Response({"error": "Student is not assigned to any track"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Assuming 'tracks' is a ManyToManyField in the Course model
-        courses = Course.objects.filter(tracks=student.track).select_related('instructor')
-
-        # Get the supervisor of the student's track
-        supervisor = student.track.supervisor
-
-        # Serialize course data, including instructor info
-        course_data = CourseSerializer(courses, many=True).data
+        # Get requested student
+        student = Student.objects.select_related('user').get(id=student_id)
         
-        # Prepare track information
-        track_data = {
-            "id": student.track.id,
-            "name": student.track.name,
-            "description": student.track.description,
-            "track_type": student.track.track_type,
-            "supervisor": {
-                "id": supervisor.id if supervisor else None,
-                "name": supervisor.get_full_name() if supervisor else "No Supervisor",
-                "email": supervisor.email if supervisor else None,
-            } if supervisor else None,
-            "branch": {
-                "id": student.track.branch.id if student.track.branch else None,
-                "name": student.track.branch.name if student.track.branch else "No Branch",
-            }
-        }
-
-        # Prepare student data
-        student_data = {
-            "id": student.id,
-            "name": student.full_name,
-            "email": student.email,
-            "track": track_data
-        }
-
+        # Verify permission
+        if request.user != student.user and not request.user.is_staff:
+            return Response(
+                {"error": "Unauthorized access"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Rest of your existing view logic...
+        courses = Course.objects.filter(tracks=student.track)
+        serializer = CourseSerializer(courses, many=True)
+        
         return Response({
-            "student": student_data,
-            "courses": course_data  # Courses with instructor info included
-        }, status=status.HTTP_200_OK)
-
+            'student': {
+                'id': student.id,
+                'name': student.full_name
+            },
+            'courses': serializer.data
+        })
+        
+    except Student.DoesNotExist:
+        return Response({"error": "Student not found"}, status=404)
     except Exception as e:
-        logger.error(f"Error retrieving student courses: {str(e)}")
-        return Response(
-            {"error": "Failed to retrieve student courses"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
+        logger.error(f"Error: {str(e)}")
+        return Response({"error": "Server error"}, status=500)
+    
 #UPdate student Info View
 
 @api_view(['PATCH'])

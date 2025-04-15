@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     "apps.branch_location",
     "corsheaders",
     'django_extensions',
-    'ai_recommendations',
+    # 'ai_recommendations',
 
 ]
 # settings.py
@@ -152,3 +152,4 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "m.nasr266@gmail.com"
 EMAIL_HOST_PASSWORD = "efvh pzab wslt upfq"  # Keep this secure
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
