@@ -35,6 +35,10 @@ import CreateAssignment from './pages/DashBoard/CreateAssignment';
 import UploadStudentPage from './components/AddStudent';
 import Hello from './pages/DashBoard/hello';
 import Jokes from './Components/Jokes/Jokes';
+import GitHubStat from './Components/githubStat/githubStat';
+import BookSearch from './Components/BookSearch/BookSearch';
+import MovieSearch from './Components/MovieSearch/MovieSearch';
+
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
@@ -67,6 +71,9 @@ const App = () => {
           <Route path="/recommendation" element={<RecommendationForm />} />
           <Route path="/ChatAI" element={<ChatWithAI />} />
           <Route path="/jokes" element={<Jokes />} />
+          <Route path="/github-stat" element={<GitHubStat />} />
+          <Route path="/book-search" element={<BookSearch />} />
+          <Route path="/movie-search" element={<MovieSearch />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/branchmanager/dashboard" element={<BranchManagerDashboard />} />

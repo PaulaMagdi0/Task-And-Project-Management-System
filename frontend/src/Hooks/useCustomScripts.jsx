@@ -11,29 +11,29 @@ const useCustomScripts = () => {
     const toggleScrolled = () => {
       const selectBody = document.querySelector("body");
       const selectHeader = document.querySelector("#header");
-      if (
-        !selectHeader.classList.contains("scroll-up-sticky") &&
-        !selectHeader.classList.contains("sticky-top") &&
-        !selectHeader.classList.contains("fixed-top")
-      )
-        return;
-      if (window.scrollY > 100) {
-        selectBody.classList.add("scrolled");
-      } else {
-        selectBody.classList.remove("scrolled");
+      if (selectHeader && 
+        (selectHeader.classList.contains("scroll-up-sticky") ||
+        selectHeader.classList.contains("sticky-top") ||
+        selectHeader.classList.contains("fixed-top"))) {
+        if (window.scrollY > 100) {
+          selectBody?.classList.add("scrolled");
+        } else {
+          selectBody?.classList.remove("scrolled");
+        }
       }
     };
 
     const mobileNavToggleBtn = document.querySelector(".mobile-nav-toggle");
     const mobileNavToogle = () => {
-      document.querySelector("body").classList.toggle("mobile-nav-active");
-      mobileNavToggleBtn.classList.toggle("bi-list");
-      mobileNavToggleBtn.classList.toggle("bi-x");
+      document.querySelector("body")?.classList.toggle("mobile-nav-active");
+      mobileNavToggleBtn?.classList.toggle("bi-list");
+      mobileNavToggleBtn?.classList.toggle("bi-x");
     };
 
     // Adding event listeners
     document.addEventListener("scroll", toggleScrolled);
     window.addEventListener("load", toggleScrolled);
+
     if (mobileNavToggleBtn) {
       mobileNavToggleBtn.addEventListener("click", mobileNavToogle);
     }
@@ -53,10 +53,8 @@ const useCustomScripts = () => {
       .forEach((navmenu) => {
         navmenu.addEventListener("click", function (e) {
           e.preventDefault();
-          this.parentNode.classList.toggle("active");
-          this.parentNode.nextElementSibling.classList.toggle(
-            "dropdown-active"
-          );
+          this.parentNode?.classList.toggle("active");
+          this.parentNode?.nextElementSibling?.classList.toggle("dropdown-active");
           e.stopImmediatePropagation();
         });
       });
@@ -105,7 +103,7 @@ const useCustomScripts = () => {
         .querySelectorAll(".init-swiper")
         .forEach(function (swiperElement) {
           let config = JSON.parse(
-            swiperElement.querySelector(".swiper-config").innerHTML.trim()
+            swiperElement.querySelector(".swiper-config")?.innerHTML.trim() || "{}"
           );
           if (swiperElement.classList.contains("swiper-tab")) {
             initSwiperWithCustomPagination(swiperElement, config);
