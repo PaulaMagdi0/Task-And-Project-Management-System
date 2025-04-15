@@ -72,10 +72,10 @@ const StudentDashboard = () => {
         console.log('Token length:', localStorage.getItem('authToken')?.length);
 
         // If using JWT, decode it at jwt.io or with:
-        const tokenParts = localStorage.getItem('authToken')?.split('.');
+        const tokenParts = authToken.split('.');
         if (tokenParts?.length === 3) {
-          console.log('JWT Header:', atob(tokenParts[0]));
-          console.log('JWT Payload:', atob(tokenParts[1]));
+          const decodedPayload = JSON.parse(atob(tokenParts[1]));
+          console.log('Token payload:', decodedPayload);
           // Check expiration in payload
         }
         // 1. First verify the token works
