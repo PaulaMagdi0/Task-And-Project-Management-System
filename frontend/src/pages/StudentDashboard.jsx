@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { FiMenu, FiX, FiBook, FiCalendar, FiAward, FiAlertTriangle, FiClipboard, FiUsers } from 'react-icons/fi';
-import { Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, Chip, Button, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert } from '@mui/material';
+import { Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert } from '@mui/material';
 import axios from 'axios';
 import './StudentDashboard.css';
 
@@ -40,8 +40,14 @@ const menuItems = [
 
 const StudentDashboard = () => {
   const { username } = useSelector((state) => state.auth);
-  const [selectedSection, setSelectedSection] = useState('deadlines');
+  const [selectedSection, setSelectedSection] = useState('courses');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [studentData, setStudentData] = useState({
+    student: null,
+    courses: [],
+    loading: true,
+    error: null
+  });
   const [dashboardData, setDashboardData] = useState({
     pendingAssignments: [],
     pendingCorrectives: [],
@@ -49,34 +55,98 @@ const StudentDashboard = () => {
     recentActivities: [],
     averageGrade: null,
     gradeTrend: 0,
-    courses: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await axios.get('/api/students/dashboard/');
-        setDashboardData({
-          pendingAssignments: data.pendingAssignments || [],
-          pendingCorrectives: data.pendingCorrectives || [],
-          upcomingDeadlines: data.upcomingDeadlines || 0,
-          recentActivities: data.recentActivities || [],
-          averageGrade: data.averageGrade || null,
-          gradeTrend: data.gradeTrend || 0,
-          courses: data.courses || [],
+        const studentId = localStorage.getItem('user_id');
+        const authToken = localStorage.getItem('authToken');
+
+        if (!authToken) throw new Error('No auth token found');
+        if (!studentId) throw new Error('No student ID found');
+
+        console.log('Token from localStorage:', localStorage.getItem('authToken'));
+        console.log('Token length:', localStorage.getItem('authToken')?.length);
+
+        // If using JWT, decode it at jwt.io or with:
+        const tokenParts = authToken.split('.');
+        if (tokenParts?.length === 3) {
+          const decodedPayload = JSON.parse(atob(tokenParts[1]));
+          console.log('Token payload:', decodedPayload);
+          // Check expiration in payload
+        }
+        // 1. First verify the token works
+        try {
+          const userResponse = await axios.get(
+            'http://127.0.0.1:8000/api/auth/user/',
+            { headers: { 'Authorization': `Bearer ${authToken}` } }
+          );
+          console.log('Current user:', userResponse.data);
+        } catch (tokenError) {
+          console.error('Token is invalid:', tokenError.response?.data);
+          throw new Error('Invalid token');
+        }
+
+        // 2. Now make the courses request
+        const coursesResponse = await axios.get(
+          `http://127.0.0.1:8000/api/student/${studentId}/courses/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 5000
+          }
+        );
+
+        console.log('Courses response:', coursesResponse.data);
+        setStudentData({
+          student: coursesResponse.data.student,
+          courses: coursesResponse.data.courses,
+          loading: false,
+          error: null
         });
+
       } catch (error) {
-        setError(error.response?.data?.message || error.message);
-      } finally {
+        console.error('Full error:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
+
+        if (error.response?.status === 401) {
+          localStorage.removeItem('authToken');
+          navigate('/login');
+        } else {
+          setError(error.response?.data?.error || error.message);
+        }
         setLoading(false);
       }
     };
-    fetchDashboardData();
+
+    fetchData();
   }, []);
 
   const renderSection = () => {
+    if (loading) {
+      return (
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress sx={{ color: '#e53935' }} />
+        </Box>
+      );
+    }
+
+    if (error) {
+      return (
+        <Alert severity="error" sx={{ m: 2 }}>
+          Error loading data: {error}
+        </Alert>
+      );
+    }
+
     switch (selectedSection) {
       case 'deadlines':
         return (
@@ -87,21 +157,22 @@ const StudentDashboard = () => {
               subheader={`${dashboardData.upcomingDeadlines} urgent items`}
             />
             <CardContent>
-              {/* <LinearProgress
+              <LinearProgress
                 variant="determinate"
                 value={Math.min(dashboardData.upcomingDeadlines * 10, 100)}
                 sx={{
                   height: 10,
                   borderRadius: 5,
-                  // backgroundColor: '#e53935',
-                  // '& .MuiLinearProgress-bar': {
-                  //   backgroundColor: '#e53935'
-                  // }
+                  backgroundColor: '#ffcdd2',
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: '#e53935'
+                  }
                 }}
-              /> */}
+              />
             </CardContent>
           </Card>
         );
+
       case 'averageGrade':
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
@@ -126,6 +197,7 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
         );
+
       case 'correctives':
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
@@ -134,54 +206,48 @@ const StudentDashboard = () => {
               avatar={<FiAlertTriangle style={{ color: '#e53935' }} />}
               subheader={`${dashboardData.pendingCorrectives.length} items`}
             />
-            <CardContent>
-              <LinearProgress
-                variant="determinate"
-                value={Math.min(dashboardData.pendingCorrectives.length * 20, 100)}
-                sx={{
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: '#ffcdd2',
-                  '& .MuiLinearProgress-bar': {
-                    backgroundColor: '#e53935'
-                  }
-                }}
-              />
-            </CardContent>
+            <List>
+              {dashboardData.pendingCorrectives.map((item, index) => (
+                <React.Fragment key={index}>
+                  <ListItem>
+                    <ListItemIcon>
+                      <FiAlertTriangle style={{ color: '#e53935' }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.title}
+                      secondary={item.description}
+                    />
+                  </ListItem>
+                  {index < dashboardData.pendingCorrectives.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
           </Card>
         );
+
       case 'courses':
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
             <CardHeader
               title="My Courses"
               avatar={<FiBook style={{ color: '#e53935' }} />}
+              subheader={`Track: ${studentData.student?.track?.name || 'Not assigned'}`}
             />
             <CardContent>
               <Grid container spacing={2}>
-                {dashboardData.courses.map((course) => (
-                  <Grid item xs={12} key={course.id}>
+                {studentData.courses.map((course) => (
+                  <Grid item xs={12} md={6} key={course.id}>
                     <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: '#e53935' }}>
                           {course.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {course.instructor} • {course.duration} days
+                          {course.description}
                         </Typography>
-                        <LinearProgress
-                          variant="determinate"
-                          value={course.progress}
-                          sx={{
-                            mt: 2,
-                            height: 8,
-                            borderRadius: 5,
-                            backgroundColor: '#bbdefb',
-                            '& .MuiLinearProgress-bar': {
-                              backgroundColor: '#e53935'
-                            }
-                          }}
-                        />
+                        <Typography variant="caption" display="block" mt={1}>
+                          Started: {new Date(course.created_at).toLocaleDateString()}
+                        </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -190,6 +256,7 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
         );
+
       case 'assignments':
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
@@ -198,27 +265,24 @@ const StudentDashboard = () => {
               avatar={<FiClipboard style={{ color: '#e53935' }} />}
             />
             <List>
-              {dashboardData.pendingAssignments.map((assignment) => (
-                <React.Fragment key={assignment.id}>
+              {dashboardData.pendingAssignments.map((assignment, index) => (
+                <React.Fragment key={index}>
                   <ListItem>
                     <ListItemIcon>
-                      <FiBook style={{ color: '#e53935' }} />
+                      <FiClipboard style={{ color: '#e53935' }} />
                     </ListItemIcon>
                     <ListItemText
-                      primary={
-                        <Typography sx={{ color: '#e53935', fontWeight: 'medium' }}>
-                          {assignment.title}
-                        </Typography>
-                      }
+                      primary={assignment.title}
                       secondary={assignment.description}
                     />
                   </ListItem>
-                  <Divider />
+                  {index < dashboardData.pendingAssignments.length - 1 && <Divider />}
                 </React.Fragment>
               ))}
             </List>
           </Card>
         );
+
       case 'activities':
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
@@ -226,64 +290,33 @@ const StudentDashboard = () => {
               title="Recent Activities"
               avatar={<FiUsers style={{ color: '#e53935' }} />}
             />
-            <CardContent>
-              <List>
-                {dashboardData.recentActivities.map((activity) => (
-                  <ListItem key={activity.id}>
-                    <ListItemIcon>
-                      {activity.type === 'grade' ?
-                        <FiAward style={{ color: '#43a047' }} /> :
-                        <FiUsers style={{ color: '#e53935' }} />}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Typography sx={{ color: '#e53935' }}>
-                          {activity.title}
-                        </Typography>
-                      }
-                      secondary={activity.date}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
+            <List>
+              {dashboardData.recentActivities.map((activity, index) => (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    {activity.type === 'grade' ? (
+                      <FiAward style={{ color: '#43a047' }} />
+                    ) : (
+                      <FiUsers style={{ color: '#e53935' }} />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={activity.title}
+                    secondary={activity.date}
+                  />
+                </ListItem>
+              ))}
+            </List>
           </Card>
         );
+
       default:
         return null;
     }
   };
 
-  if (loading) {
-    return (
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f5f7fa'
-      }}>
-        <CircularProgress sx={{ color: '#e53935' }} size={60} />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert severity="error" sx={{
-        m: 2,
-        backgroundColor: '#ffebee',
-        color: '#e53935',
-        '& .MuiAlert-icon': {
-          color: '#e53935'
-        }
-      }}>
-        Error loading dashboard: {error}
-      </Alert>
-    );
-  }
-
   const displayName = username ? username.split('@')[0] : 'User';
+
   return (
     <div className="dashboard-container">
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
@@ -292,7 +325,7 @@ const StudentDashboard = () => {
             <>
               <div className="welcome-message">
                 <h3>Welcome back,</h3>
-                <h3><b>{displayName || 'User'}</b></h3>
+                <h3><b>{displayName}</b></h3>
               </div>
               <button className="toggle-btn" onClick={() => setSidebarOpen(false)}>
                 <FiX size={24} />

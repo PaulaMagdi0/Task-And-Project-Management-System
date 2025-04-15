@@ -4,9 +4,14 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from .models import StaffMember
+from apps.courses.models import Course
+from django.contrib.auth.hashers import make_password
+from django.shortcuts import get_object_or_404
 from apps.branch_location.models import Branch
 import secrets       # Add this import
 import string        # And this import
+import logging
+logger = logging.getLogger(__name__)
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField(read_only=True)
@@ -301,3 +306,47 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
         except Exception as e:
             logger.error(f'Bulk create failed: {e}')
             raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))
+        
+
+from rest_framework import serializers
+from django.contrib.auth.hashers import make_password
+from apps.staff_members.models import StaffMember
+from apps.courses.models import Course
+
+class CreateInstructorSerializer(serializers.ModelSerializer):
+    course_id = serializers.IntegerField(required=False, write_only=True)
+
+    class Meta:
+        model = StaffMember
+        fields = [
+            'username', 'password', 'first_name', 'last_name', 'email',
+            'phone', 'branch', 'course_id'
+        ]
+        extra_kwargs = {
+            'password': {'write_only': True},
+        }
+
+    def create(self, validated_data):
+        # Hash the password before saving
+        validated_data['password'] = make_password(validated_data['password'])
+
+        # Remove the 'course_id' from validated data before creating StaffMember
+        course_id = validated_data.pop('course_id', None)
+
+        # Create the StaffMember instance
+        staff_member = super().create(validated_data)
+
+        # If course_id exists, associate the instructor with the Course
+        if course_id:
+            try:
+                # Get the course by its ID
+                course = Course.objects.get(id=course_id)
+                
+                # Assign the staff member (instructor) to the course
+                course.instructor = staff_member  # Assign the instructor
+                course.save()  # Save the course to reflect the changes
+
+            except Course.DoesNotExist:
+                raise serializers.ValidationError(f"Course with ID {course_id} does not exist.")
+
+        return staff_member

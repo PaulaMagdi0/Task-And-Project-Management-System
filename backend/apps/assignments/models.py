@@ -8,7 +8,7 @@ from apps.tracks.models import Track
 class AssignmentStudent(models.Model):
     assignment = models.ForeignKey('Assignment', on_delete=models.CASCADE)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE)
-    student = models.ForeignKey('student.Student', on_delete=models.CASCADE)
+    student = models.ForeignKey('student.Student', on_delete=models.CASCADE,default=None)
     track = models.ForeignKey('tracks.Track', null=True, blank=True, on_delete=models.SET_NULL)
 
     class Meta:

@@ -1,25 +1,30 @@
-
-from apps.tracks.models import Track  # Import Track model
+from apps.tracks.models import Track
 from rest_framework import serializers
 from .models import Course
-from apps.tracks.models import Track
+from rest_framework import serializers
+from apps.staff_members.models import StaffMember
+
+from rest_framework import serializers
+from .models import Course, StaffMember
 
 class CourseSerializer(serializers.ModelSerializer):
-    # Serialize the related Track instances for the Many-to-Many relationship
-    tracks = serializers.PrimaryKeyRelatedField(queryset=Track.objects.all(), many=True)
+    instructor = serializers.PrimaryKeyRelatedField(queryset=StaffMember.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Course
-        fields = "__all__"
+        fields = ['id', 'name', 'description', 'created_at', 'instructor', 'tracks']
 
     def create(self, validated_data):
-        # Create the course object
-        tracks_data = validated_data.pop('tracks')
-        course = super().create(validated_data)
+        # Check if instructor is provided or if it is allowed to be null
+        instructor = validated_data.get('instructor', None)
         
-        # Add related tracks to the course
-        for track in tracks_data:
-            course.tracks.add(track)
+        # Create the course instance without an instructor if it's null
+        course = Course.objects.create(**validated_data)
+
+        if instructor:
+            # If instructor is provided, associate it with the course
+            course.instructor = instructor
+            course.save()
 
         return course
 

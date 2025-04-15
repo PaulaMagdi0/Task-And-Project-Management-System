@@ -1,7 +1,7 @@
 from django.db import models
+from django.utils import timezone
 from apps.staff_members.models import StaffMember
 from apps.branch_location.models import Branch  # Import Branch model
-from django.utils import timezone
 from apps.tracks.models import Track
 
 class Course(models.Model):
@@ -24,15 +24,18 @@ class Course(models.Model):
         blank=True,
         related_name="courses"
     )
+
     class Meta:
         db_table = 'courses'  # Define the intermediary table name
+
     def __str__(self):
         return self.name  # This ensures that the course name is shown in the admin panel
-    
+
 class CourseTrack(models.Model):
     # This is the intermediary table
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     track = models.ForeignKey(Track, on_delete=models.CASCADE)
     created_at = models.DateTimeField(default=timezone.now)  # Set default to now
+    
     class Meta:
         db_table = 'courses_tracks'  # Define the intermediary table name

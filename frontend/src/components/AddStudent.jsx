@@ -92,7 +92,7 @@ const UploadStudentPage = () => {
         const file = e.target.files[0];
         setExcelFile(file);
     };
-    
+
 
     const handleCloseModal = () => {
         setOpenModal(false);
@@ -147,40 +147,48 @@ const UploadStudentPage = () => {
     };
     const handleUploadExcel = async () => {
         if (!excelFile) {
-            showErrorModal('Excel file is required.');
+            showErrorModal('Please select an Excel file');
             return;
         }
-        if (!studentData.track_id) {
-            showErrorModal('Please select a track.');
-            return;
-        }
-    
+
         setLoading(true);
+
         try {
             const formData = new FormData();
-            formData.append('file', excelFile);  // Ensure the file is attached
+            formData.append('excel_file', excelFile);
             formData.append('track_id', studentData.track_id);
-    
-            // Debug log: Ensure file is in FormData
-            console.log(formData.get('file')); // Should show the file object
-    
+
+            // Correct endpoint URL - remove duplicate /api/
             const response = await apiClient.post('/student/upload/', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
             });
-    
-            showSuccessModal('Students uploaded successfully!');
-            setExcelFile(null);
-            document.getElementById('file-upload').value = '';
+
+            if (response.data.errors?.length) {
+                showErrorModal(
+                    `Completed with ${response.data.errors.length} errors`,
+                    response.data.errors.join('\n')
+                );
+            } else {
+                showSuccessModal(`Created ${response.data.created_count} students!`);
+                resetForm();
+            }
+
         } catch (error) {
-            const errorMsg = error.response?.data?.error || 'Failed to upload students';
-            console.error(error);
-            showErrorModal(errorMsg);
+            let errorMessage = 'Upload failed';
+
+            if (error.response) {
+                errorMessage = error.response.data?.error || errorMessage;
+            }
+
+            showErrorModal(errorMessage);
         } finally {
             setLoading(false);
         }
     };
-    
-    
+
     return (
         <Box sx={{ p: 3, background: '#f5f7fa', minHeight: '100vh' }}>
             <StyledCard>

@@ -1,0 +1,66 @@
+Problem
+On NixOS, Python packages like NumPy/Pandas often fail with errors like:
+
+libstdc++.so.6: cannot open shared object file
+
+libz.so.1: not found
+
+NumPy C-extensions failed to import
+
+This happens because:
+
+NixOS isolates system libraries differently than traditional Linux
+
+Virtual environments (venv) don’t automatically inherit Nix-provided libraries
+
+Solution
+We combined Nix (for system libraries) + venv (for Python packages).
+
+Step-by-Step Fix
+1. Create shell.nix
+(This ensures Nix provides the required system libraries)
+
+{ pkgs ? import <nixpkgs> {} }:
+
+    pkgs.mkShell {
+      # System dependencies
+      buildInputs = [
+        pkgs.python3    # Python interpreter
+        pkgs.zlib       # For libz.so.1 (required by NumPy/Pandas)
+        pkgs.stdenv.cc.cc.lib  # For libstdc++.so.6 (C++ library)
+        pkgs.libffi     # Common dependency for Python packages
+      ];
+    
+      # Tell the system where to find shared libraries
+      LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.zlib}/lib";
+    
+      # Automatically set up venv when entering `nix-shell`
+      shellHook = ''
+        # Create fresh virtual environment
+        python -m venv venv
+        source venv/bin/activate
+    
+        # Install NumPy/Pandas with proper build flags
+        pip install --no-cache-dir --no-build-isolation numpy pandas
+      '';
+    }
+
+nix-shell  # This activates the shell and runs the `shellHook`
+Automatically creates/activates venv
+
+Installs NumPy/Pandas correctly
+python -c 'import numpy as np; import pandas as pd; print(f"NumPy {np.__version__}, Pandas {pd.__version__}")'
+
+
+
+python -c 'import numpy as np; import pandas as pd; print(f"NumPy {np.__version__}, Pandas {pd.__version__}")'
+(Should print versions without errors)
+
+python manage.py runserver  # Django should work now
+
+Why This Works
+Step	                    	What It Does	                     Why It’s Needed
+buildInputs	                	Adds zlib, gcc, etc.	             NixOS doesn’t expose these globally
+LD_LIBRARY_PATH	Helps       	Python find .so files	             Fixes libz.so.1 / libstdc++ errors
+--no-build-isolation	    	Prevents conflicts with Nix	         Ensures pip uses Nix-provided libraries
+venv	                    	Isolates Python packages	         Avoids conflicts with system Python

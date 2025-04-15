@@ -317,7 +317,7 @@ class ExcelUploadSerializer(serializers.Serializer):
             try:
                 password = email_password_map.get(student.email)
                 if password:
-                    verification_url = f"{settings.SITE_URL}api/student/verify/{student.verification_code}/"
+                    verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
                     
                     subject = "Your Student Account Details"
                     message = f"""

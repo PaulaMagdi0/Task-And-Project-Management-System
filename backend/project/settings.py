@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.branch_location",
     "corsheaders",
     'django_extensions',
+    # 'ai_recommendations',
     'ai_recommendations',
     'chat_ai',
     'jokes',
@@ -47,18 +48,13 @@ INSTALLED_APPS = [
 # Add this import at the top of settings.py
 from datetime import timedelta
 
-# Then add your JWT configuration
-JWT_AUTH = {
-    'ACCESS_TOKEN_COOKIE': 'access_token',
-    'REFRESH_TOKEN_COOKIE': 'refresh_token',
-    'COOKIE_PATH': '/',
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
@@ -118,7 +114,8 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",
         "USER": "postgres",
-        "PASSWORD": "2625",  # Keep this secure
+        # "PASSWORD": "1234",  # Keep this secure Khalid
+        "PASSWORD": "2625",  # Keep this secure Mahmoud+Mano
         "HOST": "localhost",
         "PORT": "5432",
     }
@@ -162,3 +159,4 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "m.nasr266@gmail.com"
 EMAIL_HOST_PASSWORD = "efvh pzab wslt upfq"  # Keep this secure
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+

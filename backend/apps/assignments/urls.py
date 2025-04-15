@@ -13,6 +13,7 @@ urlpatterns = [
         get_submitters,
         name='assignment-submitters'
     ),
+    path('<int:track_id>/', AssignmentListView.as_view(), name='assignment-list'),
     path("instructor/<int:instructor_id>/tracks/", AvailableTracksByInstructorIdView.as_view(), name="instructor-tracks"),
     path("instructor/<int:instructor_id>/tracks-courses/", InstructorTracksWithCoursesView.as_view(), name="instructor-tracks-courses"),
     path('instructor/<int:instructor_id>/assignments/', InstructorAssignmentsView.as_view(), name='instructor-assignments'),

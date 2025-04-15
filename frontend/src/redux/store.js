@@ -10,7 +10,8 @@ import gradesReducer from './gradesSlice';
 import studentsReducer from './studentsSlice';  // Import the students reducer
 import createAssignmentReducer from './createassignmentsSlice';
 import listAssignmentsReducer from './viewassignmentSlice';
-
+import branchesReducer from './branchSlice';
+import staffReducer from './staffSlice'; // Import staff reducer
 const store = configureStore({
   reducer: {
     courses: coursesReducer,
@@ -23,7 +24,8 @@ const store = configureStore({
     students: studentsReducer,  // Add students reducer
     createassignments: createAssignmentReducer,
     listassignments: listAssignmentsReducer,
-
+    branches: branchesReducer, // Add branches reducer
+    staff: staffReducer, // Add staff reducer
 
   },
 });
