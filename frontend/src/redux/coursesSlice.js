@@ -31,7 +31,7 @@ export const createCourse = createAsyncThunk(
 const coursesSlice = createSlice({
   name: 'courses',
   initialState: {
-    data: null,
+    data: [],
     loading: false,
     error: null,
     success: null,
