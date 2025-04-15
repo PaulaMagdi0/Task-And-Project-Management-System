@@ -3,7 +3,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer, LoginSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
