@@ -60,3 +60,9 @@ env/
 **/migrations/*.pyc
 **/migrations/__init__.py
 **/migrations/__pycache__/
+
+backend/apps//migrations/
+backend/apps//migrations/.py
+backend/apps//migrations/.py
+backend/apps//migrations/init.py
+backend/apps/*/migrations/pycache/
