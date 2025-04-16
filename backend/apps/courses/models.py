@@ -35,6 +35,7 @@ class CourseTrack(models.Model):
     # This is the intermediary table
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     track = models.ForeignKey(Track, on_delete=models.CASCADE)
+
     created_at = models.DateTimeField(default=timezone.now)  # Set default to now
     
     class Meta:
