@@ -59,17 +59,35 @@ class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
             if not instance.branch:
                 raise ValidationError("Supervisors must be assigned to a branch")
 
-class CreateSupervisorView(generics.CreateAPIView):
-    queryset = StaffMember.objects.filter(role="supervisor")
+# class CreateSupervisorView(generics.CreateAPIView):
+#     queryset = StaffMember.objects.filter(role="supervisor")
+#     serializer_class = CreateSupervisorSerializer
+#     # permission_classes = [IsAdminOrBranchManager]
+#     permission_classes = []
+
+#     def perform_create(self, serializer):
+#         instance = serializer.save(role=StaffMember.Role.SUPERVISOR)
+#         if not instance.branch:
+#             raise ValidationError("Supervisors must be assigned to a branch")
+class CreateStaffView(generics.CreateAPIView):
+    queryset = StaffMember.objects.all()  # Broaden queryset to include all roles
     serializer_class = CreateSupervisorSerializer
-    # permission_classes = [IsAdminOrBranchManager]
-    permission_classes = []
+    permission_classes = []  # Adjust as needed, e.g., [IsAdminOrBranchManager]
 
     def perform_create(self, serializer):
-        instance = serializer.save(role=StaffMember.Role.SUPERVISOR)
+        # Get the role from validated data
+        role = serializer.validated_data.get('role')
+        
+        # Validate that role is either SUPERVISOR or BRANCH_MANAGER
+        if role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.BRANCH_MANAGER]:
+            raise ValidationError("This endpoint is only for creating Supervisors or Branch Managers.")
+        
+        # Save the instance without overriding the role
+        instance = serializer.save()
+        
+        # Ensure a branch is assigned for SUPERVISOR or BRANCH_MANAGER
         if not instance.branch:
-            raise ValidationError("Supervisors must be assigned to a branch")
-
+            raise ValidationError(f"{role} must be assigned to a branch.")
 
 
 class CreateInstructorView(APIView):

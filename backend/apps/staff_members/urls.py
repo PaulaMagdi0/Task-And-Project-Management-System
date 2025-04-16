@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     StaffMemberListCreateView,
     StaffMemberUpdateView,
-    CreateSupervisorView,
+    CreateStaffView,
     StaffMemberDeleteView,
     supervisor_instructor_by_id_view,
     InstructorListView,
@@ -15,7 +15,8 @@ urlpatterns = [
     path('', StaffMemberListCreateView.as_view(), name='staff-list'),
 
     # Create supervisor (branch manager functionality)
-    path('create/', CreateSupervisorView.as_view(), name='create-supervisor'),
+    # path('create/', CreateSupervisorView.as_view(), name='create-supervisor'),
+    path('create/',CreateStaffView.as_view(), name='create-supervisor'),
 
     path('create-instructor/', CreateInstructorView.as_view(), name='create-instructor'),
 

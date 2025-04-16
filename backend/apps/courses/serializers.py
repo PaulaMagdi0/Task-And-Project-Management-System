@@ -35,8 +35,6 @@ class CourseSerializer(serializers.ModelSerializer):
         course.tracks.set(tracks)
 
         return course
-
-
 class MinimalCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course

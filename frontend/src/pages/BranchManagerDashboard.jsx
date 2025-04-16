@@ -17,7 +17,7 @@ const BranchManagerDashboard = () => {
   const menuItems = [
     { id: 'addTrack', icon: <FiMap />, label: 'Add Track' },
     { id: 'addSupervisors', icon: <FiUserPlus />, label: 'Add Supervisor' },
-    { id: 'deleteSupervisor', icon: <FiUserMinus />, label: 'Delete Supervisor' },
+    // { id: 'deleteSupervisor', icon: <FiUserMinus />, label: 'Delete Supervisor' },
     { id: 'assignSupervisor', icon: <FiLink />, label: 'Assign Supervisor' },
     { id: 'viewTracks', icon: <FiList />, label: 'View Tracks' },
   ];

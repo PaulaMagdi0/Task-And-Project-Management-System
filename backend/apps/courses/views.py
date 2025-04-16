@@ -50,7 +50,6 @@ class CourseListView(generics.ListCreateAPIView):
 
         print(f"✅ Associated course '{course}' with tracks")
         logger.debug(f"✅ Associated course '{course}' with tracks")
-
 class StaffMemberCoursesView(APIView):
     """
     GET: Get all courses assigned to a specific instructor (StaffMember).
