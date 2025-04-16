@@ -6,27 +6,36 @@ from apps.staff_members.models import StaffMember
 
 from rest_framework import serializers
 from .models import Course, StaffMember
-
 class CourseSerializer(serializers.ModelSerializer):
-    instructor = serializers.PrimaryKeyRelatedField(queryset=StaffMember.objects.all(), required=False, allow_null=True)
+    instructor = serializers.PrimaryKeyRelatedField(
+        queryset=StaffMember.objects.all(), required=False, allow_null=True
+    )
+    tracks = serializers.PrimaryKeyRelatedField(
+        queryset=Track.objects.all(), many=True, write_only=True
+    )
 
     class Meta:
         model = Course
         fields = ['id', 'name', 'description', 'created_at', 'instructor', 'tracks']
 
     def create(self, validated_data):
-        # Check if instructor is provided or if it is allowed to be null
-        instructor = validated_data.get('instructor', None)
-        
-        # Create the course instance without an instructor if it's null
+        # Extract instructor and tracks from the validated data
+        instructor = validated_data.pop('instructor', None)
+        tracks = validated_data.pop('tracks', [])
+
+        # Create the course instance
         course = Course.objects.create(**validated_data)
 
+        # If an instructor is provided, associate it with the course
         if instructor:
-            # If instructor is provided, associate it with the course
             course.instructor = instructor
             course.save()
 
+        # Add many-to-many relationships for tracks
+        course.tracks.set(tracks)
+
         return course
+
 
 class MinimalCourseSerializer(serializers.ModelSerializer):
     class Meta:

@@ -1,3 +1,4 @@
+from apps.courses.models import CourseTrack  # Make sure this is imported
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -10,7 +11,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
 
 class CourseListView(generics.ListCreateAPIView):
     """
@@ -21,49 +21,35 @@ class CourseListView(generics.ListCreateAPIView):
     serializer_class = CourseSerializer
 
     def perform_create(self, serializer):
-        # DEBUG: print validated data
+        """
+        Handles the creation of a new course and associating it with tracks.
+        """
         print("✅ Validated Data:", serializer.validated_data)
         logger.debug(f"✅ Validated Data: {serializer.validated_data}")
 
-        # Save course first
+        # Create the course instance
         course = serializer.save()
 
-        # DEBUG: print created course
-        print("✅ Created Course:", course)
-        logger.debug(f"✅ Created Course: {course}")
-
-        # Get the instructor from validated data (it can be null)
+        # Fetch instructor and tracks from validated data
         instructor = serializer.validated_data.get('instructor', None)
+        tracks = serializer.validated_data.get('tracks', [])
 
-        # DEBUG: print instructor
         print("👨‍🏫 Instructor:", instructor)
         logger.debug(f"👨‍🏫 Instructor: {instructor}")
 
-        # If an instructor is provided, assign it to the course
         if instructor:
             course.instructor = instructor
             course.save()
-            # DEBUG: print instructor assignment
-            print(f"🔗 Assigned instructor '{instructor}' to course '{course}'")
-            logger.debug(f"🔗 Assigned instructor '{instructor}' to course '{course}'")
-        else:
-            print(f"⚠️ No instructor provided, setting to None.")
-            logger.debug("⚠️ No instructor provided, setting to None.")
 
-        # Get the tracks from validated data
-        tracks = serializer.validated_data.get('tracks', [])
-
-        # DEBUG: print track list
+        # Add tracks to the course using the set() method to handle many-to-many relation
         print("📦 Tracks to associate:", tracks)
         logger.debug(f"📦 Tracks to associate: {tracks}")
 
-        # Add the course to each track's M2M relationship
-        for track in tracks:
-            print(f"🔗 Adding course '{course}' to track '{track}'")
-            track.courses.add(course)
-            track.save()
+        # Associate the tracks using the set method to handle M2M relationship
+        course.tracks.set(tracks)
 
-
+        print(f"✅ Associated course '{course}' with tracks")
+        logger.debug(f"✅ Associated course '{course}' with tracks")
 
 class StaffMemberCoursesView(APIView):
     """

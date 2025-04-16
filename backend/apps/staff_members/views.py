@@ -116,11 +116,10 @@ class SupervisorBulkUploadView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
-    """Retrieve the track and courses assigned to a supervisor/instructor by staff member ID."""
+    """Retrieve the tracks and courses assigned to a supervisor or instructor by staff member ID."""
 
     staff_member = get_object_or_404(StaffMember, id=staff_id)
 
@@ -168,7 +167,15 @@ def supervisor_instructor_by_id_view(request, staff_id):
                         })
 
                 taught_courses = Course.objects.filter(instructor=staff_member)
-                taught_courses_serialized = CourseSerializer(taught_courses, many=True).data
+                taught_courses_serialized = []
+                for course in taught_courses:
+                    taught_courses_serialized.append({
+                        "id": course.id,
+                        "name": course.name,
+                        "description": course.description,
+                        "created_at": course.created_at,
+                        "tracks": [{"id": t.id, "name": t.name} for t in course.tracks.all()],
+                    })
 
                 return Response({
                     "status": "success",
@@ -190,10 +197,20 @@ def supervisor_instructor_by_id_view(request, staff_id):
         elif staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
             if courses.exists():
-                course_data = CourseSerializer(courses, many=True).data
-
+                course_data = []
                 track_data = []
+
                 for course in courses:
+                    # Append course info
+                    course_data.append({
+                        "id": course.id,
+                        "name": course.name,
+                        "description": course.description,
+                        "created_at": course.created_at,
+                        "tracks": [{"id": t.id, "name": t.name} for t in course.tracks.all()]
+                    })
+
+                    # Collect associated track info (avoid duplicates)
                     for track in course.tracks.all():
                         track_data.append({
                             "id": track.id,
@@ -205,9 +222,12 @@ def supervisor_instructor_by_id_view(request, staff_id):
                             "created_at": track.created_at
                         })
 
+                # Remove duplicate tracks using dictionary keys
+                unique_tracks = list({t['id']: t for t in track_data}.values())
+
                 return Response({
                     "status": "success",
-                    "tracks": track_data,
+                    "tracks": unique_tracks,
                     "courses": course_data
                 }, status=status.HTTP_200_OK)
 
@@ -219,7 +239,7 @@ def supervisor_instructor_by_id_view(request, staff_id):
                     "courses": []
                 }, status=status.HTTP_200_OK)
 
-        # Fallback if not supervisor or instructor
+        # Fallback if neither supervisor nor instructor
         return Response({
             "status": "success",
             "tracks": [],
