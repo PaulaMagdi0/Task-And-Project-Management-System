@@ -1,67 +1,84 @@
 from rest_framework import serializers
 from .models import Grade
 from django.core.exceptions import PermissionDenied
+from apps.submission.models import AssignmentSubmission
 
 class GradeSerializer(serializers.ModelSerializer):
+    submission = serializers.PrimaryKeyRelatedField(
+        queryset=AssignmentSubmission.objects.all(),
+        required=True
+    )
+
     class Meta:
         model = Grade
         fields = [
             'id', 'student', 'track', 'assignment', 'submission', 'course',
-            'score', 'feedback', 'is_score_visible', 'is_feedback_visible',
-            'graded_date', 'created_at'
+            'score', 'feedback', 'graded_date', 'created_at'
         ]
         read_only_fields = [
-            'id', 'student', 'track', 'assignment', 'submission',
-            'course', 'graded_date', 'created_at'
+            'id', 'student', 'track', 'assignment', 'course', 
+            'graded_date', 'created_at'
         ]
 
-    def to_representation(self, instance):
-        """Customize API response based on visibility settings and user permissions"""
-        data = super().to_representation(instance)
-        request = self.context.get('request')
-        
-        # Check if user has permission to view hidden grades
-        can_view_hidden = request and (request.user.is_staff or 
-                                      request.user == instance.assignment.instructor)
-
-        # Handle score visibility
-        if not instance.is_score_visible and not can_view_hidden:
-            data.pop('score', None)
-            data['score_hidden'] = True
-
-        # Handle feedback visibility
-        if not instance.is_feedback_visible and not can_view_hidden:
-            data.pop('feedback', None)
-            data['feedback_hidden'] = True
-
-        return data
+    def validate_score(self, value):
+        """Ensure score is between 0-10"""
+        if not (0 <= value <= 10):
+            raise serializers.ValidationError("Score must be between 0 and 10.")
+        return value
 
     def validate(self, data):
-        """Validate grade updates based on user permissions"""
+        """Validate permissions and required fields"""
         request = self.context.get('request')
         
-        if request and request.method == 'PATCH':
-            # Check if user has permission to grade
-            if not request.user.has_perm('assignments.grade_assignment'):
-                raise PermissionDenied("Only instructors or above can grade assignments.")
+        # Check permissions for POST/PATCH
+        if request and request.method in ['POST', 'PATCH']:
+            if not (request.user.is_staff or request.user.role == 'instructor'):
+                raise PermissionDenied("Only instructors can grade assignments.")
         
+        # For POST requests, ensure submission exists
+        if request and request.method == 'POST':
+            if 'submission' not in data:
+                raise serializers.ValidationError({"submission": "This field is required."})
+            
+            submission = data['submission']
+            if not AssignmentSubmission.objects.filter(id=submission.id).exists():
+                raise serializers.ValidationError({"submission": "Invalid submission ID."})
+
         return data
 
+    def create(self, validated_data):
+        submission = validated_data['submission']
+        student = submission.student
+        assignment = submission.assignment
+
+        if Grade.objects.filter(student=student, assignment=assignment, submission=submission).exists():
+            raise serializers.ValidationError("This submission has already been graded.")
+
+        validated_data['student'] = student
+        validated_data['assignment'] = assignment
+        validated_data['course'] = assignment.course
+        validated_data['track'] = assignment.track
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
-        """Handle grade updates with permission checks"""
+        """Handle updates with permission checks"""
         request = self.context.get('request')
         
-        # Only instructors can update certain fields
+        # Restrict field updates for non-staff
         if request and not request.user.is_staff:
-            validated_data.pop('score', None)
-            validated_data.pop('feedback', None)
-            validated_data.pop('is_score_visible', None)
-            validated_data.pop('is_feedback_visible', None)
+            for field in ['score', 'feedback']:  # Removed visibility fields
+                validated_data.pop(field, None)
 
-        # Automatically set graded date when score/feedback is updated
+        # Update graded_date if score/feedback changes
         if 'score' in validated_data or 'feedback' in validated_data:
             validated_data['graded_date'] = serializers.DateTimeField().to_representation(
                 serializers.DateTimeField().get_default()
             )
 
         return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        """Basic representation without visibility controls"""
+        data = super().to_representation(instance)
+        # Removed visibility control logic since the fields don't exist
+        return data
