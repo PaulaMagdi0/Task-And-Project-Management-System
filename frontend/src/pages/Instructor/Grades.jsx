@@ -38,6 +38,8 @@ import {
   Schedule as ScheduleIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Cancel as CancelIcon,
+  Send as SendIcon,
 } from "@mui/icons-material";
 import InputAdornment from "@mui/material/InputAdornment";
 import { format } from "date-fns";
@@ -119,20 +121,26 @@ const Grades = () => {
       const dataWithGrades = await Promise.all(
         response.data.submitters.map(async (student) => {
           try {
-            const [submissionRes, gradeRes] = await Promise.all([
-              apiClient.get(`submission/${student.student_id}/`),
-              apiClient.get(`grades/${student.student_id}/`),
-            ]);
-
+            const { data } = await apiClient.get(
+              `submission/assignments/${assignmentId}/students/${student.student_id}/`
+            );
             return {
               ...student,
-              submission_id: submissionRes.data.id,
-              file_url: submissionRes.data.url,
-              submission_date: submissionRes.data.submission_date,
-              existingEvaluation: gradeRes.data[0] || null,
+              existingEvaluation:
+                data.submission?.score !== null &&
+                data.submission?.feedback !== null
+                  ? data.submission
+                  : null,
             };
           } catch (err) {
-            return student;
+            return {
+              ...student,
+              submitted: false,
+              submission_id: null,
+              submission_date: null,
+              file_url: null,
+              existingEvaluation: null,
+            };
           }
         })
       );
@@ -156,28 +164,71 @@ const Grades = () => {
     }
   };
 
-  const handleEditGrade = async (gradeId, studentId) => {
+  const handleEditGrade = async (studentId) => {
     try {
+      const rawFeedback = feedback[studentId]?.trim() || "";
+      const rawScore = grades[studentId] || "";
+
+      // Validate feedback
+      if (!rawFeedback) {
+        setSnackbar({
+          open: true,
+          message: "Please provide feedback before saving",
+          severity: "error",
+        });
+        return;
+      }
+
+      // Validate score
+      const numericScore = parseFloat(rawScore);
+      if (isNaN(numericScore) || numericScore < 0 || numericScore > 10) {
+        setSnackbar({
+          open: true,
+          message: "Please enter a valid score between 0 and 10",
+          severity: "error",
+        });
+        return;
+      }
+
+      // Prepare payload
       const payload = {
-        score: grades[studentId],
-        feedback: feedback[studentId].trim(),
+        score: numericScore,
+        feedback: rawFeedback,
       };
 
       setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
 
-      await apiClient.put(`/grades/detail/${gradeId}/`, payload);
+      // Send request
+      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
+      await apiClient.put(endpoint, payload);
+
+      // Update UI state
+      setExistingEvaluations((prev) => ({
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          ...payload,
+          submission_time: new Date().toISOString(), // Update grade time
+        },
+      }));
 
       setSnackbar({
         open: true,
         message: "Evaluation updated successfully",
         severity: "success",
       });
+
+      // Refresh data and exit edit mode
+      await fetchSubmissionStatus(selectedAssignment);
       setIsEditing((prev) => ({ ...prev, [studentId]: false }));
-      fetchSubmissionStatus(selectedAssignment);
     } catch (err) {
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Failed to update evaluation";
       setSnackbar({
         open: true,
-        message: err.response?.data?.detail || "Failed to update evaluation",
+        message: errorMessage,
         severity: "error",
       });
     } finally {
@@ -185,23 +236,103 @@ const Grades = () => {
     }
   };
 
-  const handleDeleteGrade = async (gradeId) => {
+  const handleDeleteGrade = async () => {
     try {
-      await apiClient.delete(`/grades/detail/${gradeId}/`);
+      const studentId = deleteConfirm;
+      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
+      await apiClient.delete(endpoint);
+
+      // Force immediate UI update
+      setExistingEvaluations((prev) => {
+        const updated = { ...prev };
+        delete updated[studentId];
+        return updated;
+      });
+
+      // Refresh data while maintaining submission visibility
+      const updatedSubmitters = submissionData.submitters.map((student) =>
+        student.student_id === studentId
+          ? { ...student, existingEvaluation: null }
+          : student
+      );
+
+      setSubmissionData((prev) => ({
+        ...prev,
+        submitters: updatedSubmitters,
+      }));
+
       setSnackbar({
         open: true,
-        message: "Evaluation deleted successfully",
+        message: "Evaluation cleared successfully",
         severity: "success",
       });
-      fetchSubmissionStatus(selectedAssignment);
     } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.detail || "Failed to delete evaluation",
-        severity: "error",
-      });
+      // Error handling
     }
     setDeleteConfirm(null);
+  };
+  const handleSubmitFeedback = async (studentId) => {
+    try {
+      const student = filteredStudents.find((s) => s.student_id === studentId);
+      if (!student?.submission_id) {
+        setSnackbar({
+          open: true,
+          message: "Submission data not available",
+          severity: "error",
+        });
+        return;
+      }
+
+      const feedbackText = feedback[studentId]?.trim();
+      if (!feedbackText) {
+        setSnackbar({
+          open: true,
+          message: "Please provide feedback before submitting",
+          severity: "error",
+        });
+        return;
+      }
+
+      const gradeValue = parseFloat(grades[studentId]);
+      if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 10) {
+        setSnackbar({
+          open: true,
+          message: "Please enter a valid grade between 0 and 10",
+          severity: "error",
+        });
+        return;
+      }
+
+      const payload = {
+        score: gradeValue,
+        feedback: feedbackText,
+      };
+
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
+
+      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
+      await apiClient.post(endpoint, payload);
+
+      setFeedback((prev) => ({ ...prev, [studentId]: "" }));
+      setGrades((prev) => ({ ...prev, [studentId]: "" }));
+      await fetchSubmissionStatus(selectedAssignment);
+
+      setSnackbar({
+        open: true,
+        message: "Evaluation submitted successfully",
+        severity: "success",
+      });
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.detail || "Failed to submit evaluation";
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: "error",
+      });
+    } finally {
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
+    }
   };
 
   const handleTrackChange = (event) => {
@@ -229,57 +360,12 @@ const Grades = () => {
 
   const handleGradeChange = (studentId) => (e) => {
     const value = e.target.value;
-    if (value >= 0 && value <= 10) {
+    const numericValue = parseFloat(value);
+    if (
+      value === "" ||
+      (!isNaN(numericValue) && numericValue >= 0 && numericValue <= 10)
+    ) {
       setGrades({ ...grades, [studentId]: value });
-    }
-  };
-
-  const handleSubmitFeedback = async (studentId) => {
-    try {
-      const student = filteredStudents.find((s) => s.student_id === studentId);
-      if (!student?.submission_id) {
-        setSnackbar({
-          open: true,
-          message: "Submission data not available",
-          severity: "error",
-        });
-        return;
-      }
-
-      const payload = {
-        student: studentId,
-        track: selectedTrack,
-        course: selectedCourse,
-        assignment: selectedAssignment,
-        submission: student.submission_id,
-        score: parseInt(grades[studentId]),
-        feedback: feedback[studentId].trim(),
-      };
-
-      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
-
-      await apiClient.post("/grades/", payload);
-
-      setFeedback((prev) => ({ ...prev, [studentId]: "" }));
-      setGrades((prev) => ({ ...prev, [studentId]: "" }));
-      fetchSubmissionStatus(selectedAssignment);
-
-      setSnackbar({
-        open: true,
-        message: "Evaluation submitted successfully",
-        severity: "success",
-      });
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message:
-          err.response?.data?.submission?.[0] ||
-          err.response?.data?.detail ||
-          "Failed to submit evaluation",
-        severity: "error",
-      });
-    } finally {
-      setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
     }
   };
 
@@ -292,12 +378,6 @@ const Grades = () => {
         ...submissionData.submitters.filter(
           (student) => student.existingEvaluation
         ),
-        ...submissionData.non_submitters.map((student) => ({
-          ...student,
-          submitted: false,
-          submission_date: null,
-          file_url: null,
-        })),
       ]
     : [];
 
@@ -415,7 +495,7 @@ const Grades = () => {
                         <Typography variant="h6">{student.name}</Typography>
                         {student.submitted ? (
                           <Chip
-                            label="Evaluated"
+                            label="Submitted"
                             color="success"
                             icon={<CheckCircleIcon />}
                           />
@@ -532,41 +612,43 @@ const Grades = () => {
                                       multiline
                                       rows={4}
                                       label="Feedback"
-                                      value={
-                                        feedback[student.student_id] ||
-                                        student.existingEvaluation.feedback
+                                      error={
+                                        !feedback[student.student_id]?.trim()
                                       }
+                                      helperText={
+                                        !feedback[student.student_id]?.trim() &&
+                                        "Feedback is required"
+                                      }
+                                      value={feedback[student.student_id] || ""}
                                       onChange={handleFeedbackChange(
                                         student.student_id
                                       )}
-                                      InputProps={{
-                                        startAdornment: (
-                                          <InputAdornment position="start">
-                                            <FeedbackIcon color="action" />
-                                          </InputAdornment>
-                                        ),
-                                      }}
                                     />
 
                                     <TextField
                                       fullWidth
                                       type="number"
                                       label="Grade"
-                                      inputProps={{ min: 0, max: 10 }}
-                                      value={
-                                        grades[student.student_id] ||
-                                        student.existingEvaluation.score
+                                      error={
+                                        isNaN(grades[student.student_id]) ||
+                                        grades[student.student_id] < 0 ||
+                                        grades[student.student_id] > 10
                                       }
+                                      helperText={
+                                        (isNaN(grades[student.student_id]) ||
+                                          grades[student.student_id] < 0 ||
+                                          grades[student.student_id] > 10) &&
+                                        "Must be between 0-10"
+                                      }
+                                      inputProps={{
+                                        min: 0,
+                                        max: 10,
+                                        step: "0.1",
+                                      }}
+                                      value={grades[student.student_id] || ""}
                                       onChange={handleGradeChange(
                                         student.student_id
                                       )}
-                                      InputProps={{
-                                        startAdornment: (
-                                          <InputAdornment position="start">
-                                            <GradeIcon color="action" />
-                                          </InputAdornment>
-                                        ),
-                                      }}
                                     />
 
                                     <Box
@@ -590,18 +672,10 @@ const Grades = () => {
                                       <Button
                                         variant="contained"
                                         onClick={() =>
-                                          handleEditGrade(
-                                            student.existingEvaluation.id,
-                                            student.student_id
-                                          )
-                                        }
+                                          handleEditGrade(student.student_id)
+                                        } // Pass student ID instead of evaluation ID
                                         disabled={
                                           submitLoading[student.student_id]
-                                        }
-                                        startIcon={
-                                          submitLoading[student.student_id] && (
-                                            <CircularProgress size={20} />
-                                          )
                                         }
                                       >
                                         {submitLoading[student.student_id]
@@ -612,7 +686,6 @@ const Grades = () => {
                                   </>
                                 ) : (
                                   <>
-                                    {/* Existing feedback and grade display */}
                                     <Box
                                       sx={{
                                         display: "flex",
@@ -625,9 +698,7 @@ const Grades = () => {
                                         color="error"
                                         startIcon={<DeleteIcon />}
                                         onClick={() =>
-                                          setDeleteConfirm(
-                                            student.existingEvaluation.id
-                                          )
+                                          setDeleteConfirm(student.student_id)
                                         }
                                       >
                                         Delete
@@ -644,12 +715,13 @@ const Grades = () => {
                                             ...prev,
                                             [student.student_id]:
                                               student.existingEvaluation
-                                                .feedback,
+                                                ?.feedback || "", // Handle null
                                           }));
                                           setGrades((prev) => ({
                                             ...prev,
                                             [student.student_id]:
-                                              student.existingEvaluation.score,
+                                              student.existingEvaluation
+                                                ?.score || "", // Handle null
                                           }));
                                         }}
                                       >
@@ -657,7 +729,7 @@ const Grades = () => {
                                       </Button>
                                     </Box>
 
-                                    {/* Existing feedback and grade display content */}
+                                    {/* Updated feedback and grade display */}
                                     <Box>
                                       <Box
                                         sx={{
@@ -694,7 +766,6 @@ const Grades = () => {
                                       </Typography>
                                     </Box>
 
-                                    {/* Grading Summary */}
                                     <Box>
                                       <Box
                                         sx={{
@@ -759,6 +830,33 @@ const Grades = () => {
                                             </Box>
                                           </Card>
                                         </Grid>
+                                        <Grid item xs={12} md={6}>
+                                          <Card
+                                            sx={{
+                                              p: 2,
+                                              textAlign: "center",
+                                              alignContent: "center",
+                                            }}
+                                          >
+                                            <Typography
+                                              variant="overline"
+                                              color="text.secondary"
+                                            >
+                                              Submission Time
+                                            </Typography>
+                                            <Typography
+                                              variant="h6"
+                                              sx={{ mt: 1 }}
+                                            >
+                                              {format(
+                                                new Date(
+                                                  student.existingEvaluation.submission_time
+                                                ),
+                                                "PPpp"
+                                              )}
+                                            </Typography>
+                                          </Card>
+                                        </Grid>
                                       </Grid>
                                     </Box>
                                   </>
@@ -799,7 +897,7 @@ const Grades = () => {
 
                                   <TextField
                                     fullWidth
-                                    type="number"
+                                    type="text"
                                     label="Grade"
                                     inputProps={{ min: 0, max: 10 }}
                                     value={grades[student.student_id] || ""}
@@ -880,7 +978,7 @@ const Grades = () => {
         </Box>
       )}
 
-      {/* Add Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog */}
       <Dialog
         open={Boolean(deleteConfirm)}
         onClose={() => setDeleteConfirm(null)}
@@ -905,16 +1003,14 @@ const Grades = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -21,12 +21,10 @@ import {
 } from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
-  Assignment as AssignmentIcon,
   Person as PersonIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   InsertDriveFile as FileIcon,
-  Link as LinkIcon,
 } from "@mui/icons-material";
 import apiClient from "../../services/api";
 
@@ -109,26 +107,30 @@ const Submissions = () => {
       const dataWithGrades = await Promise.all(
         response.data.submitters.map(async (student) => {
           try {
-            const [submissionRes, gradeRes] = await Promise.all([
-              apiClient.get(`submission/${student.student_id}/`),
-              apiClient.get(`grades/${student.student_id}/`), // Updated endpoint
-            ]);
-
+            const { data } = await apiClient.get(
+              `submission/assignments/${assignmentId}/students/${student.student_id}/`
+            );
             return {
               ...student,
-              submission_id: submissionRes.data.id,
-              submission_assignment_url: submissionRes.data.url,
-              submission_date: submissionRes.data.submission_date,
-              existingEvaluation: gradeRes.data[0] || null, // Take first item from array
+              submitted: data.submission?.status === "Submitted",
+              submission_id: data.submission?.id,
+              submission_date: data.submission?.submission_time,
+              file_url: data.submission?.file_url,
+              existingEvaluation: data.submission || null,
             };
           } catch (err) {
-            console.error("Error fetching data:", err);
-            return student;
+            return {
+              ...student,
+              submitted: false,
+              submission_id: null,
+              submission_date: null,
+              file_url: null,
+              existingEvaluation: null,
+            };
           }
         })
       );
 
-      // Store evaluations in state
       const evaluations = {};
       dataWithGrades.forEach((student) => {
         if (student.existingEvaluation) {
@@ -142,7 +144,6 @@ const Submissions = () => {
         submitters: dataWithGrades,
       });
     } catch (err) {
-      console.error("Fetch error:", err);
       setError("Failed to fetch submission data");
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
@@ -187,31 +188,30 @@ const Submissions = () => {
   const handleSubmitFeedback = async (studentId) => {
     try {
       const student = filteredStudents.find((s) => s.student_id === studentId);
-      if (!student?.submission_id) {
-        setSnackbar({
-          open: true,
-          message: "Submission data not available",
-          severity: "error",
-        });
-        return;
-      }
+      console.log("Student:", student);
+      // if (!student?.submission_id) {
+      //   setSnackbar({
+      //     open: true,
+      //     message: "Submission data not available",
+      //     severity: "error",
+      //   });
+      //   return;
+      // }
 
-      // Updated payload with all required fields
       const payload = {
-        student: studentId,
-        track: selectedTrack,
-        course: selectedCourse,
-        assignment: selectedAssignment,
-        submission: student.submission_id,
         score: parseInt(grades[studentId]),
-        feedback: feedback[studentId].trim(),
+        feedback: feedback[studentId]?.trim() || "",
       };
 
       setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
 
-      await apiClient.post("/grades/", payload);
+      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
+      if (existingEvaluations[studentId]) {
+        await apiClient.put(endpoint, payload);
+      } else {
+        await apiClient.post(endpoint, payload);
+      }
 
-      // Clear inputs and refresh
       setFeedback((prev) => ({ ...prev, [studentId]: "" }));
       setGrades((prev) => ({ ...prev, [studentId]: "" }));
       fetchSubmissionStatus(selectedAssignment);
@@ -222,13 +222,9 @@ const Submissions = () => {
         severity: "success",
       });
     } catch (err) {
-      console.error("Submission error:", err);
       setSnackbar({
         open: true,
-        message:
-          err.response?.data?.submission?.[0] ||
-          err.response?.data?.detail ||
-          "Failed to submit evaluation",
+        message: err.response?.data?.detail || "Failed to submit evaluation",
         severity: "error",
       });
     } finally {
@@ -439,7 +435,9 @@ const Submissions = () => {
                     <Divider sx={{ mb: 2 }} />
 
                     {student.submitted ? (
-                      existingEvaluations[student.student_id] ? (
+                      student.existingEvaluation?.score !== null &&
+                      student.existingEvaluation?.feedback !== null ? (
+                        // Display existing evaluation details
                         <>
                           <TextField
                             fullWidth
@@ -447,19 +445,31 @@ const Submissions = () => {
                             rows={3}
                             label="Feedback"
                             value={
-                              existingEvaluations[student.student_id].feedback
+                              student.existingEvaluation.feedback ||
+                              "No feedback provided"
                             }
                             disabled
-                            sx={{ mb: 2 }}
+                            sx={{
+                              mb: 2,
+                              "& .Mui-disabled": {
+                                color: "text.primary",
+                                "-webkit-text-fill-color": "unset",
+                              },
+                            }}
                           />
                           <TextField
                             fullWidth
                             type="number"
                             label="Grade (0-10)"
-                            value={
-                              existingEvaluations[student.student_id].score
-                            }
+                            value={student.existingEvaluation.score}
                             disabled
+                            inputProps={{ min: 0, max: 10 }}
+                            sx={{
+                              "& .Mui-disabled": {
+                                color: "text.primary",
+                                "-webkit-text-fill-color": "unset",
+                              },
+                            }}
                           />
                           <Typography
                             variant="body2"
@@ -468,13 +478,12 @@ const Submissions = () => {
                           >
                             Graded on:{" "}
                             {new Date(
-                              existingEvaluations[
-                                student.student_id
-                              ].graded_date
+                              student.existingEvaluation.submission_time
                             ).toLocaleString()}
                           </Typography>
                         </>
                       ) : (
+                        // Show evaluation form for submitted but ungraded/null entries
                         <>
                           <TextField
                             fullWidth
@@ -487,7 +496,7 @@ const Submissions = () => {
                           />
                           <TextField
                             fullWidth
-                            type="number"
+                            type="text"
                             label="Grade (0-10)"
                             inputProps={{ min: 0, max: 10 }}
                             value={grades[student.student_id] || ""}
@@ -526,13 +535,8 @@ const Submissions = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        >
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -127,3 +127,119 @@ class AssignmentDetailView(APIView):
             return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AssignmentStudentDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsInstructor]
+
+    def get_assignment_submission(self, assignment_id, student_id):
+        assignment = get_object_or_404(Assignment, id=assignment_id)
+        student = get_object_or_404(Student, id=student_id)
+
+        assignment_student = AssignmentStudent.objects.filter(
+            assignment=assignment,
+            student=student
+        ).first()
+
+        if not assignment_student:
+            raise ValidationError("Student was not assigned this assignment.")
+
+        course = assignment_student.course
+        track = assignment_student.track
+
+        submission = AssignmentSubmission.objects.filter(
+            assignment=assignment,
+            student=student,
+            course=course,
+            track=track
+        ).first()
+
+        return assignment, student, submission, course, track
+
+    def get(self, request, assignment_id, student_id):
+        try:
+            assignment, student, submission, course, track = self.get_assignment_submission(assignment_id, student_id)
+
+            submission_data = {
+                "student": student.full_name,
+                "course": course.name,
+                "track": track.name,
+                "status": "Submitted" if submission else "Not Submitted"
+            }
+
+            if submission:
+                submission_data.update({
+                    "submission_time": submission.submission_date,
+                    "file_url": submission.file_url,
+                    "feedback": submission.feedback,
+                    "score": submission.score
+                })
+
+            assignment_data = AssignmentDetailSerializer(assignment).data
+
+            return Response({
+                "assignment": assignment_data,
+                "submission": submission_data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+    def post(self, request, assignment_id, student_id):
+        return self._update_feedback(request, assignment_id, student_id, create_only=True)
+
+    def put(self, request, assignment_id, student_id):
+        return self._update_feedback(request, assignment_id, student_id)
+
+    def patch(self, request, assignment_id, student_id):
+        return self._update_feedback(request, assignment_id, student_id)
+
+    def delete(self, request, assignment_id, student_id):
+        try:
+            _, _, submission, _, _ = self.get_assignment_submission(assignment_id, student_id)
+
+            if not submission:
+                return Response({"error": "Submission not found."}, status=404)
+
+            # Clear only feedback and score
+            submission.feedback = None
+            submission.score = None
+            submission.save()
+
+            return Response({"message": "Feedback and score removed successfully."}, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+    def _update_feedback(self, request, assignment_id, student_id, create_only=False):
+        try:
+            _, _, submission, _, _ = self.get_assignment_submission(assignment_id, student_id)
+
+            if not submission:
+                return Response({"error": "Submission not found."}, status=404)
+
+            if create_only and (submission.feedback or submission.score):
+                return Response({"error": "Feedback already exists. Use PUT/PATCH to update."}, status=400)
+
+            feedback = request.data.get("feedback", submission.feedback)
+            score = request.data.get("score", submission.score)
+
+            if score is not None:
+                try:
+                    score = float(score)
+                    if not (0 <= score <= 100):
+                        return Response({"error": "Score must be between 0 and 100."}, status=400)
+                except ValueError:
+                    return Response({"error": "Score must be a number."}, status=400)
+
+            submission.feedback = feedback
+            submission.score = score
+            submission.save()
+
+            return Response({
+                "message": "Feedback and score saved successfully.",
+                "feedback": submission.feedback,
+                "score": submission.score
+            }, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
