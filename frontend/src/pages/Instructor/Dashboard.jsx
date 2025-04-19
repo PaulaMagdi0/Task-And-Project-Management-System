@@ -118,7 +118,7 @@ const InstructorDashboard = () => {
       path: "/instructor/dashboard/submissions",
     },
     {
-      text: "Grades",
+      text: "Grades & Feedbacks",
       icon: <FiAward size={20} />,
       path: "/instructor/dashboard/grades",
     },

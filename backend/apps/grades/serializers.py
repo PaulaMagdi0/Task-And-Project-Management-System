@@ -2,12 +2,23 @@ from rest_framework import serializers
 from .models import Grade
 from django.core.exceptions import PermissionDenied
 from apps.submission.models import AssignmentSubmission
+from datetime import datetime
+from django.utils.timezone import now
+import logging
 
+logger = logging.getLogger(__name__)
 class GradeSerializer(serializers.ModelSerializer):
     submission = serializers.PrimaryKeyRelatedField(
         queryset=AssignmentSubmission.objects.all(),
         required=True
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make 'submission' read-only during updates
+        if self.instance is not None:
+            self.fields['submission'].read_only = True
+            self.fields['submission'].required = False
 
     class Meta:
         model = Grade
@@ -31,7 +42,7 @@ class GradeSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         
         # Check permissions for POST/PATCH
-        if request and request.method in ['POST', 'PATCH']:
+        if request and request.method in ['POST', 'PUT', 'PATCH']:  # Added 'PUT'
             if not (request.user.is_staff or request.user.role == 'instructor'):
                 raise PermissionDenied("Only instructors can grade assignments.")
         
@@ -60,25 +71,24 @@ class GradeSerializer(serializers.ModelSerializer):
         validated_data['track'] = assignment.track
         return super().create(validated_data)
 
+
     def update(self, instance, validated_data):
         """Handle updates with permission checks"""
         request = self.context.get('request')
-        
-        # Restrict field updates for non-staff
-        if request and not request.user.is_staff:
-            for field in ['score', 'feedback']:  # Removed visibility fields
-                validated_data.pop(field, None)
 
-        # Update graded_date if score/feedback changes
+        # Restrict field updates for non-staff users
+        # if request and not request.user.is_staff:
+        #     for field in ['score', 'feedback']:
+        #         validated_data.pop(field, None)
+
+        # If 'score' or 'feedback' is updated, set the graded_date to now
         if 'score' in validated_data or 'feedback' in validated_data:
-            validated_data['graded_date'] = serializers.DateTimeField().to_representation(
-                serializers.DateTimeField().get_default()
-            )
+            validated_data['graded_date'] = now()
 
         return super().update(instance, validated_data)
+
 
     def to_representation(self, instance):
         """Basic representation without visibility controls"""
         data = super().to_representation(instance)
-        # Removed visibility control logic since the fields don't exist
         return data

@@ -22,6 +22,11 @@ import {
   Collapse,
   Paper,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
@@ -31,9 +36,9 @@ import {
   Grade as GradeIcon,
   Feedback as FeedbackIcon,
   Schedule as ScheduleIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import SendIcon from "@mui/icons-material/Send";
 import InputAdornment from "@mui/material/InputAdornment";
 import { format } from "date-fns";
 import apiClient from "../../services/api";
@@ -62,6 +67,8 @@ const Grades = () => {
     message: "",
     severity: "success",
   });
+  const [isEditing, setIsEditing] = useState({});
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     const fetchTracksAndCourses = async () => {
@@ -147,6 +154,54 @@ const Grades = () => {
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
     }
+  };
+
+  const handleEditGrade = async (gradeId, studentId) => {
+    try {
+      const payload = {
+        score: grades[studentId],
+        feedback: feedback[studentId].trim(),
+      };
+
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
+
+      await apiClient.put(`/grades/detail/${gradeId}/`, payload);
+
+      setSnackbar({
+        open: true,
+        message: "Evaluation updated successfully",
+        severity: "success",
+      });
+      setIsEditing((prev) => ({ ...prev, [studentId]: false }));
+      fetchSubmissionStatus(selectedAssignment);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || "Failed to update evaluation",
+        severity: "error",
+      });
+    } finally {
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  const handleDeleteGrade = async (gradeId) => {
+    try {
+      await apiClient.delete(`/grades/detail/${gradeId}/`);
+      setSnackbar({
+        open: true,
+        message: "Evaluation deleted successfully",
+        severity: "success",
+      });
+      fetchSubmissionStatus(selectedAssignment);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || "Failed to delete evaluation",
+        severity: "error",
+      });
+    }
+    setDeleteConfirm(null);
   };
 
   const handleTrackChange = (event) => {
@@ -470,148 +525,244 @@ const Grades = () => {
                               }}
                             >
                               <Stack spacing={3}>
-                                {/* Feedback Section */}
-                                <Box>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1.5,
-                                      mb: 2,
-                                    }}
-                                  >
-                                    <FeedbackIcon
-                                      color="primary"
-                                      sx={{ fontSize: 24 }}
+                                {isEditing[student.student_id] ? (
+                                  <>
+                                    <TextField
+                                      fullWidth
+                                      multiline
+                                      rows={4}
+                                      label="Feedback"
+                                      value={
+                                        feedback[student.student_id] ||
+                                        student.existingEvaluation.feedback
+                                      }
+                                      onChange={handleFeedbackChange(
+                                        student.student_id
+                                      )}
+                                      InputProps={{
+                                        startAdornment: (
+                                          <InputAdornment position="start">
+                                            <FeedbackIcon color="action" />
+                                          </InputAdornment>
+                                        ),
+                                      }}
                                     />
-                                    <Typography
-                                      variant="h6"
-                                      color="text.primary"
-                                    >
-                                      Student Feedback
-                                    </Typography>
-                                  </Box>
-                                  <Typography
-                                    variant="body1"
-                                    sx={{
-                                      p: 2,
-                                      borderRadius: 1,
-                                      bgcolor: "action.hover",
-                                      fontStyle: "italic",
-                                      whiteSpace: "pre-wrap",
-                                      lineHeight: 1.6,
-                                    }}
-                                  >
-                                    {student.existingEvaluation.feedback ||
-                                      "No feedback provided"}
-                                  </Typography>
-                                </Box>
 
-                                {/* Grading Details */}
-                                <Box>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1.5,
-                                      mb: 2,
-                                    }}
-                                  >
-                                    <GradeIcon
-                                      color="primary"
-                                      sx={{ fontSize: 24 }}
+                                    <TextField
+                                      fullWidth
+                                      type="number"
+                                      label="Grade"
+                                      inputProps={{ min: 0, max: 10 }}
+                                      value={
+                                        grades[student.student_id] ||
+                                        student.existingEvaluation.score
+                                      }
+                                      onChange={handleGradeChange(
+                                        student.student_id
+                                      )}
+                                      InputProps={{
+                                        startAdornment: (
+                                          <InputAdornment position="start">
+                                            <GradeIcon color="action" />
+                                          </InputAdornment>
+                                        ),
+                                      }}
                                     />
-                                    <Typography
-                                      variant="h6"
-                                      color="text.primary"
-                                    >
-                                      Grading Summary
-                                    </Typography>
-                                  </Box>
 
-                                  <Grid container spacing={3}>
-                                    {/* Score Card */}
-                                    <Grid item xs={12} md={6}>
-                                      <Card
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "flex-end",
+                                      }}
+                                    >
+                                      <Button
                                         variant="outlined"
-                                        sx={{
-                                          p: 2,
-                                          textAlign: "center",
-                                          borderColor: "primary.main",
-                                          bgcolor: "primary.light",
+                                        onClick={() =>
+                                          setIsEditing((prev) => ({
+                                            ...prev,
+                                            [student.student_id]: false,
+                                          }))
+                                        }
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        variant="contained"
+                                        onClick={() =>
+                                          handleEditGrade(
+                                            student.existingEvaluation.id,
+                                            student.student_id
+                                          )
+                                        }
+                                        disabled={
+                                          submitLoading[student.student_id]
+                                        }
+                                        startIcon={
+                                          submitLoading[student.student_id] && (
+                                            <CircularProgress size={20} />
+                                          )
+                                        }
+                                      >
+                                        {submitLoading[student.student_id]
+                                          ? "Saving..."
+                                          : "Save Changes"}
+                                      </Button>
+                                    </Box>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Existing feedback and grade display */}
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "flex-end",
+                                      }}
+                                    >
+                                      <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() =>
+                                          setDeleteConfirm(
+                                            student.existingEvaluation.id
+                                          )
+                                        }
+                                      >
+                                        Delete
+                                      </Button>
+                                      <Button
+                                        variant="contained"
+                                        startIcon={<EditIcon />}
+                                        onClick={() => {
+                                          setIsEditing((prev) => ({
+                                            ...prev,
+                                            [student.student_id]: true,
+                                          }));
+                                          setFeedback((prev) => ({
+                                            ...prev,
+                                            [student.student_id]:
+                                              student.existingEvaluation
+                                                .feedback,
+                                          }));
+                                          setGrades((prev) => ({
+                                            ...prev,
+                                            [student.student_id]:
+                                              student.existingEvaluation.score,
+                                          }));
                                         }}
                                       >
-                                        <Typography
-                                          variant="overline"
-                                          color="text.secondary"
-                                        >
-                                          Final Score
-                                        </Typography>
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "baseline",
-                                            justifyContent: "center",
-                                            gap: 1,
-                                            mt: 1,
-                                          }}
-                                        >
-                                          <Typography
-                                            variant="h2"
-                                            color="primary"
-                                          >
-                                            {student.existingEvaluation.score}
-                                          </Typography>
-                                          <Typography
-                                            variant="h5"
-                                            color="text.secondary"
-                                          >
-                                            /10
-                                          </Typography>
-                                        </Box>
-                                      </Card>
-                                    </Grid>
+                                        Edit
+                                      </Button>
+                                    </Box>
 
-                                    {/* Details Panel */}
-                                    <Grid item xs={12} md={6}>
-                                      <Stack spacing={2}>
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1.5,
-                                          }}
+                                    {/* Existing feedback and grade display content */}
+                                    <Box>
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1.5,
+                                          mb: 2,
+                                        }}
+                                      >
+                                        <FeedbackIcon
+                                          color="primary"
+                                          sx={{ fontSize: 24 }}
+                                        />
+                                        <Typography
+                                          variant="h6"
+                                          color="text.primary"
                                         >
-                                          <ScheduleIcon color="action" />
-                                          <div>
+                                          Student Feedback
+                                        </Typography>
+                                      </Box>
+                                      <Typography
+                                        variant="body1"
+                                        sx={{
+                                          p: 2,
+                                          borderRadius: 1,
+                                          bgcolor: "action.hover",
+                                          fontStyle: "italic",
+                                          whiteSpace: "pre-wrap",
+                                          lineHeight: 1.6,
+                                        }}
+                                      >
+                                        {student.existingEvaluation.feedback ||
+                                          "No feedback provided"}
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Grading Summary */}
+                                    <Box>
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1.5,
+                                          mb: 2,
+                                        }}
+                                      >
+                                        <GradeIcon
+                                          color="primary"
+                                          sx={{ fontSize: 24 }}
+                                        />
+                                        <Typography
+                                          variant="h6"
+                                          color="text.primary"
+                                        >
+                                          Grading Summary
+                                        </Typography>
+                                      </Box>
+                                      <Grid container spacing={3}>
+                                        <Grid item xs={12} md={6}>
+                                          <Card
+                                            variant="outlined"
+                                            sx={{
+                                              p: 2,
+                                              textAlign: "center",
+                                              borderColor: "primary.main",
+                                              bgcolor: "primary.light",
+                                            }}
+                                          >
                                             <Typography
-                                              variant="caption"
+                                              variant="overline"
                                               color="text.secondary"
                                             >
-                                              Evaluated On
+                                              Final Score
                                             </Typography>
-                                            <Typography variant="body1">
-                                              {format(
-                                                new Date(
-                                                  student.existingEvaluation.graded_date
-                                                ),
-                                                "MMM dd, yyyy 'at' hh:mm a"
-                                              )}
-                                            </Typography>
-                                          </div>
-                                        </Box>
-
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1.5,
-                                          }}
-                                        ></Box>
-                                      </Stack>
-                                    </Grid>
-                                  </Grid>
-                                </Box>
+                                            <Box
+                                              sx={{
+                                                display: "flex",
+                                                alignItems: "baseline",
+                                                justifyContent: "center",
+                                                gap: 1,
+                                                mt: 1,
+                                              }}
+                                            >
+                                              <Typography
+                                                variant="h2"
+                                                color="primary"
+                                              >
+                                                {
+                                                  student.existingEvaluation
+                                                    .score
+                                                }
+                                              </Typography>
+                                              <Typography
+                                                variant="h5"
+                                                color="text.secondary"
+                                              >
+                                                /10
+                                              </Typography>
+                                            </Box>
+                                          </Card>
+                                        </Grid>
+                                      </Grid>
+                                    </Box>
+                                  </>
+                                )}
                               </Stack>
                             </Paper>
                           ) : (
@@ -729,12 +880,44 @@ const Grades = () => {
         </Box>
       )}
 
+      {/* Add Delete Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deleteConfirm)}
+        onClose={() => setDeleteConfirm(null)}
+      >
+        <DialogTitle>Confirm Delete Evaluation</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to permanently delete this evaluation? This
+            action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+          <Button
+            onClick={() => handleDeleteGrade(deleteConfirm)}
+            color="error"
+            variant="contained"
+            startIcon={<DeleteIcon />}
+          >
+            Confirm Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
-      />
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

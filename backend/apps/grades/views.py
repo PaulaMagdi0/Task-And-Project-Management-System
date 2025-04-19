@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth.models import User
@@ -18,6 +18,41 @@ class GradeDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Grade.objects.all()
     serializer_class = GradeSerializer
     lookup_field = 'id'
+
+    def put(self, request, *args, **kwargs):
+        """
+        Handle PUT request to update the grade.
+        """
+        grade = self.get_object()
+        logger.debug(f"[PUT] Incoming data for grade ID {grade.id}: {request.data}")
+
+        # Allow partial updates to prevent requiring all fields
+        serializer = self.get_serializer(grade, data=request.data, partial=True, context={'request': request})
+
+        if serializer.is_valid():
+            try:
+                self.perform_update(serializer)
+                logger.info(f"[PUT] Grade ID {grade.id} successfully updated by {request.user.username}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except Exception as e:
+                logger.error(f"[PUT] Exception during update of grade ID {grade.id}: {str(e)}")
+                return Response({'detail': 'An error occurred while updating the grade.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning(f"[PUT] Validation failed for grade ID {grade.id}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Handle DELETE request to delete a grade.
+        """
+        grade = self.get_object()
+        try:
+            grade.delete()
+            logger.info(f"Grade with ID {grade.id} deleted by {request.user.username}.")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error(f"Error deleting grade with ID {grade.id}: {str(e)}")
+            return Response({"error": "Failed to delete grade."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class GradeListView(generics.ListCreateAPIView):
     serializer_class = GradeSerializer
@@ -71,4 +106,8 @@ class StudentGradeListView(generics.ListAPIView):
 
     def get_queryset(self):
         student_id = self.kwargs.get('studentid')
+        if not student_id:
+            logger.error("No student ID provided.")
+            return Grade.objects.none()
+
         return Grade.objects.filter(student__id=student_id).select_related('student', 'assignment', 'course')
