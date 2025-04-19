@@ -1,5 +1,6 @@
 // File: src/components/TracksTable.jsx
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import apiClient from '../services/api';
 
 const styles = {
@@ -79,6 +80,9 @@ const styles = {
 };
 
 const TracksTable = () => {
+  // Manager's branch ID
+  const branchId = useSelector(state => state.auth.branch.id);
+
   const [tracks, setTracks] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -87,23 +91,7 @@ const TracksTable = () => {
   const [editingTrackId, setEditingTrackId] = useState(null);
   const [newSupervisorId, setNewSupervisorId] = useState('');
 
-  // Fetch tracks and sort them by track ID
-  const fetchTracks = async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/tracks/');
-      const sortedTracks = response.data.sort((a, b) => a.id - b.id);
-      setTracks(sortedTracks);
-      setError('');
-    } catch (err) {
-      console.error('Error fetching tracks:', err);
-      setError('Error fetching tracks.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch supervisors from all staff members
+  // Load all supervisors (filter by role only)
   const fetchSupervisors = async () => {
     try {
       const response = await apiClient.get('/staff/');
@@ -114,12 +102,30 @@ const TracksTable = () => {
     }
   };
 
+  // Load tracks for this branch
+  const fetchTracks = async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/tracks/');
+      const branchTracks = response.data
+        .filter(track => track.branch === branchId)
+        .sort((a, b) => a.id - b.id);
+      setTracks(branchTracks);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching tracks:', err);
+      setError('Error fetching tracks.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchTracks();
     fetchSupervisors();
-  }, []);
+  }, [branchId]);
 
-  const toggleEditMode = (track) => {
+  const toggleEditMode = track => {
     setEditingTrackId(track.id);
     setNewSupervisorId(track.supervisor || '');
   };
@@ -129,7 +135,7 @@ const TracksTable = () => {
     setNewSupervisorId('');
   };
 
-  const saveSupervisor = async (trackId) => {
+  const saveSupervisor = async trackId => {
     try {
       await apiClient.patch(`/tracks/${trackId}/`, { supervisor: newSupervisorId || null });
       setMsg('Supervisor updated successfully.');
@@ -141,7 +147,7 @@ const TracksTable = () => {
     }
   };
 
-  const handleDelete = async (trackId) => {
+  const handleDelete = async trackId => {
     if (!window.confirm('Are you sure you want to delete this track?')) return;
     try {
       await apiClient.delete(`/tracks/${trackId}/`);
@@ -153,11 +159,6 @@ const TracksTable = () => {
     }
   };
 
-  const getSupervisorName = (supervisorId) => {
-    const supervisor = supervisors.find(s => s.id === supervisorId);
-    return supervisor ? supervisor.username : supervisorId;
-  };
-
   return (
     <div style={styles.container}>
       <h2 style={styles.header}>Tracks</h2>
@@ -165,7 +166,7 @@ const TracksTable = () => {
       {msg && <p style={styles.messageSuccess}>{msg}</p>}
       {error && <p style={styles.messageError}>{error}</p>}
       {tracks.length === 0 ? (
-        <p>No tracks found.</p>
+        <p>No tracks found in your branch.</p>
       ) : (
         <table style={styles.table}>
           <thead>
@@ -178,63 +179,52 @@ const TracksTable = () => {
             </tr>
           </thead>
           <tbody>
-            {tracks.map((track) => (
-              <tr key={track.id}>
-                <td style={styles.td}>{track.id}</td>
-                <td style={styles.td}>{track.name}</td>
-                <td style={styles.td}>{track.description}</td>
-                <td style={styles.td}>
-                  {editingTrackId === track.id ? (
-                    <>
-                      <select
-                        style={styles.select}
-                        value={newSupervisorId}
-                        onChange={(e) => setNewSupervisorId(e.target.value)}
-                      >
-                        <option value="">-- Select Supervisor --</option>
-                        {supervisors.map(sup => (
-                          <option key={sup.id} value={sup.id}>
-                            {sup.username}
-                          </option>
-                        ))}
-                      </select>
-                      <div>
-                        <button 
-                          style={{ ...styles.button, ...styles.btnPrimary }}
-                          onClick={() => saveSupervisor(track.id)}
+            {tracks.map(track => {
+              // supervisors in same branch as this track
+              const availableSup = supervisors.filter(sup => sup.branch?.id === track.branch);
+              return (
+                <tr key={track.id}>
+                  <td style={styles.td}>{track.id}</td>
+                  <td style={styles.td}>{track.name}</td>
+                  <td style={styles.td}>{track.description}</td>
+                  <td style={styles.td}>
+                    {editingTrackId === track.id ? (
+                      <>
+                        <select
+                          style={styles.select}
+                          value={newSupervisorId}
+                          onChange={e => setNewSupervisorId(e.target.value)}
                         >
-                          Save
-                        </button>
-                        <button 
-                          style={{ ...styles.button, ...styles.btnSecondary }}
-                          onClick={cancelEdit}
+                          <option value="">None</option>
+                          {availableSup.map(sup => (
+                            <option key={sup.id} value={sup.id}>{sup.username}</option>
+                          ))}
+                        </select>
+                        <div>
+                          <button style={{...styles.button,...styles.btnPrimary}} onClick={() => saveSupervisor(track.id)}>Save</button>
+                          <button style={{...styles.button,...styles.btnSecondary}} onClick={cancelEdit}>Cancel</button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {track.supervisor
+                          ? supervisors.find(s => s.id === track.supervisor && s.branch?.id === track.branch)?.username
+                          : 'None'}
+                        <button
+                          style={{...styles.button,...styles.btnOutlinePrimary,marginLeft:'0.5rem'}}
+                          onClick={() => toggleEditMode(track)}
                         >
-                          Cancel
+                          {track.supervisor ? 'Change' : 'Assign'}
                         </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {track.supervisor ? getSupervisorName(track.supervisor) : 'None'}
-                      <button 
-                        style={{ ...styles.button, ...styles.btnOutlinePrimary, marginLeft: '0.5rem' }}
-                        onClick={() => toggleEditMode(track)}
-                      >
-                        {track.supervisor ? 'Change' : 'Assign'}
-                      </button>
-                    </>
-                  )}
-                </td>
-                <td style={styles.td}>
-                  <button 
-                    style={{ ...styles.button, ...styles.btnDanger }}
-                    onClick={() => handleDelete(track.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
+                      </>
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    <button style={{...styles.button,...styles.btnDanger}} onClick={() => handleDelete(track.id)}>Delete</button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

@@ -14,8 +14,8 @@ print(os.getcwd())  # This will print the current working directory
 # courses = pd.read_csv('E:/Graduation Project ITI/Task-And-Project-Management-System/backend/data/courses.csv')
 
 # # Load CSV files Linux
-assignments = pd.read_csv('data/assignments.csv')
-courses = pd.read_csv('data/courses.csv')
+assignments = pd.read_csv('C:/Users/Khaled/Desktop/Task-And-Project-Management-System/backend/data/assignments.csv')
+courses = pd.read_csv('C:/Users/Khaled/Desktop/Task-And-Project-Management-System/backend/data/courses.csv')
 
 # Load pre-trained BERT model and tokenizer (CPU only)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')

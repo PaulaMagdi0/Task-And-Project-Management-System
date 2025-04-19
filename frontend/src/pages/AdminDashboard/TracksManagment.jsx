@@ -1,4 +1,4 @@
-// File: src/pages/AdminDashboard/TracksManagment.jsx
+// File: src/pages/AdminDashboard/TracksManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -12,6 +12,7 @@ import { fetchBranches } from '../../redux/branchSlice';
 import { fetchStaff } from '../../redux/staffSlice';
 import {
   Box,
+  Collapse,
   TextField,
   Button,
   Typography,
@@ -34,291 +35,184 @@ import {
 
 const TrackManagement = () => {
   const dispatch = useDispatch();
+  const { tracks, loading, error: serverError, message } = useSelector(state => state.tracks);
+  const { branches: allBranches } = useSelector(state => state.branches);
+  const { staff: allStaff } = useSelector(state => state.staff);
+  const { branch: managerBranch } = useSelector(state => state.auth);
 
-  // Redux selectors: tracks, branches, and all staff members.
-  const { tracks, loading, error, message } = useSelector((state) => state.tracks);
-  const { branches } = useSelector((state) => state.branches);
-  const { staff: allStaff } = useSelector((state) => state.staff);
+  // Only supervisors in this branch
+  const supervisors = allStaff.filter(s => s.role === 'supervisor' && s.branch?.id === managerBranch.id);
+  // Only show this branch
+  const branchOptions = allBranches.filter(b => b.id === managerBranch.id);
+  // Only show tracks in this branch
+  const filteredTracks = tracks.filter(t => t.branch === managerBranch.id);
 
-  // Filter supervisors from staff (we assume only users with role 'supervisor' can supervise tracks).
-  const supervisors = allStaff ? allStaff.filter(member => member.role === 'supervisor') : [];
-
-  // Local form state for creating/updating a track.
+  const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     track_type: 'ICC',
     supervisor: '',
-    branch: '',
+    branch: managerBranch.id,
   });
-
-  // Editing state (null if creating a new track).
   const [editingId, setEditingId] = useState(null);
-
-  // Delete confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [trackIdToDelete, setTrackIdToDelete] = useState(null);
-
-  // Local error state for validation messages.
+  const [trackToDelete, setTrackToDelete] = useState(null);
   const [localError, setLocalError] = useState('');
 
-  // Flatten error object into a plain string if needed.
-  const flattenError = (err) => {
+  const flattenError = err => {
     if (!err) return '';
     if (typeof err === 'string') return err;
     return Object.entries(err)
-      .map(([field, messages]) =>
-        Array.isArray(messages)
-          ? `${field}: ${messages.join(', ')}`
-          : `${field}: ${messages}`
-      )
+      .map(([f, v]) => `${f}: ${Array.isArray(v) ? v.join(', ') : v}`)
       .join(' | ');
   };
 
-  // Update local error from the Redux error state.
-  useEffect(() => {
-    if (error) {
-      setLocalError(flattenError(error));
-    } else {
-      setLocalError('');
-    }
-  }, [error]);
-
-  // Fetch tracks, branches, and staff when the component mounts.
   useEffect(() => {
     dispatch(fetchTracks());
     dispatch(fetchBranches());
     dispatch(fetchStaff());
+    return () => dispatch(clearTrackState());
   }, [dispatch]);
 
-  // Handle input field changes.
-  const handleChange = (e) => {
+  useEffect(() => {
+    setLocalError(serverError ? flattenError(serverError) : '');
+  }, [serverError]);
+
+  const handleChange = e => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(fd => ({ ...fd, [name]: value }));
     if (localError) setLocalError('');
   };
 
-  // Handle form submission for creating or updating a track.
-  const handleSubmit = async (e) => {
+  const toggleForm = () => {
+    if (!formOpen) {
+      setEditingId(null);
+      setFormData({ name: '', description: '', track_type: 'ICC', supervisor: '', branch: managerBranch.id });
+      setLocalError('');
+    }
+    setFormOpen(o => !o);
+  };
+
+  const handleSubmit = async e => {
     e.preventDefault();
     setLocalError('');
 
-    // Basic client-side validation.
-    if (!formData.name.trim()) {
-      setLocalError('Name is required.');
+    const trimmedName = formData.name.trim();
+    const duplicate = filteredTracks.find(t => t.name === trimmedName && t.track_type === formData.track_type);
+    if (duplicate && (!editingId || duplicate.id !== editingId)) {
+      setLocalError('A track with this name and type already exists in your branch.');
       return;
     }
-    if (!formData.description.trim()) {
-      setLocalError('Description is required.');
-      return;
-    }
-    if (!formData.track_type) {
-      setLocalError('Track type is required.');
-      return;
-    }
-    if (!formData.branch) {
-      setLocalError('Branch is required.');
-      return;
+    if (!trimmedName) { setLocalError('Name is required.'); return; }
+    if (!formData.description.trim()) { setLocalError('Description is required.'); return; }
+
+    const payload = { ...formData, name: trimmedName };
+    let result;
+    if (editingId) {
+      result = await dispatch(updateTrack({ id: editingId, data: payload }));
+      if (!result.error) setEditingId(null);
+    } else {
+      result = await dispatch(createTrack(payload));
     }
 
-    let actionResult;
-    if (editingId) {
-      actionResult = await dispatch(updateTrack({ id: editingId, data: formData }));
-      if (!actionResult.error) {
-        setEditingId(null);
-        dispatch(clearTrackState());
-      }
+    if (result.error) {
+      setLocalError(flattenError(result.payload || result.error));
     } else {
-      actionResult = await dispatch(createTrack(formData));
-      if (!actionResult.error) {
-        dispatch(clearTrackState());
-      }
-    }
-    if (!actionResult.error) {
-      setFormData({
-        name: '',
-        description: '',
-        track_type: 'ICC',
-        supervisor: '',
-        branch: '',
-      });
       dispatch(fetchTracks());
+      setFormOpen(false);
     }
   };
 
-  // Populate form for editing an existing track.
-  const handleEdit = (track) => {
+  const handleEdit = track => {
     setEditingId(track.id);
     setFormData({
-      name: track.name || '',
-      description: track.description || '',
-      track_type: track.track_type || 'ICC',
+      name: track.name,
+      description: track.description,
+      track_type: track.track_type,
       supervisor: track.supervisor || '',
-      branch: track.branch || '',
+      branch: managerBranch.id,
     });
+    setFormOpen(true);
   };
 
-  // Open the delete confirmation dialog.
-  const openDeleteDialog = (id) => {
-    setTrackIdToDelete(id);
+  const openDeleteDialog = id => {
+    setTrackToDelete(id);
     setDeleteDialogOpen(true);
   };
 
-  // Handle the deletion of a track.
   const handleDelete = async () => {
-    if (trackIdToDelete) {
-      await dispatch(deleteTrack(trackIdToDelete));
+    if (trackToDelete != null) {
+      await dispatch(deleteTrack(trackToDelete));
       setDeleteDialogOpen(false);
-      setTrackIdToDelete(null);
       dispatch(fetchTracks());
     }
   };
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Track Management
-      </Typography>
+      <Typography variant="h4" gutterBottom>Track Management</Typography>
+      {localError && <Alert severity="error" sx={{ mb:2 }}>{localError}</Alert>}
+      {message && <Alert severity="success" sx={{ mb:2 }}>{message}</Alert>}
 
-      {(localError || error) && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {localError}
-        </Alert>
-      )}
-      {message && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {message}
-        </Alert>
-      )}
+      <Box sx={{ mb:2 }}>
+        <Button variant="contained" onClick={toggleForm}>{formOpen ? 'Cancel' : 'Add Track'}</Button>
+      </Box>
 
-      {/* Form for creating/updating tracks */}
-      <Paper sx={{ p: 2, mt: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          {editingId ? 'Edit Track' : 'Add New Track'}
-        </Typography>
-        <form onSubmit={handleSubmit}>
-          <TextField
-            label="Track Name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            fullWidth
-            required
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            label="Description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            fullWidth
-            required
-            multiline
-            rows={3}
-            sx={{ mb: 2 }}
-          />
-          <FormControl fullWidth required sx={{ mb: 2 }}>
-            <InputLabel id="track-type-label">Track Type</InputLabel>
-            <Select
-              labelId="track-type-label"
-              name="track_type"
-              value={formData.track_type}
-              onChange={handleChange}
-              label="Track Type"
-            >
-              <MenuItem value="ICC">ICC</MenuItem>
-              <MenuItem value="9month">9 Month</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel id="supervisor-label">Supervisor</InputLabel>
-            <Select
-              labelId="supervisor-label"
-              name="supervisor"
-              value={formData.supervisor}
-              onChange={handleChange}
-              label="Supervisor"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {supervisors.map((sup) => (
-                <MenuItem key={sup.id} value={sup.id}>
-                  {sup.username}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth required sx={{ mb: 2 }}>
-            <InputLabel id="branch-label">Branch</InputLabel>
-            <Select
-              labelId="branch-label"
-              name="branch"
-              value={formData.branch}
-              onChange={handleChange}
-              label="Branch"
-            >
-              {branches.map((branch) => (
-                <MenuItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button variant="contained" type="submit" disabled={loading}>
-            {editingId ? 'Update Track' : 'Create Track'}
-          </Button>
-        </form>
-      </Paper>
+      <Collapse in={formOpen}>
+        <Paper sx={{ p:2, mb:3 }}>
+          <Typography variant="h6" gutterBottom>{editingId ? 'Edit Track' : 'Add New Track'}</Typography>
+          <form onSubmit={handleSubmit}>
+            <TextField name="name" label="Track Name" value={formData.name} onChange={handleChange} fullWidth required sx={{ mb:2 }} />
+            <TextField name="description" label="Description" value={formData.description} onChange={handleChange} fullWidth required multiline rows={3} sx={{ mb:2 }} />
+            <FormControl fullWidth required sx={{ mb:2 }}>
+              <InputLabel>Track Type</InputLabel>
+              <Select name="track_type" value={formData.track_type} onChange={handleChange} label="Track Type">
+                <MenuItem value="ICC">ICC</MenuItem>
+                <MenuItem value="9month">9 Month</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth sx={{ mb:2 }}>
+              <InputLabel>Supervisor</InputLabel>
+              <Select name="supervisor" value={formData.supervisor} onChange={handleChange} label="Supervisor">
+                <MenuItem value=""><em>None</em></MenuItem>
+                {supervisors.map(s => <MenuItem key={s.id} value={s.id}>{s.username}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth required sx={{ mb:2 }}>
+              <InputLabel>Branch</InputLabel>
+              <Select name="branch" value={formData.branch} label="Branch" disabled>
+                {branchOptions.map(b => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Button variant="contained" type="submit" disabled={loading}>{editingId ? 'Update Track' : 'Create Track'}</Button>
+          </form>
+        </Paper>
+      </Collapse>
 
-      {/* Table listing all tracks */}
-      <Paper sx={{ p: 2, mt: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Tracks List
-        </Typography>
-        {loading ? (
-          <Typography>Loading tracks...</Typography>
-        ) : (
+      <Paper sx={{ p:2 }}>
+        <Typography variant="h6" gutterBottom>Tracks in Your Branch</Typography>
+        {loading ? <Typography>Loading...</Typography> : (
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Track Type</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell>Supervisor</TableCell>
-                <TableCell>Branch</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {tracks.map((track) => (
-                <TableRow key={track.id}>
-                  <TableCell>{track.id}</TableCell>
-                  <TableCell>{track.name}</TableCell>
-                  <TableCell>{track.track_type}</TableCell>
+              {filteredTracks.map(t => (
+                <TableRow key={t.id}>
+                  <TableCell>{t.id}</TableCell>
+                  <TableCell>{t.name}</TableCell>
+                  <TableCell>{t.track_type}</TableCell>
+                  <TableCell>{t.supervisor ? supervisors.find(s => s.id === t.supervisor)?.username : 'None'}</TableCell>
                   <TableCell>
-                    {track.supervisor 
-                      ? (supervisors.find(sup => sup.id === track.supervisor)?.username || 'N/A')
-                      : 'None'}
-                  </TableCell>
-                  <TableCell>
-                    {track.branch 
-                      ? (branches.find(b => b.id === track.branch)?.name || 'N/A')
-                      : 'None'}
-                  </TableCell>
-                  <TableCell>
-                    <Button onClick={() => handleEdit(track)} variant="outlined" size="small">
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={() => openDeleteDialog(track.id)}
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      sx={{ ml: 1 }}
-                    >
-                      Delete
-                    </Button>
+                    <Button size="small" onClick={() => handleEdit(t)}>Edit</Button>
+                    <Button size="small" color="error" sx={{ ml:1 }} onClick={() => openDeleteDialog(t.id)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -327,22 +221,12 @@ const TrackManagement = () => {
         )}
       </Paper>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete this track?
-          </Typography>
-        </DialogContent>
+        <DialogContent><Typography>Are you sure you want to delete this track?</Typography></DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleDelete} variant="contained" color="error">
-            Delete
-          </Button>
+          <Button onClick={handleDelete} variant="contained" color="error">Delete</Button>
         </DialogActions>
       </Dialog>
     </Box>

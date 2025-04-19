@@ -1,126 +1,313 @@
-// File: src/components/AddSupervisor.jsx
+// File: src/components/StaffManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiUserPlus, FiLock, FiSmartphone, FiMail } from 'react-icons/fi';
-import { createSupervisor, clearSupervisorState } from '../redux/supervisorsSlice';
-// import './AddSupervisor.css'; // Assuming you have a CSS file for styling
-const AddSupervisor = () => {
-  const dispatch = useDispatch();
-  const { loading, error, message } = useSelector((state) => state.supervisors);
-  const { branch } = useSelector((state) => state.auth);
+import {
+  fetchStaff,
+  createStaff,
+  updateStaff,
+  deleteStaff,
+  clearStaffState,
+} from '../redux/staffSlice';
+import {
+  Box,
+  Collapse,
+  TextField,
+  Button,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+} from '@mui/material';
 
-  const [form, setForm] = useState({
+const StaffManagement = () => {
+  const dispatch = useDispatch();
+  const { staff, loading, error: serverError, message } = useSelector(s => s.staff);
+  const { branch } = useSelector(s => s.auth); // Branch manager's branch from token
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({
     username: '',
+    password: '',
+    first_name: '',
+    last_name: '',
     email: '',
     phone: '',
+    role: '',
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState(null);
+  const [localError, setLocalError] = useState('');
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!branch || !branch.id) {
-      alert('No branch information available. Please log in again.');
-      return;
-    }
-    const supervisorData = {
-      ...form,
-      branch_id: branch.id,
-      password: 'password1345',
-    };
-    dispatch(createSupervisor(supervisorData));
+  const flattenError = err => {
+    if (!err) return '';
+    if (typeof err === 'string') return err;
+    return Object.entries(err)
+      .map(([f, v]) => `${f}: ${Array.isArray(v) ? v.join(', ') : v}`)
+      .join(' | ');
   };
 
   useEffect(() => {
-    return () => {
-      dispatch(clearSupervisorState());
-    };
+    dispatch(fetchStaff());
   }, [dispatch]);
 
-  const renderValue = (value) =>
-    typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+  useEffect(() => {
+    if (serverError) setLocalError(flattenError(serverError));
+    else setLocalError('');
+  }, [serverError]);
+
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setFormData(fd => ({ ...fd, [name]: value }));
+    if (localError) setLocalError('');
+  };
+
+  const toggleForm = () => {
+    if (!formOpen) {
+      setEditingId(null);
+      setFormData({ username: '', password: '', first_name: '', last_name: '', email: '', phone: '', role: '' });
+      setLocalError('');
+    }
+    setFormOpen(o => !o);
+  };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setLocalError('');
+    // Validation
+    if (!formData.username.trim() || !formData.email.trim()) {
+      setLocalError('Username and email are required.');
+      return;
+    }
+    if (!['supervisor','instructor'].includes(formData.role)) {
+      setLocalError('Role must be Supervisor or Instructor.');
+      return;
+    }
+    // Prepare payload, include branch_id automatically
+    const payload = {
+      ...formData,
+      branch_id: branch.id,
+    };
+    if (editingId && !payload.password) delete payload.password;
+
+    let result;
+    if (editingId) {
+      result = await dispatch(updateStaff({ id: editingId, data: payload }));
+      if (!result.error) setEditingId(null);
+    } else {
+      result = await dispatch(createStaff(payload));
+    }
+    if (result.error) {
+      setLocalError(flattenError(result.payload || result.error));
+    } else {
+      dispatch(fetchStaff());
+      setFormOpen(false);
+    }
+  };
+
+  const handleEdit = member => {
+    setEditingId(member.id);
+    setFormData({
+      username: member.username,
+      password: '',
+      first_name: member.first_name,
+      last_name: member.last_name,
+      email: member.email,
+      phone: member.phone,
+      role: member.role,
+    });
+    setFormOpen(true);
+  };
+
+  const openDeleteDialog = id => {
+    setStaffToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (staffToDelete != null) {
+      await dispatch(deleteStaff(staffToDelete));
+      setDeleteDialogOpen(false);
+      dispatch(fetchStaff());
+    }
+  };
+
+  // Show only supervisors & instructors in manager's branch
+  const filteredStaff = staff.filter(m =>
+    ['supervisor','instructor'].includes(m.role) && m.branch?.id === branch.id
+  );
 
   return (
-    <div className="supervisor-form">
-      <h1 className="section-title"><FiUserPlus /> Add Supervisor</h1>
-      
-      <form onSubmit={handleSubmit} className="form-container">
-        <div className="form-group">
-          <label className="input-label">
-            <FiUserPlus className="input-icon" />
-            Username
-          </label>
-          <input
-            type="text"
-            name="username"
-            className="form-input"
-            value={form.username}
-            onChange={handleChange}
-            required
-          />
-        </div>
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Team Members
+      </Typography>
 
-        <div className="form-group">
-          <label className="input-label">
-            <FiMail className="input-icon" />
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            className="form-input"
-            value={form.email}
-            onChange={handleChange}
-            required
-          />
-        </div>
+      {localError && <Alert severity="error" sx={{ mb: 2 }}>{localError}</Alert>}
+      {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
 
-        <div className="form-group">
-          <label className="input-label">
-            <FiSmartphone className="input-icon" />
-            Phone (Optional)
-          </label>
-          <input
-            type="text"
-            name="phone"
-            className="form-input"
-            value={form.phone}
-            onChange={handleChange}
-          />
-        </div>
+      {/* Add Member Button */}
+      <Box sx={{ mb: 2 }}>
+        <Button variant="contained" onClick={toggleForm}>
+          {formOpen ? 'Cancel' : 'Add Member'}
+        </Button>
+      </Box>
 
-        <div className="info-box">
-          <FiLock className="icon" />
-          <div>
-            <p className="info-title">Default Credentials</p>
-            <p className="info-text">Password: <strong>password1345</strong></p>
-          </div>
-        </div>
+      {/* Collapsible Form */}
+      <Collapse in={formOpen}>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            {editingId ? 'Edit Member' : 'Add New Member'}
+          </Typography>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              name="username"
+              label="Username"
+              value={formData.username}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            {!editingId && (
+              <TextField
+                name="password"
+                label="Password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                fullWidth
+                required
+                sx={{ mb: 2 }}
+              />
+            )}
+            <TextField
+              name="first_name"
+              label="First Name"
+              value={formData.first_name}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              name="last_name"
+              label="Last Name"
+              value={formData.last_name}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              name="email"
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              name="phone"
+              label="Phone"
+              value={formData.phone}
+              onChange={handleChange}
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <FormControl fullWidth required sx={{ mb: 2 }}>
+              <InputLabel>Role</InputLabel>
+              <Select
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                label="Role"
+              >
+                <MenuItem value="instructor">Instructor</MenuItem>
+                <MenuItem value="supervisor">Supervisor</MenuItem>
+              </Select>
+            </FormControl>
+            <Button variant="contained" type="submit" disabled={loading}>
+              {editingId ? 'Update Member' : 'Create Member'}
+            </Button>
+          </form>
+        </Paper>
+      </Collapse>
 
-        <button 
-          type="submit" 
-          className="submit-btn"
-          disabled={loading}
-        >
-          {loading ? 'Creating...' : 'Create Supervisor'}
-        </button>
-
-        {message && (
-          <div className="alert-box success">
-            {renderValue(message)}
-          </div>
+      {/* Staff List Table */}
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Branch Team
+        </Typography>
+        {loading ? (
+          <Typography>Loading...</Typography>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Username</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredStaff.map(member => (
+                <TableRow key={member.id}>
+                  <TableCell>{member.id}</TableCell>
+                  <TableCell>{member.username}</TableCell>
+                  <TableCell>{member.email}</TableCell>
+                  <TableCell>{member.role}</TableCell>
+                  <TableCell>
+                    <Button size="small" onClick={() => handleEdit(member)}>
+                      Edit
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      sx={{ ml: 1 }}
+                      onClick={() => openDeleteDialog(member.id)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
+      </Paper>
 
-        {error && (
-          <div className="alert-box error">
-            {renderValue(error)}
-          </div>
-        )}
-      </form>
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this member?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} variant="contained" color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 
-export default AddSupervisor;
+export default StaffManagement;
