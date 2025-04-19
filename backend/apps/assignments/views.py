@@ -322,42 +322,57 @@ def instructor_assignments(request, track_id, course_id, staff_id):
 
 @api_view(['GET'])
 def get_submitters(request, assignment_id, track_id, course_id):
-    # Get all submissions for this assignment in the specified track/course
-    submissions = AssignmentSubmission.objects.filter(
-        assignment_id=assignment_id,
-        track_id=track_id,
-        course_id=course_id
-    ).select_related('student')
+    try:
+        # Get the assignment to validate track/course relationship
+        assignment = get_object_or_404(
+            Assignment,
+            pk=assignment_id,
+            track_id=track_id,
+            course_id=course_id
+        )
 
-    # Get all students in the track who should have submitted
-    all_students = Student.objects.filter(track_id=track_id)
-    
-    # Prepare response data
-    submitters = [{
-        'student_id': sub.student.id,
-        'name': sub.student.full_name,
-        'email': sub.student.email,
-        'submitted': True,
-        'submission_date': sub.submission_date,
-        'file_url': sub.file_url or None
-    } for sub in submissions]
+        # Get all students who should have submitted (assigned to this assignment)
+        assigned_students = Student.objects.filter(
+            assignmentstudent__assignment=assignment
+        )
 
-    non_submitters = [{
-        'student_id': student.id,
-        'name': student.full_name,
-        'email': student.email,
-        'submitted': False
-    } for student in all_students.exclude(
-        id__in=[s.student.id for s in submissions]
-    )]
+        # Get actual submissions
+        submissions = AssignmentSubmission.objects.filter(
+            assignment=assignment
+        ).select_related('student')
 
-    return Response({
-        'total_students': all_students.count(),
-        'submitted_count': len(submitters),
-        'not_submitted_count': len(non_submitters),
-        'submitters': submitters,
-        'non_submitters': non_submitters
-    })
+        # Separate submitters and non-submitters
+        submitted_student_ids = submissions.values_list('student_id', flat=True)
+        
+        submitters = [{
+            'student_id': sub.student.id,
+            'name': sub.student.full_name,
+            'email': sub.student.email,
+            'submitted': True,
+            'submission_date': sub.submission_date,
+            'file_url': sub.file_url or None
+        } for sub in submissions]
+
+        non_submitters = [{
+            'student_id': student.id,
+            'name': student.full_name,
+            'email': student.email,
+            'submitted': False
+        } for student in assigned_students.exclude(id__in=submitted_student_ids)]
+
+        return Response({
+            'total_students': assigned_students.count(),
+            'submitted_count': len(submitters),
+            'not_submitted_count': len(non_submitters),
+            'submitters': submitters,
+            'non_submitters': non_submitters
+        })
+
+    except Assignment.DoesNotExist:
+        return Response(
+            {"error": "Assignment not found for given track/course combination"},
+            status=status.HTTP_404_NOT_FOUND
+        )
     
 # views.py
 from rest_framework.views import APIView
