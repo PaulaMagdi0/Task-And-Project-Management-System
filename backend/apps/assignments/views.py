@@ -1,66 +1,39 @@
-import logging
 import os
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+import logging
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from .models import Assignment,AssignmentStudent
-from .serializers import AssignmentSerializer,SafeAssignmentSerializer
+
+from rest_framework import generics, status
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .models import Assignment, AssignmentStudent
+from .serializers import AssignmentSerializer, SafeAssignmentSerializer
 from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
-from apps.submission.models import AssignmentSubmission 
-from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
 from apps.tracks.serializers import TrackSerializer
 from apps.courses.serializers import CourseSerializer
 from apps.student.serializers import StudentSubmissionStatusSerializer
-import logging
-import os
-from django.core.exceptions import ValidationError
-from rest_framework import generics, status
-from rest_framework.response import Response
-logger = logging.getLogger(__name__)
-import os
-import json
-import logging
-from datetime import datetime
-
-
-import json
-import logging
-from apps.student.models import Student
-from apps.assignments.models import AssignmentStudent
-logger = logging.getLogger(__name__)
-
-from rest_framework import generics
-from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
-from rest_framework import status
-import json
-import logging
-from datetime import datetime
-from .models import Assignment, AssignmentStudent
-from apps.student.models import Student
-from apps.courses.models import Course
-from .serializers import AssignmentSerializer
-
-
-from rest_framework.views import APIView
+from apps.submission.models import AssignmentSubmission
+from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
+from apps.staff_members.models import StaffMember
 
 logger = logging.getLogger(__name__)
 
 class AssignmentListView(APIView):
-    def get(self, request, track_id, *args, **kwargs):
-        try:
-            track = Track.objects.get(id=track_id)
+    def get(self, request, track_id=None, *args, **kwargs):
+        if track_id:
+            track = get_object_or_404(Track, id=track_id)
             assignments = Assignment.objects.filter(track=track)
-            serialized_assignments = AssignmentSerializer(assignments, many=True)
-            return Response(serialized_assignments.data, status=status.HTTP_200_OK)
-        except Track.DoesNotExist:
-            return Response({"error": "Track not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            assignments = Assignment.objects.all()
+        serializer = AssignmentSerializer(assignments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class AssignmentCreateView(generics.CreateAPIView):
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer

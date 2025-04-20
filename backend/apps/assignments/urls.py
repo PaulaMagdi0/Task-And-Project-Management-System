@@ -16,7 +16,8 @@ urlpatterns = [
     path('', AssignmentListView.as_view(), name='assignment-list'),  # GET all
     path('create/', AssignmentCreateView.as_view(), name='assignment-create'),  # POST
     path('<int:pk>/', AssignmentDetailView.as_view(), name='assignment-detail'),  # NEW: PUT/PATCH/DELETE
-    
+    path('<int:track_id>/', AssignmentListView.as_view(), name='assignment-list-by-track'),
+
     # Student-specific endpoints
     path('student/<int:student_id>/upcoming-assignments/', upcoming_assignments, name='upcoming_assignments'),
     

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchAssignments } from "../../redux/viewassignmentSlice";
+import apiClient from "../../services/api";
 import {
   Box,
   Typography,
-  CircularProgress,
   Alert,
   Table,
   TableBody,
@@ -31,18 +31,10 @@ import {
   MenuItem,
 } from "@mui/material";
 import {
-  School as SchoolIcon,
-  Assignment as AssignmentIcon,
-  CalendarToday as CalendarIcon,
-  Description as DescriptionIcon,
-  Info as InfoIcon,
-  Refresh as RefreshIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  DeleteForever as DeleteForeverIcon,
   Warning as WarningIcon,
-  Cancel as CancelIcon,
+  GetApp as DownloadIcon,
 } from "@mui/icons-material";
 
 const Assignments = () => {
@@ -52,7 +44,7 @@ const Assignments = () => {
   const { assignments, loading, error } = useSelector(
     (state) => state.listassignments
   );
-  const { user_id } = useSelector((state) => state.auth);
+  const { user_id, token } = useSelector((state) => state.auth);
 
   // State management
   const [expandedAssignment, setExpandedAssignment] = useState(null);
@@ -84,23 +76,46 @@ const Assignments = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/assignments/${selectedAssignment.id}/`,
-        { method: "DELETE" }
-      );
-
-      if (response.ok) {
-        setAlert({
-          open: true,
-          message: "Assignment deleted successfully",
-          severity: "success",
-        });
-        dispatch(fetchAssignments(user_id));
-      }
+      await apiClient.delete(`/assignments/${selectedAssignment.id}/`);
+      setAlert({
+        open: true,
+        message: "Assignment deleted successfully",
+        severity: "success",
+      });
+      dispatch(fetchAssignments(user_id));
     } catch (error) {
       setAlert({ open: true, message: "Delete failed", severity: "error" });
     }
     setDeleteConfirmationOpen(false);
+  };
+
+  // Report download handler
+  const handleDownloadReport = async (assignmentId) => {
+    try {
+      const response = await apiClient.get(
+        `/submission/assignments/${assignmentId}/report/`,
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `assignment-${assignmentId}-report.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      setAlert({
+        open: true,
+        message: "Failed to download report",
+        severity: "error",
+      });
+    }
   };
 
   const handleEditInitiate = (assignment) => {
@@ -119,7 +134,6 @@ const Assignments = () => {
     try {
       const payload = {
         ...editData,
-        // Only send changed fields
         due_date: editData.due_date
           ? `${editData.due_date}T23:59:00Z`
           : undefined,
@@ -128,29 +142,18 @@ const Assignments = () => {
           : undefined,
       };
 
-      // Remove undefined values
       const cleanPayload = Object.fromEntries(
         Object.entries(payload).filter(([_, v]) => v !== undefined)
       );
 
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/assignments/${assignmentId}/`,
-        {
-          method: "PATCH", // Changed to PATCH for partial updates
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cleanPayload),
-        }
-      );
-
-      if (response.ok) {
-        setAlert({
-          open: true,
-          message: "Assignment updated successfully",
-          severity: "success",
-        });
-        dispatch(fetchAssignments(user_id));
-        handleAccordionToggle(null);
-      }
+      await apiClient.patch(`/assignments/${assignmentId}/`, cleanPayload);
+      setAlert({
+        open: true,
+        message: "Assignment updated successfully",
+        severity: "success",
+      });
+      dispatch(fetchAssignments(user_id));
+      handleAccordionToggle(null);
     } catch (error) {
       setAlert({ open: true, message: "Update failed", severity: "error" });
     }
@@ -158,22 +161,20 @@ const Assignments = () => {
 
   return (
     <Box sx={{ p: isMobile ? 2 : 3 }}>
-      {/* Alert Snackbar */}
       <Typography
         variant="h4"
         component="h2"
-        sx={{ fontWeight: "bold", marginBottom: 3 }}
+        sx={{ fontWeight: "bold", mb: 3 }}
       >
         Assignments
       </Typography>
+
       <Snackbar
         open={alert.open}
         autoHideDuration={6000}
         onClose={() => setAlert({ ...alert, open: false })}
       >
-        <Alert severity={alert.severity} sx={{ width: "100%" }}>
-          {alert.message}
-        </Alert>
+        <Alert severity={alert.severity}>{alert.message}</Alert>
       </Snackbar>
 
       {/* Delete Confirmation Dialog */}
@@ -218,7 +219,6 @@ const Assignments = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Assignments Table */}
       <TableContainer
         component={Paper}
         sx={{ width: "100%", overflowY: "hidden" }}
@@ -226,33 +226,61 @@ const Assignments = () => {
         <Table sx={{ minWidth: 650, tableLayout: "fixed" }}>
           <TableHead sx={{ bgcolor: theme.palette.primary.main }}>
             <TableRow>
-              <TableCell sx={{ color: "white" }}>Title</TableCell>
-              <TableCell sx={{ color: "white" }}>Type</TableCell>
-              <TableCell sx={{ color: "white" }}>Track & Course</TableCell>
-              <TableCell sx={{ color: "white" }}>Due Date</TableCell>
-              <TableCell sx={{ color: "white" }}>End Date</TableCell>
-              <TableCell sx={{ color: "white" }}>Actions</TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Title
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Type
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Track & Course
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Due Date
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                End Date
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Report
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
             {assignments.map((assignment) => (
               <React.Fragment key={assignment.id}>
                 <TableRow hover>
                   {/* Existing table cells */}
-                  <TableCell>{assignment.title}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    {assignment.title}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
                     <Chip label={assignment.assignment_type} color="primary" />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
                     {assignment.track_name} / {assignment.course_name}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
                     {new Date(assignment.due_date).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
                     {new Date(assignment.end_date).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    <Tooltip title="Download Report">
+                      <IconButton
+                        onClick={() => handleDownloadReport(assignment.id)}
+                        color="primary"
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
                     <Box display="flex" gap={1}>
                       <Tooltip title="Edit">
                         <IconButton
@@ -274,10 +302,17 @@ const Assignments = () => {
 
                 {/* Updated Accordion Section */}
                 <TableRow>
-                  <TableCell colSpan={6} sx={{ p: 0 }}>
+                  <TableCell colSpan={7} sx={{ p: 0 }}>
+                    {" "}
+                    {/* Updated colSpan to 7 */}
                     <Accordion
                       expanded={expandedAssignment === assignment.id}
-                      sx={{ width: "100%" }}
+                      sx={{
+                        width: "100%",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 2,
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                      }}
                     >
                       <AccordionSummary sx={{ display: "none" }} />
                       <AccordionDetails sx={{ px: 0 }}>
@@ -287,20 +322,22 @@ const Assignments = () => {
                             p: 3,
                             display: "flex",
                             flexDirection: "column",
-                            gap: 2,
+                            gap: 3,
                             width: "100%",
+                            bgcolor: "background.paper",
                           }}
                         >
                           {/* Form Fields */}
                           <Box
                             sx={{
-                              display: "flex",
-                              gap: 2,
-                              flexDirection: isMobile ? "column" : "row",
-                              width: "100%",
+                              display: "grid",
+                              gap: 3,
+                              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                              "& .MuiTextField-root": { mb: 0 },
                             }}
                           >
                             <TextField
+                              variant="outlined"
                               fullWidth
                               label="Title"
                               value={editData.title || ""}
@@ -310,9 +347,11 @@ const Assignments = () => {
                                   title: e.target.value,
                                 })
                               }
+                              InputLabelProps={{ shrink: true }}
                             />
 
                             <TextField
+                              variant="outlined"
                               fullWidth
                               select
                               label="Assignment Type"
@@ -323,6 +362,7 @@ const Assignments = () => {
                                   assignment_type: e.target.value,
                                 })
                               }
+                              InputLabelProps={{ shrink: true }}
                             >
                               <MenuItem value="task">Task</MenuItem>
                               <MenuItem value="project">Project</MenuItem>
@@ -331,9 +371,10 @@ const Assignments = () => {
                           </Box>
 
                           <TextField
+                            variant="outlined"
                             fullWidth
                             multiline
-                            rows={3}
+                            rows={4}
                             label="Description"
                             value={editData.description || ""}
                             onChange={(e) =>
@@ -342,17 +383,23 @@ const Assignments = () => {
                                 description: e.target.value,
                               })
                             }
+                            InputLabelProps={{ shrink: true }}
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                alignItems: "flex-start",
+                              },
+                            }}
                           />
 
                           <Box
                             sx={{
-                              display: "flex",
-                              gap: 2,
-                              flexDirection: isMobile ? "column" : "row",
-                              width: "100%",
+                              display: "grid",
+                              gap: 3,
+                              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
                             }}
                           >
                             <TextField
+                              variant="outlined"
                               fullWidth
                               type="date"
                               label="Due Date"
@@ -367,6 +414,7 @@ const Assignments = () => {
                             />
 
                             <TextField
+                              variant="outlined"
                               fullWidth
                               type="date"
                               label="End Date"
@@ -382,6 +430,7 @@ const Assignments = () => {
                           </Box>
 
                           <TextField
+                            variant="outlined"
                             fullWidth
                             label="File URL"
                             value={editData.file_url || ""}
@@ -391,6 +440,8 @@ const Assignments = () => {
                                 file_url: e.target.value,
                               })
                             }
+                            InputLabelProps={{ shrink: true }}
+                            placeholder="https://drive.google.com/..."
                           />
 
                           <Box
@@ -399,17 +450,28 @@ const Assignments = () => {
                               gap: 2,
                               justifyContent: "flex-end",
                               mt: 2,
+                              borderTop: "1px solid #eee",
+                              pt: 3,
                             }}
                           >
                             <Button
                               variant="contained"
                               onClick={() => handleEditSubmit(assignment.id)}
+                              sx={{
+                                minWidth: 140,
+                                textTransform: "uppercase",
+                                fontWeight: "bold",
+                              }}
                             >
                               Save Changes
                             </Button>
                             <Button
                               variant="outlined"
                               onClick={() => handleAccordionToggle(null)}
+                              sx={{
+                                minWidth: 100,
+                                textTransform: "uppercase",
+                              }}
                             >
                               Cancel
                             </Button>

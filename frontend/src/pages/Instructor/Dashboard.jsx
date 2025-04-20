@@ -18,13 +18,12 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
-
-// Components
 import Courses from "./Courses";
 import Assignments from "./Assignments";
 import Submissions from "./Submissions";
 import Grades from "./Grades";
 import CreateAssignment from "./CreateAssignment";
+import OpeningPage from "./OpeningPage";
 
 const DashboardContainer = styled(Box)({
   display: "flex",
@@ -186,7 +185,7 @@ const InstructorDashboard = () => {
       <MainContent>
         <ContentCard>
           <Routes>
-            <Route index element={<Courses />} />
+            <Route index element={<OpeningPage />} />
             <Route path="courses" element={<Courses />} />
             <Route path="assignments" element={<Assignments />} />
             <Route path="create-assignment" element={<CreateAssignment />} />
