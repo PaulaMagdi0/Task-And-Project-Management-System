@@ -257,7 +257,7 @@ const OpeningPage = () => {
           >
             {dashboardData.tracks[0] &&
             typeof dashboardData.tracks[0].instructor === "string"
-              ? dashboardData.tracks[0].instructor.split(" ")[0].capitalize()
+              ? dashboardData.tracks[0].instructor.split(" ")[0].toUpperCase()
               : "Instructor"}{" "}
             Dashboard
           </Typography>
