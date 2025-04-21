@@ -68,7 +68,7 @@ const Submissions = () => {
         );
         setData({
           tracks: response.data.tracks,
-          courses: response.data.courses          ,
+          courses: response.data.courses,
         });
         setError(null);
       } catch (err) {
@@ -99,83 +99,123 @@ const Submissions = () => {
     };
     fetchAssignments();
   }, [selectedTrack, selectedCourse]);
-console.log(data);
-
-  // Fetch submissions when assignment is selected
   const fetchSubmissionStatus = async (assignmentId) => {
     try {
       setLoading((prev) => ({ ...prev, submissions: true }));
       const response = await apiClient.get(
         `assignments/${assignmentId}/track/${selectedTrack}/course/${selectedCourse}/submitters/`
       );
-
+  
       const dataWithGrades = await Promise.all(
         response.data.submitters.map(async (student) => {
           try {
-            const { data } = await apiClient.get(
-              `submission/assignments/${assignmentId}/students/${student.student_id}/`
-            );
+            // 1. Fetch submission with error handling
+            let submission = {};
+            try {
+              const submissionRes = await apiClient.get(
+                `submission/assignments/${assignmentId}/students/${student.student_id}/`
+              );
+              submission = submissionRes.data.submission || {};
+              
+              // Fallback for submission ID using alternative endpoint
+              if (!submission.id && submission.file_url) {
+                const altRes = await apiClient.get(
+                  `submission/instructor/?student=${student.student_id}&assignment=${assignmentId}`
+                );
+                if (altRes.data.results?.length > 0) {
+                  submission = altRes.data.results[0];
+                }
+              }
+            } catch (submissionError) {
+              console.error('Submission fetch error:', submissionError);
+            }
+  
+            // 2. Validate submission existence
+            const hasValidSubmission = !!submission.file_url; // Use file presence as submission indicator
+            const submissionId = submission.id || submission.submission_id || null;
+  
+            // 3. Fetch existing grade
+            let existingGrade = null;
+            try {
+              const gradeRes = await apiClient.get(
+                `grades/student/${student.student_id}/?assignment=${assignmentId}`
+              );
+              existingGrade = gradeRes.data[0] || null;
+            } catch (gradeError) {
+              console.error('Grade fetch error:', gradeError);
+            }
+  
+            // 4. Return normalized data
             return {
               ...student,
-              submitted: data.submission?.status === "Submitted",
-              submission_id: data.submission?.id,
-              submission_date: data.submission?.submission_time,
-              file_url: data.submission?.file_url,
-              existingEvaluation: data.submission || null,
+              submitted: hasValidSubmission,
+              submission_id: submissionId,
+              submission_date: submission.submission_time,
+              file_url: submission.file_url,
+              existingGrade,
             };
           } catch (err) {
+            console.error('Student processing error:', err);
             return {
               ...student,
               submitted: false,
               submission_id: null,
-              submission_date: null,
-              file_url: null,
-              existingEvaluation: null,
+              existingGrade: null,
             };
           }
         })
       );
-
+  
+      // Update state with normalized data
       const evaluations = {};
+      const initialFeedback = {};
+      const initialGrades = {};
+  
       dataWithGrades.forEach((student) => {
-        if (student.existingEvaluation) {
-          evaluations[student.student_id] = student.existingEvaluation;
+        if (student.existingGrade) {
+          evaluations[student.student_id] = student.existingGrade;
+          initialFeedback[student.student_id] = student.existingGrade.feedback;
+          initialGrades[student.student_id] = student.existingGrade.score.toString();
+          
+          // Sync submission ID from grade if missing
+          if (!student.submission_id && student.existingGrade.submission) {
+            student.submission_id = student.existingGrade.submission;
+          }
         }
       });
+  
       setExistingEvaluations(evaluations);
-
+      setFeedback(initialFeedback);
+      setGrades(initialGrades);
       setSubmissionData({
         ...response.data,
         submitters: dataWithGrades,
       });
+  
     } catch (err) {
       setError("Failed to fetch submission data");
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
     }
   };
-
-  // Handler functions
+  // Handlers
   const handleTrackChange = (event) => {
     setSelectedTrack(event.target.value);
     setSelectedCourse("");
     setSelectedAssignment("");
-    setSubmissionData(null);
+    setSubmissionData({ submitters: [], non_submitters: [] });
   };
 
   const handleCourseChange = (event) => {
     setSelectedCourse(event.target.value);
     setSelectedAssignment("");
-    setSubmissionData(null);
+    setSubmissionData({ submitters: [], non_submitters: [] });
   };
 
   const handleAssignmentChange = (event) => {
     const assignmentId = event.target.value;
-    console.log("Selected Assignment:", assignmentId);
     setSelectedAssignment(assignmentId);
-    if (selectedTrack) {
-      fetchSubmissionStatus(assignmentId, selectedTrack);
-    }
+    fetchSubmissionStatus(assignmentId);
   };
 
   const handleAccordionChange = (studentId) => (event, isExpanded) => {
@@ -184,81 +224,135 @@ console.log(data);
 
   const handleFeedbackChange = (studentId) => (e) =>
     setFeedback({ ...feedback, [studentId]: e.target.value });
+
   const handleGradeChange = (studentId) => (e) =>
     setGrades({ ...grades, [studentId]: e.target.value });
 
   const handleSubmitFeedback = async (studentId) => {
-    try {
-      const student = filteredStudents.find((s) => s.student_id === studentId);
-      console.log("Student:", student);
-      // if (!student?.submission_id) {
-      //   setSnackbar({
-      //     open: true,
-      //     message: "Submission data not available",
-      //     severity: "error",
-      //   });
-      //   return;
-      // }
-
-      const payload = {
-        score: parseInt(grades[studentId]),
-        feedback: feedback[studentId]?.trim() || "",
-      };
-
-      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
-
-      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
-      if (existingEvaluations[studentId]) {
-        await apiClient.put(endpoint, payload);
-      } else {
-        await apiClient.post(endpoint, payload);
-      }
-
-      setFeedback((prev) => ({ ...prev, [studentId]: "" }));
-      setGrades((prev) => ({ ...prev, [studentId]: "" }));
-      fetchSubmissionStatus(selectedAssignment);
-
-      setSnackbar({
-        open: true,
-        message: "Evaluation submitted successfully",
-        severity: "success",
-      });
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.detail || "Failed to submit evaluation",
-        severity: "error",
-      });
-    } finally {
-      setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
+  try {
+    setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
+    
+    // 1. Find student across all submission data
+    const student = [...submissionData.submitters, ...(submissionData.non_submitters || [])]
+      .find(s => s.student_id === studentId);
+      
+    if (!student) {
+      throw new Error("Student not found in submission records");
     }
-  };
+
+    // 2. Submission ID resolution with multiple fallbacks
+    let submissionId = student.submission_id;
+    
+    // Fallback 1: Check existing grade's submission reference
+    if (!submissionId && student.existingGrade?.submission) {
+      submissionId = student.existingGrade.submission;
+    }
+    
+    // Fallback 2: API lookup if still missing but submission exists
+    if (!submissionId && student.submitted) {
+      const submissionRes = await apiClient.get(
+        `submission/?student=${studentId}&assignment=${selectedAssignment}`
+      );
+      if (submissionRes.data.results?.length > 0) {
+        submissionId = submissionRes.data.results[0].id;
+      }
+    }
+
+    // Final validation
+    if (!submissionId) {
+      console.error("Submission resolution failed:", {
+        studentId,
+        assignment: selectedAssignment,
+        studentData: student
+      });
+      throw new Error("Could not verify submission. Please contact support.");
+    }
+
+    // 3. Grade validation
+    const rawGrade = grades[studentId];
+    const score = parseInt(rawGrade, 10);
+    
+    if (isNaN(score)) {
+      throw new Error("Please enter a valid numerical grade");
+    }
+    
+    if (score < 0 || score > 10) {
+      throw new Error("Grade must be between 0 and 10");
+    }
+
+    // 4. Prepare payload
+    const payload = {
+      score,
+      feedback: feedback[studentId]?.trim() || "",
+      submission: submissionId,
+    };
+
+    // 5. API call logic
+    let response;
+    if (existingEvaluations[studentId]) {
+      // Update existing grade (PUT)
+      response = await apiClient.put(
+        `grades/${existingEvaluations[studentId].id}/`,
+        payload
+      );
+    } else {
+      // Create new grade (POST with full context)
+      response = await apiClient.post("grades/", {
+        ...payload,
+        student: studentId,
+        assignment: selectedAssignment,
+        course: selectedCourse,
+        track: selectedTrack
+      });
+    }
+
+    // 6. Refresh data and update state
+    await fetchSubmissionStatus(selectedAssignment);
+    
+    // Clear feedback/grade if new submission
+    if (!existingEvaluations[studentId]) {
+      setFeedback(prev => ({ ...prev, [studentId]: "" }));
+      setGrades(prev => ({ ...prev, [studentId]: "" }));
+    }
+
+    setSnackbar({
+      open: true,
+      message: `Grade ${existingEvaluations[studentId] ? "updated" : "recorded"} successfully`,
+      severity: "success",
+    });
+
+  } catch (err) {
+    console.error("Grade submission error:", {
+      error: err.message,
+      response: err.response?.data
+    });
+    
+    setSnackbar({
+      open: true,
+      message: err.response?.data?.detail || err.message,
+      severity: "error",
+    });
+  } finally {
+    setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
+  }
+};
 
   // Filter courses for selected track
-  const filteredCourses = data?.courses?.filter((course) =>
-    course?.tracks?.some((track) => track.id === Number(selectedTrack))
-  ) ?? [];
-  
-  // console.log(selectedTrack,data?.courses[0].tracks[0].name)
+  const filteredCourses = data.courses.filter((course) =>
+    course.tracks.some((track) => track.id === Number(selectedTrack))
+  );
 
-  // Filter students based on status
-
-  // Safe fallback for submissionData
-  const submitters = submissionData?.submitters || [];
-  const nonSubmitters = submissionData?.non_submitters || [];
-
-  // Normalize and merge students
+  // Student filtering
   const mergedStudents = [
-    ...submitters.map((student) => ({ ...student, submitted: true })),
-    ...nonSubmitters.map((student) => ({
-      ...student,
+    ...(submissionData.submitters || []),
+    ...(submissionData.non_submitters || []).map((s) => ({
+      ...s,
       submitted: false,
       submission_date: null,
       file_url: null,
     })),
   ];
 
-  // Filter based on status
   const filteredStudents = mergedStudents.filter((student) =>
     statusFilter === "all"
       ? true
@@ -273,8 +367,8 @@ console.log(data);
         Student Submissions
       </Typography>
 
+      {/* Selection Grids */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Track Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Track</InputLabel>
@@ -293,7 +387,6 @@ console.log(data);
           </FormControl>
         </Grid>
 
-        {/* Course Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Course</InputLabel>
@@ -312,7 +405,6 @@ console.log(data);
           </FormControl>
         </Grid>
 
-        {/* Assignment Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Assignment</InputLabel>
@@ -331,7 +423,6 @@ console.log(data);
           </FormControl>
         </Grid>
 
-        {/* Status Filter */}
         <Grid item xs={12} md={12}>
           <FormControl fullWidth>
             <InputLabel>Filter by Status</InputLabel>
@@ -348,20 +439,14 @@ console.log(data);
         </Grid>
       </Grid>
 
-      {/* Loading States */}
+      {/* Loading and Error States */}
       {loading.initial && (
         <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
           <CircularProgress />
           <Typography sx={{ ml: 2 }}>Loading initial data...</Typography>
         </Box>
       )}
-
-      {/* Error Handling */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {/* Submissions List */}
       {submissionData && (
@@ -380,29 +465,17 @@ console.log(data);
               sx={{ mb: 2, boxShadow: 3 }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box
-                  sx={{
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
+                <Box sx={{ width: "100%", display: "flex", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <PersonIcon />
                     <Typography>{student.name}</Typography>
                     <Chip
                       label={student.submitted ? "Submitted" : "Not Submitted"}
                       color={student.submitted ? "success" : "error"}
-                      icon={
-                        student.submitted ? <CheckCircleIcon /> : <CancelIcon />
-                      }
+                      icon={student.submitted ? <CheckCircleIcon /> : <CancelIcon />}
                     />
                   </Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ alignContent: "center" }}
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     {student.email}
                   </Typography>
                 </Box>
@@ -411,15 +484,12 @@ console.log(data);
               <AccordionDetails>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1">
-                      Submission Details
-                    </Typography>
+                    <Typography variant="subtitle1">Submission Details</Typography>
                     <Divider sx={{ mb: 2 }} />
                     {student.submitted ? (
                       <>
                         <Typography variant="body2">
-                          Submitted:{" "}
-                          {new Date(student.submission_date).toLocaleString()}
+                          Submitted: {new Date(student.submission_date).toLocaleString()}
                         </Typography>
                         {student.file_url && (
                           <Button
@@ -434,17 +504,13 @@ console.log(data);
                         )}
                       </>
                     ) : (
-                      <Typography color="text.secondary">
-                        No submission found
-                      </Typography>
+                      <Typography color="text.secondary">No submission found</Typography>
                     )}
                   </Grid>
 
                   <Grid item xs={12} md={6}>
                     <Typography variant="subtitle1">Evaluation</Typography>
                     <Divider sx={{ mb: 2 }} />
-
-                    {/* Feedback and Grade Input Logic */}
                     {student.submitted ? (
                       <>
                         <TextField
@@ -456,20 +522,40 @@ console.log(data);
                           onChange={handleFeedbackChange(student.student_id)}
                           sx={{ mb: 2 }}
                         />
-
                         <TextField
                           fullWidth
                           type="number"
-                          label="Grade"
+                          label="Grade (0-10)"
                           inputProps={{ min: 0, max: 10 }}
                           value={grades[student.student_id] || ""}
                           onChange={handleGradeChange(student.student_id)}
                           sx={{ mb: 2 }}
                         />
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={() => handleSubmitFeedback(student.student_id)}
+                          disabled={submitLoading[student.student_id]}
+                        >
+                          {submitLoading[student.student_id] ? (
+                            <CircularProgress size={24} sx={{ color: "#fff" }} />
+                          ) : existingEvaluations[student.student_id] ? (
+                            "Update Evaluation"
+                          ) : (
+                            "Submit Evaluation"
+                          )}
+                        </Button>
+                        {existingEvaluations[student.student_id] && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Last updated:{" "}
+                            {new Date(
+                              existingEvaluations[student.student_id].updated_at
+                            ).toLocaleString()}
+                          </Typography>
+                        )}
                       </>
                     ) : (
                       <>
-                        {/* Show grade as 0 and disable input if not submitted */}
                         <TextField
                           fullWidth
                           type="number"
@@ -478,32 +564,16 @@ console.log(data);
                           disabled
                           sx={{ mb: 2 }}
                         />
-                        {/* Hide feedback field */}
                         <TextField
                           fullWidth
                           multiline
                           rows={3}
                           label="Feedback"
-                          value="No Thing Submitted"
+                          value="No submission available"
                           disabled
                           sx={{ mb: 2 }}
                         />
                       </>
-                    )}
-
-                    {student.submitted && (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => handleSubmitFeedback(student.student_id)}
-                        disabled={submitLoading[student.student_id]}
-                      >
-                        {submitLoading[student.student_id] ? (
-                          <CircularProgress size={24} sx={{ color: "#fff" }} />
-                        ) : (
-                          "Save Evaluation"
-                        )}
-                      </Button>
                     )}
                   </Grid>
                 </Grid>
@@ -515,33 +585,18 @@ console.log(data);
 
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "center",
-        }}
-        message={
-          <Typography
-            sx={{
-              margin: "auto",
-              textAlign: "center",
-              width: "100%",
-              fontWeight: "bold",
-              fontSize: "1rem",
-            }}
-          >
-            {snackbar.message}
-          </Typography>
-        }
-        ContentProps={{
-          sx: {
-            backgroundColor: snackbar.severity === "success" ? "green" : "red",
-            color: "#fff",
-            justifyContent: "center",
-          },
-        }}
-      />
+        autoHideDuration={6000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

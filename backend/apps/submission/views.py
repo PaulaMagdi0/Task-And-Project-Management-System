@@ -36,6 +36,7 @@ from .serializers import AssignmentSubmissionSerializer,AssignmentDetailSerializ
 from apps.submission.models import AssignmentSubmission
 from rest_framework.permissions import IsAuthenticated
 from apps.staff_members.permissions import IsInstructor
+from apps.grades.models import Grade
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
     queryset = AssignmentSubmission.objects.all()
@@ -145,32 +146,29 @@ class AssignmentStudentDetailView(APIView):
     permission_classes = [IsAuthenticated, IsInstructor]
 
     def get_assignment_submission(self, assignment_id, student_id):
-        assignment = get_object_or_404(Assignment, id=assignment_id)
-        student = get_object_or_404(Student, id=student_id)
-
-        assignment_student = AssignmentStudent.objects.filter(
-            assignment=assignment,
-            student=student
-        ).first()
-
-        if not assignment_student:
-            raise ValidationError("Student was not assigned this assignment.")
-
-        course = assignment_student.course
-        track = assignment_student.track
-
-        submission = AssignmentSubmission.objects.filter(
-            assignment=assignment,
-            student=student,
-            course=course,
-            track=track
-        ).first()
-
-        return assignment, student, submission, course, track
+        try:
+            # Fetch the necessary objects
+            assignment = Assignment.objects.get(id=assignment_id)
+            student = Student.objects.get(id=student_id)
+            course = assignment.course  # Assuming assignment is linked to a course
+            track = student.track  # Assuming student is linked to a track
+            
+            # Fetch the submission (if it exists)
+            submission = student.submissions.filter(assignment_id=assignment_id).first()
+            
+            return assignment, student, submission, course, track
+        except Assignment.DoesNotExist:
+            raise Exception("Assignment not found.")
+        except Student.DoesNotExist:
+            raise Exception("Student not found.")
 
     def get(self, request, assignment_id, student_id):
         try:
+            # Retrieve data from the database
             assignment, student, submission, course, track = self.get_assignment_submission(assignment_id, student_id)
+            
+            # Fetch the grade information (if exists)
+            grade = Grade.objects.filter(assignment=assignment, student=student).first()
 
             submission_data = {
                 "student": student.full_name,
@@ -183,18 +181,26 @@ class AssignmentStudentDetailView(APIView):
                 submission_data.update({
                     "submission_time": submission.submission_date,
                     "file_url": submission.file_url,
-                    "feedback": submission.feedback,
-                    "score": submission.score
+                })
+            
+            # If there's a grade, include it in the response
+            if grade:
+                submission_data.update({
+                    "feedback": grade.feedback or "No feedback",  # Default to 'No feedback' if missing
+                    "score": grade.score if grade.score is not None else None,  # Handle null score
+                    "graded_date": grade.graded_date
                 })
 
+            # Serialize the assignment data
             assignment_data = AssignmentDetailSerializer(assignment).data
 
+            # Return the combined response
             return Response({
                 "assignment": assignment_data,
                 "submission": submission_data
             }, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def post(self, request, assignment_id, student_id):
         return self._update_feedback(request, assignment_id, student_id, create_only=True)
@@ -349,3 +355,30 @@ class AssignmentReportView(APIView):
                 {"error": "Failed to generate report. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class SubmissionByStudentAssignmentView(generics.ListAPIView):
+    serializer_class = AssignmentSubmissionSerializer
+
+    def get_queryset(self):
+        student_id = self.request.query_params.get('student')
+        assignment_id = self.request.query_params.get('assignment')
+
+        if not student_id or not assignment_id:
+            logger.warning("Missing student or assignment query parameter.")
+            return AssignmentSubmission.objects.none()
+
+        logger.debug(f"Filtering submissions for student={student_id}, assignment={assignment_id}")
+        return AssignmentSubmission.objects.filter(student_id=student_id, assignment_id=assignment_id)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        if not queryset.exists():
+            logger.info(f"No submission found for student={request.query_params.get('student')} and assignment={request.query_params.get('assignment')}")
+            return Response(
+                {"detail": "Submission not found for this student and assignment."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

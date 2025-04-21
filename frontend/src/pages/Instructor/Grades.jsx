@@ -370,7 +370,7 @@ const Grades = () => {
   };
 
   const filteredCourses = data.courses.filter((course) =>
-    course.tracks.includes(Number(selectedTrack))
+    course.tracks.some((track) => track.id === Number(selectedTrack))
   );
 
   const filteredStudents = submissionData
