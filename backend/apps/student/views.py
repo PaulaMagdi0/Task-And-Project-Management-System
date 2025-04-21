@@ -1,12 +1,15 @@
 import logging
 from rest_framework import status
 from rest_framework.response import Response
+from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes,parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
 from rest_framework import generics
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
@@ -238,29 +241,22 @@ def verify_email(request, verification_code):
     """Email verification endpoint with security checks"""
     try:
         student = get_object_or_404(Student, verification_code=verification_code)
-        
+
         if student.verified:
-            return Response(
-                {'status': 'already_verified'}, 
-                status=status.HTTP_200_OK
-            )
+            return redirect("http://localhost:5174/verified")
 
         student.verified = True
         student.verification_code = None
         student.save()
-        
+
         logger.info(f"Student {student.id} email verified")
-        return Response(
-            {'status': 'success'},
-            status=status.HTTP_200_OK
-        )
+        return redirect("http://localhost:5174/verified")
 
     except Exception as e:
         logger.error(f"Verification failed: {str(e)}")
-        return Response(
-            {'status': 'invalid_code'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return redirect("http://localhost:5174/not-verified")
+
+            
 from rest_framework.permissions import IsAuthenticated
 
 @api_view(['GET'])
@@ -269,7 +265,8 @@ def student_courses(request, student_id):
     try:
         # Get requested student
         student = Student.objects.select_related('user').get(id=student_id)
-        
+        # logger.info(f"User ID from token: {request.user.id}")
+
         # Verify permission
         if request.user != student.user and not request.user.is_staff:
             return Response(
@@ -300,34 +297,39 @@ def student_courses(request, student_id):
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
-    """Secure student update with permission checks"""
+    """Change the student's password only"""
     student = get_object_or_404(Student, id=student_id)
     
-    # Permission check
-    if not (has_student_management_permission(request.user) or request.user.id == student_id):
-        raise PermissionDenied("You don't have permission to update this student")
-
-    serializer = StudentSerializer(
-        student, 
-        data=request.data, 
-        partial=True,
-        context={'request': request}
-    )
-
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        serializer.save()
-        logger.info(f"Student {student_id} updated by user {request.user.id}")
-        return Response(serializer.data)
-    
-    except Exception as e:
-        logger.error(f"Update failed for student {student_id}: {str(e)}")
+    # Permission check: Ensure the user has permission to change the password
+    if request.user.id != student_id:
         return Response(
-            {"error": "Update failed"}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "You do not have permission to change this password"},
+            status=status.HTTP_403_FORBIDDEN
         )
+
+    current_password = request.data.get('currentPassword')
+    new_password = request.data.get('newPassword')
+
+    if not current_password or not new_password:
+        return Response(
+            {"error": "Both current password and new password are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Authenticate the user to verify the current password
+    user = student.user
+    if not authenticate(username=user.username, password=current_password):
+        return Response(
+            {"error": "Current password is incorrect"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Update the password and save it
+    user.password = make_password(new_password)
+    user.save()
+
+    return Response({"message": "Password updated successfully"})
+
 
 
 @api_view(['DELETE'])

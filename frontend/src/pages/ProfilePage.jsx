@@ -36,11 +36,12 @@ const ProfilePage = () => {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [userData, setUserData] = useState({
-        fullName: '',
+        first_name: '',
+        last_name: '',
         phone: '',
-        position: '',
+        role: '',
         department: '',
-        joinDate: '',
+        date_joined: '',
         location: '',
         languages: '',
         currentPassword: '',
@@ -50,14 +51,16 @@ const ProfilePage = () => {
     // Fetch user data on component mount
     useEffect(() => {
         const fetchUserData = async () => {
+            const studentId = localStorage.getItem("user_id");
             try {
-                const response = await axios.get('/api/user/profile', {
+                const response = await axios.get(`http://localhost:8000/api/student/${studentId}/courses`, {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
                 });
 
                 const data = response.data;
+                console.log('Student Courses:', data);
                 setUserData({
                     fullName: data.fullName || username,
                     phone: data.phone || '+20 123 456 7890',
@@ -88,6 +91,7 @@ const ProfilePage = () => {
 
         fetchUserData();
     }, [token, username]);
+    // console.log(userData);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -102,8 +106,8 @@ const ProfilePage = () => {
 
     const handleSave = async () => {
         try {
-            // Verify current password and update new password
-            await axios.put('/api/user/change-password', {
+            // Send the request to change the password
+            const response = await axios.patch('/api/user/change-password', {
                 currentPassword: userData.currentPassword,
                 newPassword: userData.newPassword
             }, {
@@ -112,13 +116,20 @@ const ProfilePage = () => {
                 }
             });
 
+            // If the password is updated successfully
             setIsEditing(false);
             setUserData(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+
+            // Optionally, show a success message to the user
+            alert('Password updated successfully');
         } catch (error) {
             console.error('Error changing password:', error);
             // Handle error (show error message to user)
+            alert('Failed to update password: ' + error?.response?.data?.detail || 'Something went wrong');
         }
     };
+
+
 
     return (
         <Box sx={{
@@ -207,7 +218,7 @@ const ProfilePage = () => {
                             <TextField
                                 fullWidth
                                 label="Full Name"
-                                value={userData.fullName}
+                                value={`${userData.first_name} ${userData.last_name}`}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -224,7 +235,7 @@ const ProfilePage = () => {
                             <TextField
                                 fullWidth
                                 label="Email"
-                                value={email}
+                                value={userData.email}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -237,7 +248,7 @@ const ProfilePage = () => {
                             />
                         </Grid>
 
-                        <Grid item xs={12} md={6}>
+                        {/* <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Phone"
@@ -252,13 +263,13 @@ const ProfilePage = () => {
                                 }}
                                 sx={textFieldStyles}
                             />
-                        </Grid>
+                        </Grid> */}
 
                         <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Join Date"
-                                value={userData.joinDate}
+                                value={userData.date_joined}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -292,7 +303,7 @@ const ProfilePage = () => {
                             <TextField
                                 fullWidth
                                 label="Position"
-                                value={userData.position}
+                                value={userData.role}
                                 InputProps={{
                                     readOnly: true
                                 }}
@@ -300,7 +311,7 @@ const ProfilePage = () => {
                             />
                         </Grid>
 
-                        <Grid item xs={12} md={6}>
+                        {/* <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Department"
@@ -310,7 +321,7 @@ const ProfilePage = () => {
                                 }}
                                 sx={textFieldStyles}
                             />
-                        </Grid>
+                        </Grid> */}
                     </Grid>
                 </Box>
 
