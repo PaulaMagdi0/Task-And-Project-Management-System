@@ -35,17 +35,10 @@ import {
 
 const TrackManagement = () => {
   const dispatch = useDispatch();
-  const { tracks, loading, error: serverError, message } = useSelector(state => state.tracks);
-  const { branches: allBranches } = useSelector(state => state.branches);
-  const { staff: allStaff } = useSelector(state => state.staff);
-  const { branch: managerBranch } = useSelector(state => state.auth);
-
-  // Only supervisors in this branch
-  const supervisors = allStaff.filter(s => s.role === 'supervisor' && s.branch?.id === managerBranch.id);
-  // Only show this branch
-  const branchOptions = allBranches.filter(b => b.id === managerBranch.id);
-  // Only show tracks in this branch
-  const filteredTracks = tracks.filter(t => t.branch === managerBranch.id);
+  const { tracks = [], loading, error: serverError, message } = useSelector(state => state.tracks);
+  const { branches = [] } = useSelector(state => state.branches);
+  const { staff: allStaff = [] } = useSelector(state => state.staff);
+  const supervisors = allStaff.filter(member => member.role === 'supervisor');
 
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -53,7 +46,7 @@ const TrackManagement = () => {
     description: '',
     track_type: 'ICC',
     supervisor: '',
-    branch: managerBranch.id,
+    branch: '',
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -76,7 +69,7 @@ const TrackManagement = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    setLocalError(serverError ? flattenError(serverError) : '');
+    if (serverError) setLocalError(flattenError(serverError)); else setLocalError('');
   }, [serverError]);
 
   const handleChange = e => {
@@ -88,26 +81,20 @@ const TrackManagement = () => {
   const toggleForm = () => {
     if (!formOpen) {
       setEditingId(null);
-      setFormData({ name: '', description: '', track_type: 'ICC', supervisor: '', branch: managerBranch.id });
+      setFormData({ name: '', description: '', track_type: 'ICC', supervisor: '', branch: '' });
       setLocalError('');
     }
     setFormOpen(o => !o);
   };
 
   const handleSubmit = async e => {
-    e.preventDefault();
-    setLocalError('');
-
-    const trimmedName = formData.name.trim();
-    const duplicate = filteredTracks.find(t => t.name === trimmedName && t.track_type === formData.track_type);
-    if (duplicate && (!editingId || duplicate.id !== editingId)) {
-      setLocalError('A track with this name and type already exists in your branch.');
-      return;
-    }
-    if (!trimmedName) { setLocalError('Name is required.'); return; }
+    e.preventDefault(); setLocalError('');
+    if (!formData.name.trim()) { setLocalError('Name is required.'); return; }
     if (!formData.description.trim()) { setLocalError('Description is required.'); return; }
+    if (!formData.track_type) { setLocalError('Track type is required.'); return; }
+    if (!formData.branch) { setLocalError('Branch is required.'); return; }
 
-    const payload = { ...formData, name: trimmedName };
+    const payload = { ...formData, name: formData.name.trim() };
     let result;
     if (editingId) {
       result = await dispatch(updateTrack({ id: editingId, data: payload }));
@@ -116,12 +103,8 @@ const TrackManagement = () => {
       result = await dispatch(createTrack(payload));
     }
 
-    if (result.error) {
-      setLocalError(flattenError(result.payload || result.error));
-    } else {
-      dispatch(fetchTracks());
-      setFormOpen(false);
-    }
+    if (result.error) setLocalError(flattenError(result.payload || result.error));
+    else { dispatch(fetchTracks()); setFormOpen(false); }
   };
 
   const handleEdit = track => {
@@ -131,16 +114,14 @@ const TrackManagement = () => {
       description: track.description,
       track_type: track.track_type,
       supervisor: track.supervisor || '',
-      branch: managerBranch.id,
+      branch: track.branch || '',
     });
     setFormOpen(true);
   };
 
   const openDeleteDialog = id => {
-    setTrackToDelete(id);
-    setDeleteDialogOpen(true);
+    setTrackToDelete(id); setDeleteDialogOpen(true);
   };
-
   const handleDelete = async () => {
     if (trackToDelete != null) {
       await dispatch(deleteTrack(trackToDelete));
@@ -148,6 +129,9 @@ const TrackManagement = () => {
       dispatch(fetchTracks());
     }
   };
+
+  // Filter supervisors dynamically based on selected branch in form
+  const filteredSupervisors = supervisors.filter(sup => sup.branch?.id === formData.branch);
 
   return (
     <Box sx={{ p: 4 }}>
@@ -176,13 +160,13 @@ const TrackManagement = () => {
               <InputLabel>Supervisor</InputLabel>
               <Select name="supervisor" value={formData.supervisor} onChange={handleChange} label="Supervisor">
                 <MenuItem value=""><em>None</em></MenuItem>
-                {supervisors.map(s => <MenuItem key={s.id} value={s.id}>{s.username}</MenuItem>)}
+                {filteredSupervisors.map(s => <MenuItem key={s.id} value={s.id}>{s.username}</MenuItem>)}
               </Select>
             </FormControl>
             <FormControl fullWidth required sx={{ mb:2 }}>
               <InputLabel>Branch</InputLabel>
-              <Select name="branch" value={formData.branch} label="Branch" disabled>
-                {branchOptions.map(b => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+              <Select name="branch" value={formData.branch} onChange={handleChange} label="Branch">
+                {branches.map(b => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
               </Select>
             </FormControl>
             <Button variant="contained" type="submit" disabled={loading}>{editingId ? 'Update Track' : 'Create Track'}</Button>
@@ -191,28 +175,25 @@ const TrackManagement = () => {
       </Collapse>
 
       <Paper sx={{ p:2 }}>
-        <Typography variant="h6" gutterBottom>Tracks in Your Branch</Typography>
-        {loading ? <Typography>Loading...</Typography> : (
+        <Typography variant="h6" gutterBottom>Tracks List</Typography>
+        {loading ? (<Typography>Loading tracks...</Typography>) : (
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Supervisor</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell>ID</TableCell><TableCell>Name</TableCell><TableCell>Type</TableCell><TableCell>Supervisor</TableCell><TableCell>Branch</TableCell><TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredTracks.map(t => (
+              {tracks.map(t => (
                 <TableRow key={t.id}>
                   <TableCell>{t.id}</TableCell>
                   <TableCell>{t.name}</TableCell>
                   <TableCell>{t.track_type}</TableCell>
-                  <TableCell>{t.supervisor ? supervisors.find(s => s.id === t.supervisor)?.username : 'None'}</TableCell>
+                  <TableCell>{t.supervisor ? supervisors.find(s=>s.id===t.supervisor)?.username : 'None'}</TableCell>
+                  <TableCell>{branches.find(b=>b.id===t.branch)?.name}</TableCell>
                   <TableCell>
-                    <Button size="small" onClick={() => handleEdit(t)}>Edit</Button>
-                    <Button size="small" color="error" sx={{ ml:1 }} onClick={() => openDeleteDialog(t.id)}>Delete</Button>
+                    <Button size="small" onClick={()=>handleEdit(t)}>Edit</Button>
+                    <Button size="small" color="error" sx={{ ml:1 }} onClick={()=>openDeleteDialog(t.id)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -221,11 +202,11 @@ const TrackManagement = () => {
         )}
       </Paper>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog open={deleteDialogOpen} onClose={()=>setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent><Typography>Are you sure you want to delete this track?</Typography></DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={()=>setDeleteDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleDelete} variant="contained" color="error">Delete</Button>
         </DialogActions>
       </Dialog>
