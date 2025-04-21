@@ -108,6 +108,57 @@ class StaffMemberListSerializer(serializers.ModelSerializer):
         return obj.branch.name
 
 
+# class CreateSupervisorSerializer(serializers.ModelSerializer):
+#     branch_id = serializers.PrimaryKeyRelatedField(
+#         queryset=Branch.objects.all(),
+#         source='branch',
+#         write_only=True,
+#         required=True
+#     )
+    
+#     class Meta:
+#         model = StaffMember
+#         fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id']
+#         extra_kwargs = {
+#             'password': {'write_only': True, 'required': False},
+#             'email': {'required': True}
+#         }
+
+#     def validate(self, data):
+#         if StaffMember.objects.filter(email=data['email']).exists():
+#             raise serializers.ValidationError({
+#                 'email': _('A user with this email already exists.')
+#             })
+#         return data
+
+#     @transaction.atomic
+#     def create(self, validated_data):
+#         # Remove any role that might have been passed in (to avoid duplicates)
+#         validated_data.pop('role', None)
+        
+#         password = validated_data.pop('password', None)
+#         branch = validated_data.pop('branch')
+        
+#         if not password:
+#             password = ''.join(
+#                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
+#                 for _ in range(12)
+#             )
+            
+#         supervisor = StaffMember(
+#             **validated_data,
+#             role=StaffMember.Role.SUPERVISOR  # Explicitly assign the supervisor role
+#         )
+        
+#         try:
+#             validate_password(password, supervisor)
+#             supervisor.set_password(password)
+#             supervisor.branch = branch
+#             supervisor.save()
+#             return supervisor
+#         except DjangoValidationError as e:
+#             raise serializers.ValidationError({'password': e.messages})
+
 class CreateSupervisorSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
@@ -118,13 +169,24 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = StaffMember
-        fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id']
+        fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id', 'role']  # Added 'role'
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
-            'email': {'required': True}
+            'email': {'required': True},
+            'role': {'required': True}  # Ensure role is required
         }
 
+    def validate_role(self, value):
+        # Validate that role is either SUPERVISOR or BRANCH_MANAGER
+        valid_roles = [StaffMember.Role.SUPERVISOR, StaffMember.Role.BRANCH_MANAGER]
+        if value not in valid_roles:
+            raise serializers.ValidationError(
+                f"Role must be one of {[r.value for r in valid_roles]}."
+            )
+        return value
+
     def validate(self, data):
+        # Check email uniqueness
         if StaffMember.objects.filter(email=data['email']).exists():
             raise serializers.ValidationError({
                 'email': _('A user with this email already exists.')
@@ -133,32 +195,34 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        # Remove any role that might have been passed in (to avoid duplicates)
-        validated_data.pop('role', None)
+        # Extract role from validated data
+        role = validated_data.pop('role')
         
+        # Extract password and branch
         password = validated_data.pop('password', None)
         branch = validated_data.pop('branch')
         
+        # Generate random password if none provided
         if not password:
             password = ''.join(
                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
                 for _ in range(12)
             )
             
-        supervisor = StaffMember(
+        # Create staff member with the provided role
+        staff = StaffMember(
             **validated_data,
-            role=StaffMember.Role.SUPERVISOR  # Explicitly assign the supervisor role
+            role=role  # Use the role from validated data
         )
         
         try:
-            validate_password(password, supervisor)
-            supervisor.set_password(password)
-            supervisor.branch = branch
-            supervisor.save()
-            return supervisor
+            validate_password(password, staff)
+            staff.set_password(password)
+            staff.branch = branch
+            staff.save()
+            return staff
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
-
 class CreateBranchManagerSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),

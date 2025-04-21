@@ -157,11 +157,11 @@ const Courses = () => {
 
   // Filter courses
   const filteredCourses = courses.filter((course) => {
-    const courseTracks = course.tracks.map(
+    const courseTracks = (course.tracks || []).map(
       (trackId) => tracks.find((t) => t.id === trackId)?.name || ""
     );
     const courseDate = new Date(course.created_at).toISOString().split("T")[0];
-
+  
     return (
       (course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
@@ -170,16 +170,18 @@ const Courses = () => {
       (!createdAtFilter || courseDate === createdAtFilter)
     );
   });
+  
 
   const rows = filteredCourses.map((course) => ({
     id: course.id,
     name: course.name,
     description: course.description,
-    tracks: course.tracks.map(
+    tracks: (course.tracks || []).map(
       (trackId) => tracks.find((t) => t.id === trackId)?.name || "Unknown Track"
     ),
     created_at: formatDate(course.created_at),
   }));
+  
 
   return (
     <Box sx={{ padding: 3 }}>
