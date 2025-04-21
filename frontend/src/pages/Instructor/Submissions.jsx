@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import {
   Box,
   Typography,
@@ -21,22 +21,26 @@ import {
 } from "@mui/material";
 import {
   ExpandMore as ExpandMoreIcon,
-  Assignment as AssignmentIcon,
   Person as PersonIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
 import apiClient from "../../services/api";
-import { fetchAssignments } from "../../redux/assignmentsSlice";
-import { fetchCourses } from "../../redux/coursesSlice";
 
 const Submissions = () => {
-  const dispatch = useDispatch();
-  const { assignments } = useSelector((state) => state.assignments);
-  const { data: courses } = useSelector((state) => state.courses);
   const instructorId = useSelector((state) => state.auth.user_id);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState({
+    initial: true,
+    assignments: false,
+    submissions: false,
+  });
+  const [error, setError] = useState(null);
+  const [data, setData] = useState({ tracks: [], courses: [] });
+  const [selectedTrack, setSelectedTrack] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedAssignment, setSelectedAssignment] = useState("");
+  const [assignments, setAssignments] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [submissionData, setSubmissionData] = useState({
     submitters: [],
@@ -47,89 +51,121 @@ const Submissions = () => {
   const [feedback, setFeedback] = useState({});
   const [grades, setGrades] = useState({});
   const [submitLoading, setSubmitLoading] = useState({});
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [selectedAssignment, setSelectedAssignment] = useState("");
-  const [selectedTrack, setSelectedTrack] = useState("");
+  const [existingEvaluations, setExistingEvaluations] = useState({});
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
+  // Fetch tracks and courses on mount
   useEffect(() => {
-    dispatch(fetchAssignments(instructorId));
-    dispatch(fetchCourses(instructorId));
-  }, [dispatch, instructorId]);
-
-  const fetchSubmissionStatus = async (assignmentId, trackId) => {
-    try {
-      setLoading(true);
-      const assignment = assignments.find((a) => a.id === assignmentId);
-      if (!assignment) {
-        console.error("Assignment not found for ID:", assignmentId);
-        return;
+    const fetchTracksAndCourses = async () => {
+      try {
+        setLoading((prev) => ({ ...prev, initial: true }));
+        const response = await apiClient.get(
+          `staff/track-and-courses/${instructorId}/`
+        );
+        setData({
+          tracks: response.data.tracks,
+          courses: response.data.courses,
+        });
+        setError(null);
+      } catch (err) {
+        setError("Failed to fetch tracks and courses");
+      } finally {
+        setLoading((prev) => ({ ...prev, initial: false }));
       }
+    };
+    fetchTracksAndCourses();
+  }, [instructorId]);
 
+  // Fetch assignments when track and course are selected
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!selectedTrack || !selectedCourse) return;
+
+      try {
+        setLoading((prev) => ({ ...prev, assignments: true }));
+        const response = await apiClient.get(
+          `assignments/track/${selectedTrack}/course/${selectedCourse}/assignments/`
+        );
+        setAssignments(response.data.assignments);
+      } catch (err) {
+        setError("Failed to fetch assignments");
+      } finally {
+        setLoading((prev) => ({ ...prev, assignments: false }));
+      }
+    };
+    fetchAssignments();
+  }, [selectedTrack, selectedCourse]);
+
+  // Fetch submissions when assignment is selected
+  const fetchSubmissionStatus = async (assignmentId) => {
+    try {
+      setLoading((prev) => ({ ...prev, submissions: true }));
       const response = await apiClient.get(
-        `assignments/${assignmentId}/track/${trackId}/course/${assignment.course}/submitters/`
+        `assignments/${assignmentId}/track/${selectedTrack}/course/${selectedCourse}/submitters/`
       );
-      console.log("API Response:", response.data);
 
-      // Combine submitters and non_submitters, adding a `submitted` property
-      const submittersWithStatus = (response.data.submitters || []).map((student) => ({
-        ...student,
-        submitted: true,
-      }));
-      const nonSubmittersWithStatus = (response.data.non_submitters || []).map((student) => ({
-        ...student,
-        submitted: false,
-        submission_date: null,
-        file_url: null,
-        submission_assignment_url: null,
-      }));
-
-      const allStudents = [...submittersWithStatus, ...nonSubmittersWithStatus];
-
-      // Fetch submission URLs for submitted students
-      const dataWithUrls = await Promise.all(
-        allStudents.map(async (student) => {
-          if (student.submitted) {
-            try {
-              const res = await apiClient.get(`submission/${student.student_id}/`);
-              return { ...student, submission_assignment_url: res.data.url || null };
-            } catch {
-              return { ...student, submission_assignment_url: null };
-            }
+      const dataWithGrades = await Promise.all(
+        response.data.submitters.map(async (student) => {
+          try {
+            const { data } = await apiClient.get(
+              `submission/assignments/${assignmentId}/students/${student.student_id}/`
+            );
+            return {
+              ...student,
+              submitted: data.submission?.status === "Submitted",
+              submission_id: data.submission?.id,
+              submission_date: data.submission?.submission_time,
+              file_url: data.submission?.file_url,
+              existingEvaluation: data.submission || null,
+            };
+          } catch (err) {
+            return {
+              ...student,
+              submitted: false,
+              submission_id: null,
+              submission_date: null,
+              file_url: null,
+              existingEvaluation: null,
+            };
           }
-          return student;
         })
       );
 
-      setSubmissionData({
-        submitters: dataWithUrls,
-        submitted_count: response.data.submitted_count || 0,
-        not_submitted_count: response.data.not_submitted_count || 0,
+      const evaluations = {};
+      dataWithGrades.forEach((student) => {
+        if (student.existingEvaluation) {
+          evaluations[student.student_id] = student.existingEvaluation;
+        }
       });
+      setExistingEvaluations(evaluations);
 
-      console.log("Updated submissionData:", {
-        submitters: dataWithUrls,
-        submitted_count: response.data.submitted_count,
-        not_submitted_count: response.data.not_submitted_count,
-      });
-    } catch (error) {
-      console.error("Error fetching submission status:", error);
       setSubmissionData({
-        submitters: [],
-        submitted_count: 0,
-        not_submitted_count: 0,
+        ...response.data,
+        submitters: dataWithGrades,
       });
+    } catch (err) {
+      setError("Failed to fetch submission data");
     } finally {
-      setLoading(false);
+      setLoading((prev) => ({ ...prev, submissions: false }));
     }
   };
 
+  // Handler functions
   const handleTrackChange = (event) => {
-    const trackId = event.target.value;
-    console.log("Selected Track:", trackId);
-    setSelectedTrack(trackId);
-    if (selectedAssignment) {
-      fetchSubmissionStatus(selectedAssignment, trackId);
-    }
+    setSelectedTrack(event.target.value);
+    setSelectedCourse("");
+    setSelectedAssignment("");
+    setSubmissionData(null);
+  };
+
+  const handleCourseChange = (event) => {
+    setSelectedCourse(event.target.value);
+    setSelectedAssignment("");
+    setSubmissionData(null);
   };
 
   const handleAssignmentChange = (event) => {
@@ -149,47 +185,75 @@ const Submissions = () => {
   const handleGradeChange = (studentId) => (e) => setGrades({ ...grades, [studentId]: e.target.value });
 
   const handleSubmitFeedback = async (studentId) => {
-    const studentFeedback = feedback[studentId];
-    const studentGrade = grades[studentId];
-
-    if (!studentFeedback || !studentGrade || studentGrade < 0 || studentGrade > 10) {
-      setSnackbar({ open: true, message: "Invalid input. Check feedback and grade.", severity: "error" });
-      return;
-    }
-
     try {
+      const student = filteredStudents.find((s) => s.student_id === studentId);
+      console.log("Student:", student);
+      // if (!student?.submission_id) {
+      //   setSnackbar({
+      //     open: true,
+      //     message: "Submission data not available",
+      //     severity: "error",
+      //   });
+      //   return;
+      // }
+
+      const payload = {
+        score: parseInt(grades[studentId]),
+        feedback: feedback[studentId]?.trim() || "",
+      };
+
       setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
-      await apiClient.put(`/submissions/${studentId}`, {
-        feedback: studentFeedback,
-        grade: studentGrade,
-        assignment_id: selectedAssignment,
+
+      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
+      if (existingEvaluations[studentId]) {
+        await apiClient.put(endpoint, payload);
+      } else {
+        await apiClient.post(endpoint, payload);
+      }
+
+      setFeedback((prev) => ({ ...prev, [studentId]: "" }));
+      setGrades((prev) => ({ ...prev, [studentId]: "" }));
+      fetchSubmissionStatus(selectedAssignment);
+
+      setSnackbar({
+        open: true,
+        message: "Evaluation submitted successfully",
+        severity: "success",
       });
-      setSnackbar({ open: true, message: "Evaluation submitted successfully.", severity: "success" });
-      setExpandedStudent(null);
-      fetchSubmissionStatus(selectedAssignment, selectedTrack);
     } catch (err) {
-      setSnackbar({ open: true, message: "Failed to submit evaluation", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || "Failed to submit evaluation",
+        severity: "error",
+      });
     } finally {
       setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
     }
   };
 
-  const filteredStudents = () => {
-    console.log("submissionData:", submissionData);
-    if (!submissionData || !submissionData.submitters) {
-      console.log("No submitters found, returning empty array");
-      return [];
-    }
-    const filtered = submissionData.submitters.filter((student) => {
-      console.log("Filtering student:", student);
-      if (statusFilter === "all") return true;
-      if (statusFilter === "submitted") return student.submitted;
-      if (statusFilter === "not-submitted") return !student.submitted;
-      return false;
-    });
-    console.log("Filtered students:", filtered);
-    return filtered;
-  };
+  // Filter courses for selected track
+  const filteredCourses = data.courses.filter((course) =>
+    course.tracks.includes(Number(selectedTrack))
+  );
+
+  // Filter students based on status
+  const filteredStudents = submissionData
+    ? [
+        ...submissionData.submitters,
+        ...submissionData.non_submitters.map((student) => ({
+          ...student,
+          submitted: false,
+          submission_date: null,
+          file_url: null,
+        })),
+      ].filter((student) =>
+        statusFilter === "all"
+          ? true
+          : statusFilter === "submitted"
+          ? student.submitted
+          : !student.submitted
+      )
+    : [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -198,11 +262,17 @@ const Submissions = () => {
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
+        {/* Track Selector */}
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Track</InputLabel>
-            <Select value={selectedTrack} onChange={handleTrackChange} label="Select Track">
-              {courses?.tracks?.map((track) => (
+            <Select
+              value={selectedTrack}
+              onChange={handleTrackChange}
+              label="Select Track"
+              disabled={loading.initial}
+            >
+              {data.tracks.map((track) => (
                 <MenuItem key={track.id} value={track.id}>
                   {track.name}
                 </MenuItem>
@@ -211,23 +281,46 @@ const Submissions = () => {
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        {/* Course Selector */}
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth>
-            <InputLabel>Select Assignment</InputLabel>
-            <Select value={selectedAssignment} onChange={handleAssignmentChange} label="Select Assignment">
-              {assignments.map((assignment) => (
-                <MenuItem key={assignment.id} value={assignment.id}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <AssignmentIcon fontSize="small" />
-                    {assignment.title}
-                  </Box>
+            <InputLabel>Select Course</InputLabel>
+            <Select
+              value={selectedCourse}
+              onChange={handleCourseChange}
+              label="Select Course"
+              disabled={!selectedTrack || loading.assignments}
+            >
+              {filteredCourses.map((course) => (
+                <MenuItem key={course.id} value={course.id}>
+                  {course.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        {/* Assignment Selector */}
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel>Select Assignment</InputLabel>
+            <Select
+              value={selectedAssignment}
+              onChange={handleAssignmentChange}
+              label="Select Assignment"
+              disabled={!selectedCourse || loading.assignments}
+            >
+              {assignments.map((assignment) => (
+                <MenuItem key={assignment.id} value={assignment.id}>
+                  {assignment.title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Status Filter */}
+        <Grid item xs={12} md={12}>
           <FormControl fullWidth>
             <InputLabel>Filter by Status</InputLabel>
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Filter by Status">
@@ -239,112 +332,191 @@ const Submissions = () => {
         </Grid>
       </Grid>
 
-      {loading && (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-          <CircularProgress size={60} />
+      {/* Loading States */}
+      {loading.initial && (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+          <CircularProgress />
+          <Typography sx={{ ml: 2 }}>Loading initial data...</Typography>
         </Box>
       )}
 
+      {/* Error Handling */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Submissions List */}
       {submissionData && (
         <Box sx={{ mt: 2 }}>
           <Typography variant="subtitle1" sx={{ mb: 2 }}>
-            Showing {filteredStudents().length} students (
-            {submissionData.submitted_count} submitted, {submissionData.not_submitted_count} not submitted)
+            Showing {filteredStudents.length} students (
+            {submissionData.submitted_count} submitted,{" "}
+            {submissionData.not_submitted_count} not submitted)
           </Typography>
 
-          {filteredStudents().length === 0 && (
-            <Typography>No students found for this assignment and track.</Typography>
-          )}
-
-          {filteredStudents().map((student) => (
+          {filteredStudents.map((student) => (
             <Accordion
               key={student.student_id}
               expanded={expandedStudent === student.student_id}
               onChange={handleAccordionChange(student.student_id)}
-              sx={{ border: "1px solid #ddd", borderRadius: "5px", marginBottom: 2, boxShadow: "none" }}
+              sx={{ mb: 2, boxShadow: 3 }}
             >
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                sx={{ backgroundColor: "#f9f9f9", borderBottom: "1px solid #ddd" }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box
+                  sx={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <PersonIcon color="action" />
+                    <PersonIcon />
                     <Typography>{student.name}</Typography>
                     <Chip
                       label={student.submitted ? "Submitted" : "Not Submitted"}
                       color={student.submitted ? "success" : "error"}
-                      icon={student.submitted ? <CheckCircleIcon /> : <CancelIcon />}
-                      size="small"
+                      icon={
+                        student.submitted ? <CheckCircleIcon /> : <CancelIcon />
+                      }
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ alignContent: "center" }}
+                  >
                     {student.email}
                   </Typography>
                 </Box>
               </AccordionSummary>
 
-              <AccordionDetails sx={{ display: "flex", flexDirection: "column", gap: 2, padding: "16px" }}>
+              <AccordionDetails>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom>
+                    <Typography variant="subtitle1">
                       Submission Details
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
                     {student.submitted ? (
                       <>
                         <Typography variant="body2">
-                          <strong>Submission Date:</strong>{" "}
-                          {student.submission_date
-                            ? new Date(student.submission_date).toLocaleString()
-                            : "N/A"}
+                          Submitted:{" "}
+                          {new Date(student.submission_date).toLocaleString()}
                         </Typography>
                         {student.file_url && (
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <FileIcon fontSize="small" />
-                            <a href={student.file_url} target="_blank" rel="noopener noreferrer">
-                              View Submission
-                            </a>
-                          </Box>
+                          <Button
+                            variant="outlined"
+                            startIcon={<FileIcon />}
+                            href={student.file_url}
+                            target="_blank"
+                            sx={{ mt: 1 }}
+                          >
+                            View Submission
+                          </Button>
                         )}
                       </>
                     ) : (
-                      <Typography variant="body2">No submission yet.</Typography>
+                      <Typography color="text.secondary">
+                        No submission found
+                      </Typography>
                     )}
                   </Grid>
 
                   <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Evaluation
-                    </Typography>
+                    <Typography variant="subtitle1">Evaluation</Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <TextField
-                      label="Feedback"
-                      multiline
-                      rows={4}
-                      variant="outlined"
-                      fullWidth
-                      value={feedback[student.student_id] || ""}
-                      onChange={handleFeedbackChange(student.student_id)}
-                    />
-                    <TextField
-                      label="Grade"
-                      variant="outlined"
-                      fullWidth
-                      value={grades[student.student_id] || ""}
-                      onChange={handleGradeChange(student.student_id)}
-                      type="number"
-                      inputProps={{ min: 0, max: 10 }}
-                    />
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => handleSubmitFeedback(student.student_id)}
-                      disabled={submitLoading[student.student_id]}
-                      sx={{ mt: 2 }}
-                    >
-                      {submitLoading[student.student_id] ? "Submitting..." : "Submit Evaluation"}
-                    </Button>
+
+                    {student.submitted ? (
+                      student.existingEvaluation?.score !== null &&
+                      student.existingEvaluation?.feedback !== null ? (
+                        // Display existing evaluation details
+                        <>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Feedback"
+                            value={
+                              student.existingEvaluation.feedback ||
+                              "No feedback provided"
+                            }
+                            disabled
+                            sx={{
+                              mb: 2,
+                              "& .Mui-disabled": {
+                                color: "text.primary",
+                                "-webkit-text-fill-color": "unset",
+                              },
+                            }}
+                          />
+                          <TextField
+                            fullWidth
+                            type="number"
+                            label="Grade (0-10)"
+                            value={student.existingEvaluation.score}
+                            disabled
+                            inputProps={{ min: 0, max: 10 }}
+                            sx={{
+                              "& .Mui-disabled": {
+                                color: "text.primary",
+                                "-webkit-text-fill-color": "unset",
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 2 }}
+                          >
+                            Graded on:{" "}
+                            {new Date(
+                              student.existingEvaluation.submission_time
+                            ).toLocaleString()}
+                          </Typography>
+                        </>
+                      ) : (
+                        // Show evaluation form for submitted but ungraded/null entries
+                        <>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Feedback"
+                            value={feedback[student.student_id] || ""}
+                            onChange={handleFeedbackChange(student.student_id)}
+                            sx={{ mb: 2 }}
+                          />
+                          <TextField
+                            fullWidth
+                            type="text"
+                            label="Grade (0-10)"
+                            inputProps={{ min: 0, max: 10 }}
+                            value={grades[student.student_id] || ""}
+                            onChange={handleGradeChange(student.student_id)}
+                          />
+                          <Button
+                            variant="contained"
+                            onClick={() =>
+                              handleSubmitFeedback(student.student_id)
+                            }
+                            disabled={submitLoading[student.student_id]}
+                            sx={{ mt: 2 }}
+                          >
+                            {submitLoading[student.student_id] ? (
+                              <CircularProgress size={24} />
+                            ) : (
+                              "Submit Evaluation"
+                            )}
+                          </Button>
+                        </>
+                      )
+                    ) : (
+                      <Typography color="text.secondary">
+                        No submission to evaluate
+                      </Typography>
+                    )}
                   </Grid>
                 </Grid>
               </AccordionDetails>
@@ -356,9 +528,11 @@ const Submissions = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
       >
-        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Box>
   );

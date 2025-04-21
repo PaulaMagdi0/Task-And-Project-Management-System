@@ -1,21 +1,25 @@
-import logging
 import os
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+import logging
 from django.utils import timezone
-from .models import Assignment,AssignmentStudent
-from .serializers import AssignmentSerializer,SafeAssignmentSerializer
+from django.shortcuts import get_object_or_404
+
+from rest_framework import generics, status
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .models import Assignment, AssignmentStudent
+from .serializers import AssignmentSerializer, SafeAssignmentSerializer
 from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
-from apps.submission.models import AssignmentSubmission 
-from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
 from apps.tracks.serializers import TrackSerializer
 from apps.courses.serializers import CourseSerializer
 from apps.student.serializers import StudentSubmissionStatusSerializer
+from apps.submission.models import AssignmentSubmission
+from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
+from apps.staff_members.models import StaffMember
 from rest_framework.response import Response
 import json
 from datetime import datetime
@@ -31,14 +35,15 @@ from apps.staff_members.models import StaffMember
 logger = logging.getLogger(__name__)
 
 class AssignmentListView(APIView):
-    def get(self, request, track_id, *args, **kwargs):
-        try:
-            track = Track.objects.get(id=track_id)
+    def get(self, request, track_id=None, *args, **kwargs):
+        if track_id:
+            track = get_object_or_404(Track, id=track_id)
             assignments = Assignment.objects.filter(track=track)
-            serialized_assignments = AssignmentSerializer(assignments, many=True)
-            return Response(serialized_assignments.data, status=status.HTTP_200_OK)
-        except Track.DoesNotExist:
-            return Response({"error": "Track not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            assignments = Assignment.objects.all()
+        serializer = AssignmentSerializer(assignments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class AssignmentCreateView(generics.CreateAPIView):
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
@@ -300,42 +305,57 @@ def instructor_assignments(request, track_id, course_id, staff_id):
 
 @api_view(['GET'])
 def get_submitters(request, assignment_id, track_id, course_id):
-    # Get all submissions for this assignment in the specified track/course
-    submissions = AssignmentSubmission.objects.filter(
-        assignment_id=assignment_id,
-        track_id=track_id,
-        course_id=course_id
-    ).select_related('student')
+    try:
+        # Get the assignment to validate track/course relationship
+        assignment = get_object_or_404(
+            Assignment,
+            pk=assignment_id,
+            track_id=track_id,
+            course_id=course_id
+        )
 
-    # Get all students in the track who should have submitted
-    all_students = Student.objects.filter(track_id=track_id)
-    
-    # Prepare response data
-    submitters = [{
-        'student_id': sub.student.id,
-        'name': sub.student.full_name,
-        'email': sub.student.email,
-        'submitted': True,
-        'submission_date': sub.submission_date,
-        'file_url': sub.file_url or None
-    } for sub in submissions]
+        # Get all students who should have submitted (assigned to this assignment)
+        assigned_students = Student.objects.filter(
+            assignmentstudent__assignment=assignment
+        )
 
-    non_submitters = [{
-        'student_id': student.id,
-        'name': student.full_name,
-        'email': student.email,
-        'submitted': False
-    } for student in all_students.exclude(
-        id__in=[s.student.id for s in submissions]
-    )]
+        # Get actual submissions
+        submissions = AssignmentSubmission.objects.filter(
+            assignment=assignment
+        ).select_related('student')
 
-    return Response({
-        'total_students': all_students.count(),
-        'submitted_count': len(submitters),
-        'not_submitted_count': len(non_submitters),
-        'submitters': submitters,
-        'non_submitters': non_submitters
-    })
+        # Separate submitters and non-submitters
+        submitted_student_ids = submissions.values_list('student_id', flat=True)
+        
+        submitters = [{
+            'student_id': sub.student.id,
+            'name': sub.student.full_name,
+            'email': sub.student.email,
+            'submitted': True,
+            'submission_date': sub.submission_date,
+            'file_url': sub.file_url or None
+        } for sub in submissions]
+
+        non_submitters = [{
+            'student_id': student.id,
+            'name': student.full_name,
+            'email': student.email,
+            'submitted': False
+        } for student in assigned_students.exclude(id__in=submitted_student_ids)]
+
+        return Response({
+            'total_students': assigned_students.count(),
+            'submitted_count': len(submitters),
+            'not_submitted_count': len(non_submitters),
+            'submitters': submitters,
+            'non_submitters': non_submitters
+        })
+
+    except Assignment.DoesNotExist:
+        return Response(
+            {"error": "Assignment not found for given track/course combination"},
+            status=status.HTTP_404_NOT_FOUND
+        )
     
 # views.py
 
