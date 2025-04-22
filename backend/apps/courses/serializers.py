@@ -6,7 +6,6 @@ from apps.staff_members.models import StaffMember
 
 from rest_framework import serializers
 from .models import Course, StaffMember
-
 class CourseSerializer(serializers.ModelSerializer):
     instructor = serializers.PrimaryKeyRelatedField(
         queryset=StaffMember.objects.all(), required=False, allow_null=True
@@ -36,7 +35,6 @@ class CourseSerializer(serializers.ModelSerializer):
         course.tracks.set(tracks)
 
         return course
-
 class MinimalCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course

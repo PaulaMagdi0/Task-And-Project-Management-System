@@ -1,3 +1,4 @@
+from apps.courses.models import CourseTrack  # Make sure this is imported
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -10,7 +11,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
 
 class CourseListView(generics.ListCreateAPIView):
     """

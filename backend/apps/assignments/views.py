@@ -1,6 +1,7 @@
 import os
 import logging
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 from rest_framework import generics, status
@@ -20,17 +21,6 @@ from apps.student.serializers import StudentSubmissionStatusSerializer
 from apps.submission.models import AssignmentSubmission
 from apps.submission.serializers import AssignmentSubmissionSerializer as SubmissionSerializer
 from apps.staff_members.models import StaffMember
-from rest_framework.response import Response
-import json
-from datetime import datetime
-from rest_framework.exceptions import ValidationError
-from rest_framework.views import APIView
-from apps.tracks.models import Track
-from apps.staff_members.models import StaffMember
-
-
-
-
 
 logger = logging.getLogger(__name__)
 

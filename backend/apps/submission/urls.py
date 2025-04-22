@@ -5,7 +5,8 @@ from .views import (
     AssignmentSubmissionViewSet,
     AssignmentDetailView,
     AssignmentStudentDetailView,
-    AssignmentReportView
+    AssignmentReportView,
+    SubmissionByStudentAssignmentView
 )
 # Initialize the DefaultRouter and register the viewset
 router = DefaultRouter()
@@ -14,6 +15,8 @@ router.register(r'submissions', AssignmentSubmissionViewSet, basename='submissio
 
 urlpatterns = [
     path('', include(router.urls)), 
+    # GET Subbmission by Student id and assignment
+    path('instructor/', SubmissionByStudentAssignmentView.as_view(), name='submission-by-student-assignment'),
     path('assignments/<int:assignment_id>/details/', AssignmentDetailView.as_view(), name='assignment-detail'),
     path('assignments/<int:assignment_id>/students/<int:student_id>/', 
        AssignmentStudentDetailView.as_view(), 
@@ -22,4 +25,5 @@ urlpatterns = [
         AssignmentReportView.as_view(), 
         name='assignment-report'
     ),
+
 ]

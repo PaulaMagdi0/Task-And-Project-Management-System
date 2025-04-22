@@ -76,10 +76,12 @@ const OpeningPage = () => {
           `/staff/track-and-courses/${user_id}/`
         );
         const tracks = tracksCoursesRes.data?.tracks || [];
+        const courses = tracksCoursesRes.data?.courses || [];
 
+          console.log(tracksCoursesRes);
+          
         // Parallel fetch: courses, submissions, assignments
-        const [coursesRes, submissionsRes, assignmentsRes] = await Promise.all([
-          apiClient.get("/courses/"),
+        const [submissionsRes, assignmentsRes] = await Promise.all([
           apiClient.get("/submission/submissions/"),
           apiClient.get("/assignments/"),
         ]);
@@ -88,7 +90,7 @@ const OpeningPage = () => {
 
         setDashboardData({
           tracks,
-          courses: coursesRes.data || [],
+          courses,
           assignments,
           submissions: (submissionsRes.data || []).map((sub) => ({
             ...sub,
@@ -256,7 +258,7 @@ const OpeningPage = () => {
             }}
           >
             {dashboardData.tracks[0] &&
-            typeof dashboardData.tracks[0].instructor === "string"
+              typeof dashboardData.tracks[0].instructor === "string"
               ? dashboardData.tracks[0].instructor.split(" ")[0].toUpperCase()
               : "Instructor"}{" "}
             Dashboard
@@ -526,11 +528,11 @@ const OpeningPage = () => {
                   Your Courses
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {dashboardData.courses.map((course, index) => {
-                    const courseTrack = dashboardData.tracks.find(
-                      (track) => track.id === course.tracks?.[0]
-                    );
-
+                  {
+                    dashboardData.courses.map((course, index) => {
+                      const courseTrack = course.tracks?.length
+                      ? dashboardData.tracks.find((track) => track.id === course.tracks[0]?.id)
+                      : null;
                     return (
                       <Grow key={course.id} in timeout={(index + 1) * 300}>
                         <Box
