@@ -25,5 +25,5 @@ urlpatterns = [
         AssignmentReportView.as_view(), 
         name='assignment-report'
     ),
-
+#submissions/?student=${studentId}&assignment=${selectedAssignment}
 ]
