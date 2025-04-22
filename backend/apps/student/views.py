@@ -1,19 +1,24 @@
 import logging
 from rest_framework import status
 from rest_framework.response import Response
+from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes,parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
 from rest_framework import generics
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
 from .models import Student
 from apps.tracks.models import Track  # Adjust based on your app structure
 from apps.courses.models import Course
+from apps.assignments.models import Assignment  # Import Assignment model
 from apps.staff_members.models import StaffMember
+from apps.assignments.serializers import AssignmentSerializer
 from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
 from rest_framework.views import APIView
 
@@ -238,38 +243,30 @@ def verify_email(request, verification_code):
     """Email verification endpoint with security checks"""
     try:
         student = get_object_or_404(Student, verification_code=verification_code)
-        
+
         if student.verified:
-            return Response(
-                {'status': 'already_verified'}, 
-                status=status.HTTP_200_OK
-            )
+            return redirect("http://localhost:5174/verified")
 
         student.verified = True
         student.verification_code = None
         student.save()
-        
+
         logger.info(f"Student {student.id} email verified")
-        return Response(
-            {'status': 'success'},
-            status=status.HTTP_200_OK
-        )
+        return redirect("http://localhost:5174/verified")
 
     except Exception as e:
         logger.error(f"Verification failed: {str(e)}")
-        return Response(
-            {'status': 'invalid_code'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return redirect("http://localhost:5174/not-verified")
+
+from rest_framework.permissions import IsAuthenticated
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get student (remove 'user' if not related)
+        # Get the student
         student = Student.objects.select_related('track').get(id=student_id)
 
-        # If you store user inside student
         if hasattr(student, 'user'):
             if request.user != student.user and not request.user.is_staff:
                 return Response({"error": "Unauthorized access"}, status=403)
@@ -277,58 +274,79 @@ def student_courses(request, student_id):
             if not request.user.is_staff:
                 return Response({"error": "Unauthorized access"}, status=403)
 
+        # Get all courses for the student's track
         courses = Course.objects.filter(tracks=student.track)
-        serializer = CourseSerializer(courses, many=True)
+
+        # Prepare course data
+        course_data = [
+            {
+                'course_id': course.id,
+                'name': course.name,
+                'created_at': course.created_at,
+                'description': course.description,
+            }
+            for course in courses
+        ]
+
+        # Get all assignments related to these courses
+        assignments = Assignment.objects.filter(course__in=courses)
+        assignments_serializer = AssignmentSerializer(assignments, many=True)
 
         return Response({
             'student': {
                 'id': student.id,
-                'name': student.full_name
+                'name': student.full_name,
+                'email': student.email,
+                'role': student.role,
+                'date_joined': student.date_joined
             },
-            'courses': serializer.data
+            'courses': course_data,
+            'assignments': assignments_serializer.data
         })
-        
+
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=404)
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         return Response({"error": "Server error"}, status=500)
 
+
     
 #UPdate student Info View
+
+from django.contrib.auth.hashers import check_password
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
-    """Secure student update with permission checks"""
     student = get_object_or_404(Student, id=student_id)
     
-    # Permission check
-    if not (has_student_management_permission(request.user) or request.user.id == student_id):
-        raise PermissionDenied("You don't have permission to update this student")
+    if request.user.id != student.id:
+        return Response({"error": "Permission denied"}, status=403)
 
-    serializer = StudentSerializer(
-        student, 
-        data=request.data, 
-        partial=True,
-        context={'request': request}
-    )
+    current_password = request.data.get('currentPassword')
+    new_password = request.data.get('newPassword')
 
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Validate inputs
+    if not current_password or not new_password:
+        return Response({"error": "Both passwords required"}, status=400)
+
+    # Verify current password
+    if not check_password(current_password, student.password):  # Changed this line
+        return Response({"error": "Current password incorrect"}, status=400)
+
+    if len(new_password) < 8:
+        return Response({"error": "Password too short"}, status=400)
+
+    if current_password == new_password:
+        return Response({"error": "New password must differ"}, status=400)
 
     try:
-        serializer.save()
-        logger.info(f"Student {student_id} updated by user {request.user.id}")
-        return Response(serializer.data)
-    
+        student.set_password(new_password)
+        student.save()
+        return Response({"message": "Password updated"})
     except Exception as e:
-        logger.error(f"Update failed for student {student_id}: {str(e)}")
-        return Response(
-            {"error": "Update failed"}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])

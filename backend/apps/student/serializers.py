@@ -378,7 +378,7 @@ class StudentSerializer(serializers.ModelSerializer):
         """Validate email uniqueness."""
         if self.instance and self.instance.email == value:
             return value
-         
+        
         if Student.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
         return value
@@ -427,7 +427,7 @@ class StudentSerializer(serializers.ModelSerializer):
     def _send_verification_email(self, student, password):
         """Send verification email."""
         try:
-            verification_url = f"{settings.SITE_URL}/verify/{student.verification_code}/"
+            verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
             
             subject = "Verify Your Student Account"
             message = f"""

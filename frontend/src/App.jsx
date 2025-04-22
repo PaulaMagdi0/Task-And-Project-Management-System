@@ -18,6 +18,7 @@ import TermsOfService from "./Components/TermsOfService/TermsOfService";
 import Team from "./Components/Team/Team";
 import SignIn from "./pages/Signin";
 import NotFound from "./pages/NotFound";
+import VerifiedPage from './pages/verifiedPage';
 import AccessDenied from "./Components/Denied/Denied";
 import Chatting, { dummyUsers } from './pages/Chat/Chatting';
 import RecommendationForm from './Components/Recommendation/Recommendation';
@@ -49,6 +50,7 @@ import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
 import ChatWithAI from './Components/ChatAI/ChatWithAI';
+import NotVerifiedPage from './pages/NotVerifiedPage';
 const App = () => {
   useCustomScripts();
   const { userType, role } = useSelector((state) => state.auth);
@@ -77,6 +79,8 @@ const App = () => {
           <Route path="/github-stat" element={<GitHubStat />} />
           <Route path="/book-search" element={<BookSearch />} />
           <Route path="/movie-search" element={<MovieSearch />} />
+          <Route path="/verified" element={<VerifiedPage />} />
+          <Route path="/not-verified" element={<NotVerifiedPage />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route
@@ -99,7 +103,7 @@ const App = () => {
             <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
 
           )}
-             {/* Instructor-Specific Routes */}
+          {/* Instructor-Specific Routes */}
           {userType === "staff" && role === "instructor" && (
             <Route
               path="/instructor/dashboard/*"

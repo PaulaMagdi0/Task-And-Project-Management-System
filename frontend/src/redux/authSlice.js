@@ -23,6 +23,7 @@ export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async ({ email, password }, thunkAPI) => {
     try {
+      // Use the correct login endpoint.
       const response = await apiClient.post("/auth/login/", {
         email: email.trim(),
         password,

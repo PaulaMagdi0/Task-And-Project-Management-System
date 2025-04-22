@@ -45,6 +45,7 @@ const StudentDashboard = () => {
   const [studentData, setStudentData] = useState({
     student: null,
     courses: [],
+    assignments: [],
     loading: true,
     error: null
   });
@@ -62,73 +63,71 @@ const StudentDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setStudentData((prevState) => ({
+          ...prevState,
+          loading: true,
+          error: null,  // Reset error before retrying
+        }));
+
         const studentId = localStorage.getItem('user_id');
         const authToken = localStorage.getItem('authToken');
 
-        if (!authToken) throw new Error('No auth token found');
-        if (!studentId) throw new Error('No student ID found');
-
-        console.log('Token from localStorage:', localStorage.getItem('authToken'));
-        console.log('Token length:', localStorage.getItem('authToken')?.length);
-
-        // If using JWT, decode it at jwt.io or with:
-        const tokenParts = authToken.split('.');
-        if (tokenParts?.length === 3) {
-          const decodedPayload = JSON.parse(atob(tokenParts[1]));
-          console.log('Token payload:', decodedPayload);
-          // Check expiration in payload
-        }
-        // 1. First verify the token works
-        try {
-          const userResponse = await axios.get(
-            'http://127.0.0.1:8000/api/auth/user/',
-            { headers: { 'Authorization': `Bearer ${authToken}` } }
-          );
-          console.log('Current user:', userResponse.data);
-        } catch (tokenError) {
-          console.error('Token is invalid:', tokenError.response?.data);
-          throw new Error('Invalid token');
+        if (!authToken || !studentId) {
+          throw new Error('Missing authentication token or student ID');
         }
 
-        // 2. Now make the courses request
-        const coursesResponse = await axios.get(
+        const response = await axios.get(
           `http://127.0.0.1:8000/api/student/${studentId}/courses/`,
           {
             headers: {
               'Authorization': `Bearer ${authToken}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
             },
-            timeout: 5000
+            timeout: 5000,
           }
         );
 
-        console.log('Courses response:', coursesResponse.data);
+        console.log('Courses and Assignments response:', response.data); // Can remove this later
+        setLoading(false)
+        // Update state with fetched data
         setStudentData({
-          student: coursesResponse.data.student,
-          courses: coursesResponse.data.courses,
+          student: response.data.student,
+          courses: response.data.courses || [],
+          assignments: response.data.assignments || [],
           loading: false,
-          error: null
+          error: null,
         });
 
+        // Set dashboard data based on response
+        setDashboardData({
+          pendingAssignments: response.data.assignments || [],
+          pendingCorrectives: [], // Update as needed
+          upcomingDeadlines: 0, // Update as needed
+          recentActivities: [], // Update as needed
+          averageGrade: null, // Update as needed
+          gradeTrend: 0, // Update as needed
+        });
       } catch (error) {
-        console.error('Full error:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        });
+        console.error('Error fetching data:', error);
 
+        // Handle Unauthorized error and remove token
         if (error.response?.status === 401) {
           localStorage.removeItem('authToken');
           navigate('/login');
         } else {
-          setError(error.response?.data?.error || error.message);
+          setStudentData((prevState) => ({
+            ...prevState,
+            loading: false,
+            error: error.response?.data?.error || error.message,
+          }));
         }
-        setLoading(false);
       }
     };
 
     fetchData();
   }, []);
+  // console.log(dashboardData);
+
 
   const renderSection = () => {
     if (loading) {
@@ -154,12 +153,26 @@ const StudentDashboard = () => {
             <CardHeader
               title="Upcoming Deadlines"
               avatar={<FiCalendar style={{ color: '#e53935' }} />}
-              subheader={`${dashboardData.upcomingDeadlines} urgent items`}
+              subheader={`${dashboardData.pendingAssignments.filter((a) => {
+                const endDate = new Date(a.end_date);
+                const now = new Date();
+                const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
+                return diffInDays >= 0 && diffInDays <= 3;
+              }).length
+                } urgent items`}
             />
             <CardContent>
               <LinearProgress
                 variant="determinate"
-                value={Math.min(dashboardData.upcomingDeadlines * 10, 100)}
+                value={Math.min(
+                  dashboardData.pendingAssignments.filter((a) => {
+                    const endDate = new Date(a.end_date);
+                    const now = new Date();
+                    const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
+                    return diffInDays >= 0 && diffInDays <= 3;
+                  }).length * 10,
+                  100
+                )}
                 sx={{
                   height: 10,
                   borderRadius: 5,
@@ -169,8 +182,33 @@ const StudentDashboard = () => {
                   }
                 }}
               />
+
+              <List sx={{ mt: 2 }}>
+                {dashboardData.pendingAssignments
+                  .filter((assignment) => {
+                    const endDate = new Date(assignment.end_date);
+                    const now = new Date();
+                    const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
+                    return diffInDays >= 0 && diffInDays <= 3;
+                  })
+                  .sort((a, b) => new Date(a.end_date) - new Date(b.end_date)) // 👈 Sorting by end_date ascending
+                  .map((assignment, index) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        <FiCalendar style={{ color: '#e53935' }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={assignment.title}
+                        secondary={`Ends: ${new Date(assignment.end_date).toLocaleDateString()} (${assignment.course_name})`}
+                      />
+                    </ListItem>
+                  ))}
+              </List>
+
             </CardContent>
           </Card>
+
+
         );
 
       case 'averageGrade':
@@ -231,19 +269,19 @@ const StudentDashboard = () => {
             <CardHeader
               title="My Courses"
               avatar={<FiBook style={{ color: '#e53935' }} />}
-              subheader={`Track: ${studentData.student?.track?.name || 'Not assigned'}`}
+              subheader={`Track: ${studentData.assignments[0].track_name || 'Not assigned'}`}
             />
             <CardContent>
-              <Grid container spacing={2}>
+              <Grid container spacing={2} >
                 {studentData.courses.map((course) => (
                   <Grid item xs={12} md={6} key={course.id}>
                     <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: '#e53935' }}>
-                          {course.name}
+                          {course.name} {/* Use course.name to display each course */}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {course.description}
+                          {course.description} {/* Use course.description to display each course */}
                         </Typography>
                         <Typography variant="caption" display="block" mt={1}>
                           Started: {new Date(course.created_at).toLocaleDateString()}
@@ -259,27 +297,40 @@ const StudentDashboard = () => {
 
       case 'assignments':
         return (
-          <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
+          <Card elevation={3} sx={{ borderTop: '4px solid #e53935', mb: 4 }}>
             <CardHeader
               title="Pending Assignments"
               avatar={<FiClipboard style={{ color: '#e53935' }} />}
             />
-            <List>
-              {dashboardData.pendingAssignments.map((assignment, index) => (
-                <React.Fragment key={index}>
-                  <ListItem>
-                    <ListItemIcon>
-                      <FiClipboard style={{ color: '#e53935' }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={assignment.title}
-                      secondary={assignment.description}
-                    />
-                  </ListItem>
-                  {index < dashboardData.pendingAssignments.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-            </List>
+            <CardContent>
+              <Grid container spacing={2}>
+                {dashboardData.pendingAssignments.map((assignment, index) => (
+                  <Grid item xs={12} key={index}>
+                    <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935', p: 1 }}>
+                      <CardContent sx={{ pl: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#e53935' }}>
+                          {assignment.course_name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          {assignment.title}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          Due: {new Date(assignment.due_date).toLocaleDateString()}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          Ends: {new Date(assignment.end_date).toLocaleDateString()}
+                        </Typography>
+                        {assignment.file_url && (
+                          <Typography variant="caption" display="block">
+                            File: <a href={assignment.file_url} target="_blank" rel="noopener noreferrer">Open File</a>
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
           </Card>
         );
 
