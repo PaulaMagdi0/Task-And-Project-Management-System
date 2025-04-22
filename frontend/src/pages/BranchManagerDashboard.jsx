@@ -1,12 +1,11 @@
 // File: src/components/BranchManagerDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { FiMenu, FiX, FiMap, FiUserPlus, FiUserMinus, FiLink, FiList } from 'react-icons/fi';
+import { FiMenu, FiX, FiMap, FiUserPlus, FiLink, FiList } from 'react-icons/fi';
 import AddTrack from '../components/AddTrack';
 import AddSupervisor from '../components/AddSupervisor';
 import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
 import TracksTable from '../components/TracksTable';
-import DeleteSupervisor from '../components/DeleteSupervisor';
 import './BranchManagerDashboard.css';
 
 const BranchManagerDashboard = () => {
@@ -16,8 +15,7 @@ const BranchManagerDashboard = () => {
 
   const menuItems = [
     { id: 'addTrack', icon: <FiMap />, label: 'Add Track' },
-    { id: 'addSupervisors', icon: <FiUserPlus />, label: 'Add Supervisor' },
-    // { id: 'deleteSupervisor', icon: <FiUserMinus />, label: 'Delete Supervisor' },
+    { id: 'addStaff', icon: <FiUserPlus />, label: 'Add Staff' },
     { id: 'assignSupervisor', icon: <FiLink />, label: 'Assign Supervisor' },
     { id: 'viewTracks', icon: <FiList />, label: 'View Tracks' },
   ];
@@ -26,7 +24,7 @@ const BranchManagerDashboard = () => {
     <div className="dashboard-container">
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          {sidebarOpen && (
+          {sidebarOpen ? (
             <>
               <div className="welcome-message">
                 <h3>Welcome back,</h3>
@@ -36,8 +34,7 @@ const BranchManagerDashboard = () => {
                 <FiX size={24} />
               </button>
             </>
-          )}
-          {!sidebarOpen && (
+          ) : (
             <button className="toggle-btn" onClick={() => setSidebarOpen(true)}>
               <FiMenu size={24} />
             </button>
@@ -70,17 +67,10 @@ const BranchManagerDashboard = () => {
             </>
           )}
 
-          {selectedOption === 'addSupervisors' && (
+          {selectedOption === 'addStaff' && (
             <>
-              <h1 className="section-title"><FiUserPlus /> Supervisor Management</h1>
+              <h1 className="section-title"><FiUserPlus /> Staff Management</h1>
               <AddSupervisor />
-            </>
-          )}
-
-          {selectedOption === 'deleteSupervisor' && (
-            <>
-              <h1 className="section-title"><FiUserMinus /> Remove Supervisor</h1>
-              <DeleteSupervisor />
             </>
           )}
 

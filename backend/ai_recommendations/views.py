@@ -17,6 +17,7 @@ print(os.getcwd())  # This will print the current working directory
 assignments = pd.read_csv('data/assignments.csv')
 courses = pd.read_csv('data/courses.csv')
 
+
 # Load pre-trained BERT model and tokenizer (CPU only)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 device = torch.device("cpu")

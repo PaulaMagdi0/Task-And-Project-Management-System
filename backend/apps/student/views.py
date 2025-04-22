@@ -267,20 +267,20 @@ from rest_framework.permissions import IsAuthenticated
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get requested student
-        student = Student.objects.select_related('user').get(id=student_id)
-        
-        # Verify permission
-        if request.user != student.user and not request.user.is_staff:
-            return Response(
-                {"error": "Unauthorized access"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Rest of your existing view logic...
+        # Get student (remove 'user' if not related)
+        student = Student.objects.select_related('track').get(id=student_id)
+
+        # If you store user inside student
+        if hasattr(student, 'user'):
+            if request.user != student.user and not request.user.is_staff:
+                return Response({"error": "Unauthorized access"}, status=403)
+        else:
+            if not request.user.is_staff:
+                return Response({"error": "Unauthorized access"}, status=403)
+
         courses = Course.objects.filter(tracks=student.track)
         serializer = CourseSerializer(courses, many=True)
-        
+
         return Response({
             'student': {
                 'id': student.id,
@@ -294,6 +294,7 @@ def student_courses(request, student_id):
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         return Response({"error": "Server error"}, status=500)
+
     
 #UPdate student Info View
 

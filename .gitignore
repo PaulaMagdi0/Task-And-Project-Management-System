@@ -66,3 +66,8 @@ backend/apps//migrations/.py
 backend/apps//migrations/.py
 backend/apps//migrations/init.py
 backend/apps/*/migrations/pycache/
+
+**/migrations/*.py
+!**/migrations/__init__.py
+backend/**/migrations/*.py
+!backend/**/migrations/__init__.py
