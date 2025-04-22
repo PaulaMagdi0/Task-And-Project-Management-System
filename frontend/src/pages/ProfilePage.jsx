@@ -28,6 +28,8 @@ import {
     Key
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
+import { useSnackbar } from 'notistack';
+import { CircularProgress } from '@mui/material';
 import axios from 'axios';
 
 const ProfilePage = () => {
@@ -35,9 +37,11 @@ const ProfilePage = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
+    const { enqueueSnackbar } = useSnackbar();
+    const [isLoading, setIsLoading] = useState(false);
     const [userData, setUserData] = useState({
-        first_name: '',
-        last_name: '',
+        fullName: '',
+        email: '',
         phone: '',
         role: '',
         department: '',
@@ -52,6 +56,7 @@ const ProfilePage = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             const studentId = localStorage.getItem("user_id");
+            const token = localStorage.getItem("authToken");
             try {
                 const response = await axios.get(`http://localhost:8000/api/student/${studentId}/courses`, {
                     headers: {
@@ -60,39 +65,48 @@ const ProfilePage = () => {
                 });
 
                 const data = response.data;
-                console.log('Student Courses:', data);
+                // console.log('DATAAAAAAAAAAAA:', data);
+
+                const [firstName, lastName] = data.student.name?.split(' ') || [];
+                const dateJoined = data.student.date_joined?.split("T")[0] || '';
+
                 setUserData({
-                    fullName: data.fullName || username,
-                    phone: data.phone || '+20 123 456 7890',
-                    position: data.position || 'Senior Instructor',
-                    department: data.department || 'Education',
-                    joinDate: data.joinDate || 'January 15, 2023',
-                    location: data.location || 'Cairo, Egypt',
-                    languages: data.languages || 'English, Arabic',
-                    currentPassword: '',
-                    newPassword: ''
+                    fullName: data.student.name || '',
+                    first_name: firstName || '',
+                    last_name: lastName || '',
+                    email: data.student.email || '',
+                    phone: data.student.phone || '',
+                    role: data.student.role || 'Student',
+                    department: data.student.department || 'Education',
+                    date_joined: dateJoined, // Use the split date here
+                    location: data.student.location || 'Cairo, Egypt',
+                    languages: data.student.languages || 'English, Arabic',
+                    newPassword: '' // Only allow setting a new password if required
                 });
             } catch (error) {
                 console.error('Error fetching user data:', error);
-                // Fallback to default values if API fails
                 setUserData({
                     fullName: username,
+                    first_name: username?.split(' ')[0] || '',
+                    last_name: username?.split(' ')[1] || '',
+                    email: email,
                     phone: '+20 123 456 7890',
-                    position: 'Senior Instructor',
+                    role: 'Senior Instructor',
                     department: 'Education',
-                    joinDate: 'January 15, 2023',
+                    date_joined: '2023-01-15', // Fallback date for error handling
                     location: 'Cairo, Egypt',
                     languages: 'English, Arabic',
-                    currentPassword: '',
                     newPassword: ''
                 });
             }
         };
 
         fetchUserData();
-    }, [token, username]);
-    // console.log(userData);
+    }, [token, username, email]);
 
+
+
+    console.log('userData:', userData);
     const handleChange = (e) => {
         const { name, value } = e.target;
         setUserData(prev => ({ ...prev, [name]: value }));
@@ -105,27 +119,51 @@ const ProfilePage = () => {
     };
 
     const handleSave = async () => {
+        const studentId = localStorage.getItem("user_id");
+        const authToken = localStorage.getItem("authToken");
+        const { currentPassword, newPassword } = userData;
+
+        // Client-side validation
+        if (!currentPassword || !newPassword) {
+            enqueueSnackbar('Both fields are required', { variant: 'error' });
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            enqueueSnackbar('Password must be at least 8 characters', { variant: 'error' });
+            return;
+        }
+
+        setIsLoading(true);
+
         try {
-            // Send the request to change the password
-            const response = await axios.patch('/api/user/change-password', {
-                currentPassword: userData.currentPassword,
-                newPassword: userData.newPassword
-            }, {
+            const response = await fetch(`http://localhost:8000/api/student/${studentId}/update/`, {
+                method: "PATCH",
                 headers: {
-                    Authorization: `Bearer ${token}`
-                }
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword,
+                }),
             });
 
-            // If the password is updated successfully
-            setIsEditing(false);
-            setUserData(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+            const data = await response.json();
 
-            // Optionally, show a success message to the user
-            alert('Password updated successfully');
+            if (response.ok) {
+                alert('Password updated successfully')
+                enqueueSnackbar(data.message || 'Password updated successfully', { variant: 'success' });
+                setIsEditing(false);
+                setUserData(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+            } else {
+                alert('Current Password is Invalid')
+                throw new Error(data.error || "Failed to update password");
+            }
         } catch (error) {
-            console.error('Error changing password:', error);
-            // Handle error (show error message to user)
-            alert('Failed to update password: ' + error?.response?.data?.detail || 'Something went wrong');
+            enqueueSnackbar(error.message, { variant: 'error' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -170,7 +208,7 @@ const ProfilePage = () => {
                             {userData.fullName}
                         </Typography>
                         <Typography variant="body1" sx={{ color: '#aaa', mb: 1 }}>
-                            {userData.position} At ITI
+                            {userData.role} At ITI
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
                             <Chip
@@ -248,7 +286,7 @@ const ProfilePage = () => {
                             />
                         </Grid>
 
-                        {/* <Grid item xs={12} md={6}>
+                        <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Phone"
@@ -263,7 +301,7 @@ const ProfilePage = () => {
                                 }}
                                 sx={textFieldStyles}
                             />
-                        </Grid> */}
+                        </Grid>
 
                         <Grid item xs={12} md={6}>
                             <TextField
@@ -311,7 +349,7 @@ const ProfilePage = () => {
                             />
                         </Grid>
 
-                        {/* <Grid item xs={12} md={6}>
+                        <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Department"
@@ -321,7 +359,7 @@ const ProfilePage = () => {
                                 }}
                                 sx={textFieldStyles}
                             />
-                        </Grid> */}
+                        </Grid>
                     </Grid>
                 </Box>
 
@@ -440,23 +478,23 @@ const ProfilePage = () => {
                             </Button>
                             <Button
                                 variant="contained"
-                                startIcon={<Save size={18} />}
+                                startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <Save size={18} />}
                                 onClick={handleSave}
-                                disabled={!userData.currentPassword || !userData.newPassword}
+                                disabled={!userData.currentPassword || !userData.newPassword || isLoading}
                                 sx={{
                                     ...containedButtonStyles,
-                                    backgroundColor: '#d32f2f', // Blood red
+                                    backgroundColor: '#d32f2f',
                                     color: 'white',
                                     '&:hover': {
-                                        backgroundColor: '#b71c1c', // Darker red on hover
+                                        backgroundColor: '#b71c1c',
                                     },
                                     '&.Mui-disabled': {
-                                        backgroundColor: 'rgba(211, 47, 47, 0.5)', // Semi-transparent when disabled
+                                        backgroundColor: 'rgba(211, 47, 47, 0.5)',
                                         color: 'rgba(255, 255, 255, 0.5)'
                                     }
                                 }}
                             >
-                                Save Password
+                                {isLoading ? 'Updating...' : 'Save Password'}
                             </Button>
                         </>
                     )}

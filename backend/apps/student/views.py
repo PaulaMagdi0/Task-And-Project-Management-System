@@ -16,7 +16,9 @@ from apps.staff_members.permissions import has_student_management_permission
 from .models import Student
 from apps.tracks.models import Track  # Adjust based on your app structure
 from apps.courses.models import Course
+from apps.assignments.models import Assignment  # Import Assignment model
 from apps.staff_members.models import StaffMember
+from apps.assignments.serializers import AssignmentSerializer
 from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
 from rest_framework.views import APIView
 
@@ -243,18 +245,18 @@ def verify_email(request, verification_code):
         student = get_object_or_404(Student, verification_code=verification_code)
 
         if student.verified:
-            return redirect("http://localhost:5173/verified")
+            return redirect("http://localhost:5174/verified")
 
         student.verified = True
         student.verification_code = None
         student.save()
 
         logger.info(f"Student {student.id} email verified")
-        return redirect("http://localhost:5173/verified")
+        return redirect("http://localhost:5174/verified")
 
     except Exception as e:
         logger.error(f"Verification failed: {str(e)}")
-        return redirect("http://localhost:5173/not-verified")
+        return redirect("http://localhost:5174/not-verified")
 
 from rest_framework.permissions import IsAuthenticated
 
@@ -262,10 +264,9 @@ from rest_framework.permissions import IsAuthenticated
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get student (remove 'user' if not related)
+        # Get the student
         student = Student.objects.select_related('track').get(id=student_id)
 
-        # If you store user inside student
         if hasattr(student, 'user'):
             if request.user != student.user and not request.user.is_staff:
                 return Response({"error": "Unauthorized access"}, status=403)
@@ -273,63 +274,79 @@ def student_courses(request, student_id):
             if not request.user.is_staff:
                 return Response({"error": "Unauthorized access"}, status=403)
 
+        # Get all courses for the student's track
         courses = Course.objects.filter(tracks=student.track)
-        serializer = CourseSerializer(courses, many=True)
+
+        # Prepare course data
+        course_data = [
+            {
+                'course_id': course.id,
+                'name': course.name,
+                'created_at': course.created_at,
+                'description': course.description,
+            }
+            for course in courses
+        ]
+
+        # Get all assignments related to these courses
+        assignments = Assignment.objects.filter(course__in=courses)
+        assignments_serializer = AssignmentSerializer(assignments, many=True)
 
         return Response({
             'student': {
                 'id': student.id,
-                'name': student.full_name
+                'name': student.full_name,
+                'email': student.email,
+                'role': student.role,
+                'date_joined': student.date_joined
             },
-            'courses': serializer.data
+            'courses': course_data,
+            'assignments': assignments_serializer.data
         })
-        
+
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=404)
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         return Response({"error": "Server error"}, status=500)
 
+
     
 #UPdate student Info View
+
+from django.contrib.auth.hashers import check_password
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
-    """Change the student's password only"""
     student = get_object_or_404(Student, id=student_id)
     
-    # Permission check: Ensure the user has permission to change the password
-    if request.user.id != student_id:
-        return Response(
-            {"error": "You do not have permission to change this password"},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    if request.user.id != student.id:
+        return Response({"error": "Permission denied"}, status=403)
 
     current_password = request.data.get('currentPassword')
     new_password = request.data.get('newPassword')
 
+    # Validate inputs
     if not current_password or not new_password:
-        return Response(
-            {"error": "Both current password and new password are required"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "Both passwords required"}, status=400)
 
-    # Authenticate the user to verify the current password
-    user = student.user
-    if not authenticate(username=user.username, password=current_password):
-        return Response(
-            {"error": "Current password is incorrect"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    # Verify current password
+    if not check_password(current_password, student.password):  # Changed this line
+        return Response({"error": "Current password incorrect"}, status=400)
 
-    # Update the password and save it
-    user.password = make_password(new_password)
-    user.save()
+    if len(new_password) < 8:
+        return Response({"error": "Password too short"}, status=400)
 
-    return Response({"message": "Password updated successfully"})
+    if current_password == new_password:
+        return Response({"error": "New password must differ"}, status=400)
 
-
+    try:
+        student.set_password(new_password)
+        student.save()
+        return Response({"message": "Password updated"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])

@@ -28,10 +28,6 @@ export const loginUser = createAsyncThunk(
         email: email.trim(),
         password,
       });
-      const response = await apiClient.post("/auth/login/", {
-        email: email.trim(),
-        password,
-      });
       const token = response.data.access;
       if (!token) throw new Error("No token returned from server");
       const decoded = jwtDecode(token);
