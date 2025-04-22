@@ -227,116 +227,162 @@ const Submissions = () => {
 
   const handleGradeChange = (studentId) => (e) =>
     setGrades({ ...grades, [studentId]: e.target.value });
-
   const handleSubmitFeedback = async (studentId) => {
-  try {
-    setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
-    
-    // 1. Find student across all submission data
-    const student = [...submissionData.submitters, ...(submissionData.non_submitters || [])]
-      .find(s => s.student_id === studentId);
-      
-    if (!student) {
-      throw new Error("Student not found in submission records");
-    }
-
-    // 2. Submission ID resolution with multiple fallbacks
-    let submissionId = student.submission_id;
-    
-    // Fallback 1: Check existing grade's submission reference
-    if (!submissionId && student.existingGrade?.submission) {
-      submissionId = student.existingGrade.submission;
-    }
-    
-    // Fallback 2: API lookup if still missing but submission exists
-    if (!submissionId && student.submitted) {
-      const submissionRes = await apiClient.get(
-        `submission/?student=${studentId}&assignment=${selectedAssignment}`
-      );
-      if (submissionRes.data.results?.length > 0) {
-        submissionId = submissionRes.data.results[0].id;
+    try {
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
+  
+      // Validate context first
+      if (!selectedTrack || !selectedCourse || !selectedAssignment) {
+        throw new Error("Missing required context (track, course, or assignment)");
       }
-    }
-
-    // Final validation
-    if (!submissionId) {
-      console.error("Submission resolution failed:", {
-        studentId,
-        assignment: selectedAssignment,
-        studentData: student
+  
+      // Find student across all submission data
+      const student = [...submissionData.submitters, ...(submissionData.non_submitters || [])]
+        .find(s => s.student_id === studentId);
+  
+      if (!student) {
+        throw new Error("Student not found in submission records");
+      }
+  
+      // Enhanced submission ID resolution
+      let submissionId = student.submission_id;
+  
+      // 1. Check existing evaluation first
+      if (!submissionId && student.existingEvaluation?.submission) {
+        submissionId = student.existingEvaluation.submission;
+      }
+  
+      // 2. Check file URL pattern (support multiple URL formats)
+      if (!submissionId && student.file_url) {
+        const urlPatterns = [
+          /\/d\/([a-zA-Z0-9-_]+)/, // Google Drive direct
+          /id=([a-zA-Z0-9-_]+)/, // Standard ID parameter
+          /\/file\/d\/([a-zA-Z0-9-_]+)/ // Alternative Google Drive pattern
+        ];
+        
+        for (const pattern of urlPatterns) {
+          const match = student.file_url.match(pattern);
+          if (match) {
+            submissionId = match[1];
+            break;
+          }
+        }
+      }
+  
+      // 3. API fallback with better error handling
+      if (!submissionId && student.submitted) {
+        try {
+          const submissionRes = await apiClient.get(
+            `submissions/?student=${studentId}&assignment=${selectedAssignment}`
+          );
+          
+          // Handle different API response structures
+          if (submissionRes.data?.results?.[0]?.id) {
+            submissionId = submissionRes.data.results[0].id;
+          } else if (submissionRes.data?.id) {
+            submissionId = submissionRes.data.id;
+          }
+        } catch (apiError) {
+          console.error('API fallback failed:', {
+            error: apiError.response?.data || apiError.message,
+            studentId,
+            assignment: selectedAssignment
+          });
+        }
+      }
+  
+      // Final validation with meaningful error
+      if (!submissionId) {
+        console.error("Submission resolution failed - technical details:", {
+          studentId,
+          assignment: selectedAssignment,
+          studentData: {
+            submitted: student.submitted,
+            file_url: student.file_url,
+            submission_id: student.submission_id,
+            existing_evaluation: !!student.existingEvaluation
+          }
+        });
+        
+        throw new Error(`Could not verify submission for ${student.name}. Please ensure:
+          1. The student has submitted their work
+          2. The submission file is properly uploaded
+          3. Refresh the page and try again`);
+      }
+  
+      // Validate and parse grade
+      const rawScore = grades[studentId];
+      const numericScore = parseFloat(rawScore);
+      
+      if (isNaN(numericScore)) {
+        throw new Error("Please enter a valid numerical grade");
+      }
+      
+      if (numericScore < 0 || numericScore > 10) {
+        throw new Error("Grade must be between 0 and 10");
+      }
+  
+      // Prepare API payload
+      const payload = {
+        score: numericScore,
+        feedback: feedback[studentId]?.trim() || "",
+        submission: submissionId,
+        ...(!existingEvaluations[studentId] && {
+          student: studentId,
+          assignment: selectedAssignment,
+          course: selectedCourse,
+          track: selectedTrack
+        })
+      };
+  
+      // Execute API request
+      const endpoint = existingEvaluations[studentId] 
+        ? `grades/${existingEvaluations[studentId].id}/`
+        : "grades/";
+  
+      await apiClient[existingEvaluations[studentId] ? "put" : "post"](endpoint, payload);
+  
+      // Update state while preserving existing data
+      await fetchSubmissionStatus(selectedAssignment);
+      
+      setSubmissionData(prev => ({
+        ...prev,
+        submitters: prev.submitters.map(s => 
+          s.student_id === studentId ? { ...s, ...student } : s
+        )
+      }));
+  
+      if (!existingEvaluations[studentId]) {
+        setFeedback(prev => ({ ...prev, [studentId]: "" }));
+        setGrades(prev => ({ ...prev, [studentId]: "" }));
+      }
+  
+      setSnackbar({
+        open: true,
+        message: `Evaluation ${existingEvaluations[studentId] ? "updated" : "submitted"} successfully`,
+        severity: "success",
       });
-      throw new Error("Could not verify submission. Please contact support.");
-    }
-
-    // 3. Grade validation
-    const rawGrade = grades[studentId];
-    const score = parseInt(rawGrade, 10);
-    
-    if (isNaN(score)) {
-      throw new Error("Please enter a valid numerical grade");
-    }
-    
-    if (score < 0 || score > 10) {
-      throw new Error("Grade must be between 0 and 10");
-    }
-
-    // 4. Prepare payload
-    const payload = {
-      score,
-      feedback: feedback[studentId]?.trim() || "",
-      submission: submissionId,
-    };
-
-    // 5. API call logic
-    let response;
-    if (existingEvaluations[studentId]) {
-      // Update existing grade (PUT)
-      response = await apiClient.put(
-        `grades/${existingEvaluations[studentId].id}/`,
-        payload
-      );
-    } else {
-      // Create new grade (POST with full context)
-      response = await apiClient.post("grades/", {
-        ...payload,
-        student: studentId,
-        assignment: selectedAssignment,
-        course: selectedCourse,
-        track: selectedTrack
+  
+    } catch (err) {
+      console.error("Grade submission error:", {
+        error: err.message,
+        stack: err.stack,
+        response: err.response?.data
       });
+  
+      const userMessage = err.response?.data?.detail || 
+        err.message.replace(/Error: /, '');
+  
+      setSnackbar({
+        open: true,
+        message: userMessage,
+        severity: "error",
+      });
+    } finally {
+      setSubmitLoading(prev => ({ ...prev, [studentId]: false }));
     }
-
-    // 6. Refresh data and update state
-    await fetchSubmissionStatus(selectedAssignment);
-    
-    // Clear feedback/grade if new submission
-    if (!existingEvaluations[studentId]) {
-      setFeedback(prev => ({ ...prev, [studentId]: "" }));
-      setGrades(prev => ({ ...prev, [studentId]: "" }));
-    }
-
-    setSnackbar({
-      open: true,
-      message: `Grade ${existingEvaluations[studentId] ? "updated" : "recorded"} successfully`,
-      severity: "success",
-    });
-
-  } catch (err) {
-    console.error("Grade submission error:", {
-      error: err.message,
-      response: err.response?.data
-    });
-    
-    setSnackbar({
-      open: true,
-      message: err.response?.data?.detail || err.message,
-      severity: "error",
-    });
-  } finally {
-    setSubmitLoading((prev) => ({ ...prev, [studentId]: false }));
-  }
-};
-
+  };  
+  
   // Filter courses for selected track
   const filteredCourses = data.courses.filter((course) =>
     course.tracks.some((track) => track.id === Number(selectedTrack))

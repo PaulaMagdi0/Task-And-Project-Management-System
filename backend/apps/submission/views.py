@@ -146,35 +146,30 @@ class AssignmentStudentDetailView(APIView):
     permission_classes = [IsAuthenticated, IsInstructor]
 
     def get_assignment_submission(self, assignment_id, student_id):
-        try:
-            # Fetch the necessary objects
-            assignment = Assignment.objects.get(id=assignment_id)
-            student = Student.objects.get(id=student_id)
-            course = assignment.course  # Assuming assignment is linked to a course
-            track = student.track  # Assuming student is linked to a track
-            
-            # Fetch the submission (if it exists)
-            submission = student.submissions.filter(assignment_id=assignment_id).first()
-            
-            return assignment, student, submission, course, track
-        except Assignment.DoesNotExist:
-            raise Exception("Assignment not found.")
-        except Student.DoesNotExist:
-            raise Exception("Student not found.")
+        # Safer fetching using get_object_or_404
+        assignment = get_object_or_404(Assignment, id=assignment_id)
+        student = get_object_or_404(Student, id=student_id)
+
+        course = assignment.course
+        track = student.track
+
+        # Get the first matching submission
+        submission = student.submissions.filter(assignment_id=assignment_id).first()
+
+        return assignment, student, submission, course, track
 
     def get(self, request, assignment_id, student_id):
         try:
-            # Retrieve data from the database
             assignment, student, submission, course, track = self.get_assignment_submission(assignment_id, student_id)
-            
-            # Fetch the grade information (if exists)
+
+            # Get the grade if it exists
             grade = Grade.objects.filter(assignment=assignment, student=student).first()
 
             submission_data = {
                 "student": student.full_name,
                 "course": course.name,
                 "track": track.name,
-                "status": "Submitted" if submission else "Not Submitted"
+                "status": "Submitted" if submission else "Not Submitted",
             }
 
             if submission:
@@ -182,26 +177,27 @@ class AssignmentStudentDetailView(APIView):
                     "submission_time": submission.submission_date,
                     "file_url": submission.file_url,
                 })
-            
-            # If there's a grade, include it in the response
+
             if grade:
                 submission_data.update({
-                    "feedback": grade.feedback or "No feedback",  # Default to 'No feedback' if missing
-                    "score": grade.score if grade.score is not None else None,  # Handle null score
-                    "graded_date": grade.graded_date
+                    "feedback": grade.feedback or "No feedback",
+                    "score": grade.score,
+                    "graded_date": grade.graded_date,
                 })
 
-            # Serialize the assignment data
             assignment_data = AssignmentDetailSerializer(assignment).data
 
-            # Return the combined response
             return Response({
                 "assignment": assignment_data,
                 "submission": submission_data
             }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
     def post(self, request, assignment_id, student_id):
         return self._update_feedback(request, assignment_id, student_id, create_only=True)
 

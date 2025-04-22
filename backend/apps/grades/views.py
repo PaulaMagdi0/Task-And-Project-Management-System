@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from apps.grades.models import Grade
 from rest_framework.generics import ListAPIView
-
+from apps.submission.models import AssignmentSubmission
 # Set up logging
 logger = logging.getLogger(__name__)
 

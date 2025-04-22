@@ -145,6 +145,8 @@ const Courses = () => {
   // Prepare filter options
   const trackNames = [...new Set(tracks.map((track) => track.name))];
   const courseNames = [...new Set(courses.map((course) => course.name))];
+  // console.log(tracks);
+  
   const createdDates = [
     ...new Set(
       courses.map(
@@ -171,14 +173,20 @@ const Courses = () => {
     );
   });
   
+  console.log(filteredCourses);
 
   const rows = filteredCourses.map((course) => ({
     id: course.id,
     name: course.name,
     description: course.description,
-    tracks: (course.tracks || []).map(
-      (trackId) => tracks.find((t) => t.id === trackId)?.name || "Unknown Track"
-    ),
+    tracks: course?.tracks
+      ? course?.tracks.map((trackId) => {
+          // Find the track by ID
+          const track = tracks.find((t) => t.id === trackId.id);
+          // If track is found, return its name, otherwise return "Unknown Track"
+          return track ? track.name : "Unknown Track"; 
+        })
+      : [],  // Default to an empty array if no tracks exist
     created_at: formatDate(course.created_at),
   }));
   
