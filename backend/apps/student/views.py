@@ -261,7 +261,6 @@ def verify_email(request, verification_code):
             {'status': 'invalid_code'},
             status=status.HTTP_400_BAD_REQUEST
         )
-from rest_framework.permissions import IsAuthenticated
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

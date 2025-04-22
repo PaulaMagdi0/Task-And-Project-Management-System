@@ -121,16 +121,48 @@ const Grades = () => {
       const dataWithGrades = await Promise.all(
         response.data.submitters.map(async (student) => {
           try {
-            const { data } = await apiClient.get(
-              `submission/assignments/${assignmentId}/students/${student.student_id}/`
-            );
+            // Fetch submission
+            let submission = {};
+            try {
+              const submissionRes = await apiClient.get(
+                `submission/assignments/${assignmentId}/students/${student.student_id}/`
+              );
+              submission = submissionRes.data.submission || {};
+              // Fallback for submission ID
+              if (!submission.id && submission.file_url) {
+                const altRes = await apiClient.get(
+                  `submission/instructor/?student=${student.student_id}&assignment=${assignmentId}`
+                );
+                if (altRes.data.results?.length > 0) {
+                  submission = altRes.data.results[0];
+                }
+              }
+            } catch (submissionError) {
+              console.error('Submission fetch error:', submissionError);
+            }
+
+            // Validate submission
+            const hasValidSubmission = !!submission.file_url;
+            const submissionId = submission.id || submission.submission_id || null;
+
+            // Fetch existing grade
+            let existingEvaluation = null;
+            try {
+              const gradeRes = await apiClient.get(
+                `grades/student/${student.student_id}/?assignment=${assignmentId}`
+              );
+              existingEvaluation = gradeRes.data[0] || null;
+            } catch (gradeError) {
+              console.error('Grade fetch error:', gradeError);
+            }
+
             return {
               ...student,
-              existingEvaluation:
-                data.submission?.score !== null &&
-                data.submission?.feedback !== null
-                  ? data.submission
-                  : null,
+              submitted: hasValidSubmission,
+              submission_id: submissionId,
+              submission_date: submission.submission_time,
+              file_url: submission.file_url,
+              existingEvaluation,
             };
           } catch (err) {
             return {
@@ -146,13 +178,20 @@ const Grades = () => {
       );
 
       const evaluations = {};
+      const initialFeedback = {};
+      const initialGrades = {};
+
       dataWithGrades.forEach((student) => {
         if (student.existingEvaluation) {
           evaluations[student.student_id] = student.existingEvaluation;
+          initialFeedback[student.student_id] = student.existingEvaluation.feedback;
+          initialGrades[student.student_id] = student.existingEvaluation.score.toString();
         }
       });
-      setExistingEvaluations(evaluations);
 
+      setExistingEvaluations(evaluations);
+      setFeedback(initialFeedback);
+      setGrades(initialGrades);
       setSubmissionData({
         ...response.data,
         submitters: dataWithGrades,
@@ -166,49 +205,86 @@ const Grades = () => {
 
   const handleEditGrade = async (studentId) => {
     try {
-      const rawFeedback = feedback[studentId]?.trim() || "";
-      const rawScore = grades[studentId] || "";
+      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
 
-      // Validate feedback
-      if (!rawFeedback) {
-        setSnackbar({
-          open: true,
-          message: "Please provide feedback before saving",
-          severity: "error",
-        });
-        return;
+      if (!selectedTrack || !selectedCourse || !selectedAssignment) {
+        throw new Error("Missing required context (track, course, or assignment)");
       }
 
-      // Validate score
+      const student = submissionData.submitters.find((s) => s.student_id === studentId);
+      if (!student) {
+        throw new Error("Student not found in submission records");
+      }
+
+      let submissionId = student.submission_id;
+      if (!submissionId && student.existingEvaluation?.submission) {
+        submissionId = student.existingEvaluation.submission;
+      }
+
+      if (!submissionId && student.file_url) {
+        const urlPatterns = [
+          /\/d\/([a-zA-Z0-9-_]+)/,
+          /id=([a-zA-Z0-9-_]+)/,
+          /\/file\/d\/([a-zA-Z0-9-_]+)/
+        ];
+        for (const pattern of urlPatterns) {
+          const match = student.file_url.match(pattern);
+          if (match) {
+            submissionId = match[1];
+            break;
+          }
+        }
+      }
+
+      if (!submissionId && student.submitted) {
+        try {
+          const submissionRes = await apiClient.get(
+            `submission/assignments/${selectedAssignment}/students/${studentId}/`
+          );
+          submissionId = submissionRes.data.submission?.id;
+        } catch (apiError) {
+          console.error('Submission fetch error:', apiError);
+        }
+      }
+
+      if (!submissionId) {
+        throw new Error(`Could not resolve submission for ${student.name}.`);
+      }
+
+      const rawScore = grades[studentId];
       const numericScore = parseFloat(rawScore);
       if (isNaN(numericScore) || numericScore < 0 || numericScore > 10) {
-        setSnackbar({
-          open: true,
-          message: "Please enter a valid score between 0 and 10",
-          severity: "error",
-        });
-        return;
+        throw new Error("Score must be a number between 0 and 10");
       }
 
-      // Prepare payload
+      const rawFeedback = feedback[studentId]?.trim() || "";
+      if (!rawFeedback) {
+        throw new Error("Feedback is required before saving");
+      }
+
+      const evaluation = existingEvaluations[studentId];
+      if (!evaluation?.id) {
+        throw new Error("No existing evaluation found to update");
+      }
+
       const payload = {
         score: numericScore,
         feedback: rawFeedback,
+        submission: submissionId,
+        student: studentId,
+        assignment: selectedAssignment,
+        course: selectedCourse,
+        track: selectedTrack,
       };
 
-      setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
+      await apiClient.put(`grades/${evaluation.id}/`, payload);
 
-      // Send request
-      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
-      await apiClient.put(endpoint, payload);
-
-      // Update UI state
       setExistingEvaluations((prev) => ({
         ...prev,
         [studentId]: {
           ...prev[studentId],
           ...payload,
-          submission_time: new Date().toISOString(), // Update grade time
+          updated_at: new Date().toISOString(),
         },
       }));
 
@@ -218,13 +294,13 @@ const Grades = () => {
         severity: "success",
       });
 
-      // Refresh data and exit edit mode
       await fetchSubmissionStatus(selectedAssignment);
       setIsEditing((prev) => ({ ...prev, [studentId]: false }));
     } catch (err) {
       const errorMessage =
         err.response?.data?.detail ||
         err.response?.data?.message ||
+        err.message ||
         "Failed to update evaluation";
       setSnackbar({
         open: true,
@@ -239,17 +315,24 @@ const Grades = () => {
   const handleDeleteGrade = async () => {
     try {
       const studentId = deleteConfirm;
-      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
-      await apiClient.delete(endpoint);
+      const evaluation = existingEvaluations[studentId];
+      if (!evaluation?.id) {
+        setSnackbar({
+          open: true,
+          message: "No evaluation found to delete",
+          severity: "error",
+        });
+        return;
+      }
 
-      // Force immediate UI update
+      await apiClient.delete(`grades/${evaluation.id}/`);
+
       setExistingEvaluations((prev) => {
         const updated = { ...prev };
         delete updated[studentId];
         return updated;
       });
 
-      // Refresh data while maintaining submission visibility
       const updatedSubmitters = submissionData.submitters.map((student) =>
         student.student_id === studentId
           ? { ...student, existingEvaluation: null }
@@ -263,17 +346,27 @@ const Grades = () => {
 
       setSnackbar({
         open: true,
-        message: "Evaluation cleared successfully",
+        message: "Evaluation deleted successfully",
         severity: "success",
       });
     } catch (err) {
-      // Error handling
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Failed to delete evaluation";
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: "error",
+      });
+    } finally {
+      setDeleteConfirm(null);
     }
-    setDeleteConfirm(null);
   };
+
   const handleSubmitFeedback = async (studentId) => {
     try {
-      const student = filteredStudents.find((s) => s.student_id === studentId);
+      const student = submissionData.submitters.find((s) => s.student_id === studentId);
       if (!student?.submission_id) {
         setSnackbar({
           open: true,
@@ -306,12 +399,16 @@ const Grades = () => {
       const payload = {
         score: gradeValue,
         feedback: feedbackText,
+        submission: student.submission_id,
+        student: studentId,
+        assignment: selectedAssignment,
+        course: selectedCourse,
+        track: selectedTrack,
       };
 
       setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
 
-      const endpoint = `submission/assignments/${selectedAssignment}/students/${studentId}/`;
-      await apiClient.post(endpoint, payload);
+      await apiClient.post(`grades/`, payload);
 
       setFeedback((prev) => ({ ...prev, [studentId]: "" }));
       setGrades((prev) => ({ ...prev, [studentId]: "" }));
@@ -374,11 +471,7 @@ const Grades = () => {
   );
 
   const filteredStudents = submissionData
-    ? [
-        ...submissionData.submitters.filter(
-          (student) => student.existingEvaluation
-        ),
-      ]
+    ? submissionData.submitters.filter((student) => student.existingEvaluation)
     : [];
 
   const getBorderColor = (student) => {
@@ -394,7 +487,6 @@ const Grades = () => {
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Track Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Track</InputLabel>
@@ -413,7 +505,6 @@ const Grades = () => {
           </FormControl>
         </Grid>
 
-        {/* Course Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Course</InputLabel>
@@ -432,7 +523,6 @@ const Grades = () => {
           </FormControl>
         </Grid>
 
-        {/* Assignment Selector */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Select Assignment</InputLabel>
@@ -452,7 +542,6 @@ const Grades = () => {
         </Grid>
       </Grid>
 
-      {/* Loading States */}
       {loading.initial && (
         <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
           <CircularProgress />
@@ -484,13 +573,7 @@ const Grades = () => {
                 >
                   <CardHeader
                     title={
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 2,
-                        }}
-                      >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                         <PersonIcon />
                         <Typography variant="h6">{student.name}</Typography>
                         {student.submitted ? (
@@ -548,10 +631,12 @@ const Grades = () => {
                                   <ScheduleIcon color="action" />
                                   <Typography variant="body2">
                                     Submitted:{" "}
-                                    {format(
-                                      new Date(student.submission_date),
-                                      "PPpp"
-                                    )}
+                                    {student.submission_date
+                                      ? format(
+                                          new Date(student.submission_date),
+                                          "PPpp"
+                                        )
+                                      : "N/A"}
                                   </Typography>
                                 </Box>
                                 {student.file_url && (
@@ -612,19 +697,14 @@ const Grades = () => {
                                       multiline
                                       rows={4}
                                       label="Feedback"
-                                      error={
-                                        !feedback[student.student_id]?.trim()
-                                      }
+                                      error={!feedback[student.student_id]?.trim()}
                                       helperText={
                                         !feedback[student.student_id]?.trim() &&
                                         "Feedback is required"
                                       }
                                       value={feedback[student.student_id] || ""}
-                                      onChange={handleFeedbackChange(
-                                        student.student_id
-                                      )}
+                                      onChange={handleFeedbackChange(student.student_id)}
                                     />
-
                                     <TextField
                                       fullWidth
                                       type="number"
@@ -640,17 +720,10 @@ const Grades = () => {
                                           grades[student.student_id] > 10) &&
                                         "Must be between 0-10"
                                       }
-                                      inputProps={{
-                                        min: 0,
-                                        max: 10,
-                                        step: "0.1",
-                                      }}
+                                      inputProps={{ min: 0, max: 10, step: "0.1" }}
                                       value={grades[student.student_id] || ""}
-                                      onChange={handleGradeChange(
-                                        student.student_id
-                                      )}
+                                      onChange={handleGradeChange(student.student_id)}
                                     />
-
                                     <Box
                                       sx={{
                                         display: "flex",
@@ -671,12 +744,8 @@ const Grades = () => {
                                       </Button>
                                       <Button
                                         variant="contained"
-                                        onClick={() =>
-                                          handleEditGrade(student.student_id)
-                                        } // Pass student ID instead of evaluation ID
-                                        disabled={
-                                          submitLoading[student.student_id]
-                                        }
+                                        onClick={() => handleEditGrade(student.student_id)}
+                                        disabled={submitLoading[student.student_id]}
                                       >
                                         {submitLoading[student.student_id]
                                           ? "Saving..."
@@ -697,9 +766,7 @@ const Grades = () => {
                                         variant="outlined"
                                         color="error"
                                         startIcon={<DeleteIcon />}
-                                        onClick={() =>
-                                          setDeleteConfirm(student.student_id)
-                                        }
+                                        onClick={() => setDeleteConfirm(student.student_id)}
                                       >
                                         Delete
                                       </Button>
@@ -714,22 +781,18 @@ const Grades = () => {
                                           setFeedback((prev) => ({
                                             ...prev,
                                             [student.student_id]:
-                                              student.existingEvaluation
-                                                ?.feedback || "", // Handle null
+                                              student.existingEvaluation?.feedback || "",
                                           }));
                                           setGrades((prev) => ({
                                             ...prev,
                                             [student.student_id]:
-                                              student.existingEvaluation
-                                                ?.score || "", // Handle null
+                                              student.existingEvaluation?.score?.toString() || "",
                                           }));
                                         }}
                                       >
                                         Edit
                                       </Button>
                                     </Box>
-
-                                    {/* Updated feedback and grade display */}
                                     <Box>
                                       <Box
                                         sx={{
@@ -743,10 +806,7 @@ const Grades = () => {
                                           color="primary"
                                           sx={{ fontSize: 24 }}
                                         />
-                                        <Typography
-                                          variant="h6"
-                                          color="text.primary"
-                                        >
+                                        <Typography variant="h6" color="text.primary">
                                           Student Feedback
                                         </Typography>
                                       </Box>
@@ -765,7 +825,6 @@ const Grades = () => {
                                           "No feedback provided"}
                                       </Typography>
                                     </Box>
-
                                     <Box>
                                       <Box
                                         sx={{
@@ -779,10 +838,7 @@ const Grades = () => {
                                           color="primary"
                                           sx={{ fontSize: 24 }}
                                         />
-                                        <Typography
-                                          variant="h6"
-                                          color="text.primary"
-                                        >
+                                        <Typography variant="h6" color="text.primary">
                                           Grading Summary
                                         </Typography>
                                       </Box>
@@ -812,14 +868,8 @@ const Grades = () => {
                                                 mt: 1,
                                               }}
                                             >
-                                              <Typography
-                                                variant="h2"
-                                                color="primary"
-                                              >
-                                                {
-                                                  student.existingEvaluation
-                                                    .score
-                                                }
+                                              <Typography variant="h2" color="primary">
+                                                {student.existingEvaluation.score}
                                               </Typography>
                                               <Typography
                                                 variant="h5"
@@ -844,16 +894,15 @@ const Grades = () => {
                                             >
                                               Submission Time
                                             </Typography>
-                                            <Typography
-                                              variant="h6"
-                                              sx={{ mt: 1 }}
-                                            >
-                                              {format(
-                                                new Date(
-                                                  student.existingEvaluation.submission_time
-                                                ),
-                                                "PPpp"
-                                              )}
+                                            <Typography variant="h6" sx={{ mt: 1 }}>
+                                              {student.existingEvaluation.submission_time
+                                                ? format(
+                                                    new Date(
+                                                      student.existingEvaluation.submission_time
+                                                    ),
+                                                    "PPpp"
+                                                  )
+                                                : "N/A"}
                                             </Typography>
                                           </Card>
                                         </Grid>
@@ -877,9 +926,7 @@ const Grades = () => {
                                     label="Feedback"
                                     placeholder="Provide constructive feedback..."
                                     value={feedback[student.student_id] || ""}
-                                    onChange={handleFeedbackChange(
-                                      student.student_id
-                                    )}
+                                    onChange={handleFeedbackChange(student.student_id)}
                                     InputProps={{
                                       startAdornment: (
                                         <InputAdornment position="start">
@@ -894,16 +941,13 @@ const Grades = () => {
                                       },
                                     }}
                                   />
-
                                   <TextField
                                     fullWidth
                                     type="text"
                                     label="Grade"
                                     inputProps={{ min: 0, max: 10 }}
                                     value={grades[student.student_id] || ""}
-                                    onChange={handleGradeChange(
-                                      student.student_id
-                                    )}
+                                    onChange={handleGradeChange(student.student_id)}
                                     InputProps={{
                                       startAdornment: (
                                         <InputAdornment position="start">
@@ -928,21 +972,13 @@ const Grades = () => {
                                       },
                                     }}
                                   />
-
                                   <Box
-                                    sx={{
-                                      display: "flex",
-                                      justifyContent: "flex-end",
-                                    }}
+                                    sx={{ display: "flex", justifyContent: "flex-end" }}
                                   >
                                     <Button
                                       variant="contained"
-                                      onClick={() =>
-                                        handleSubmitFeedback(student.student_id)
-                                      }
-                                      disabled={
-                                        submitLoading[student.student_id]
-                                      }
+                                      onClick={() => handleSubmitFeedback(student.student_id)}
+                                      disabled={submitLoading[student.student_id]}
                                       startIcon={
                                         submitLoading[student.student_id] ? (
                                           <CircularProgress size={20} />
@@ -978,22 +1014,18 @@ const Grades = () => {
         </Box>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={Boolean(deleteConfirm)}
-        onClose={() => setDeleteConfirm(null)}
-      >
+      <Dialog open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)}>
         <DialogTitle>Confirm Delete Evaluation</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to permanently delete this evaluation? This
-            action cannot be undone.
+            Are you sure you want to permanently delete this evaluation? This action
+            cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirm(null)}>Cancel</Button>
           <Button
-            onClick={() => handleDeleteGrade(deleteConfirm)}
+            onClick={handleDeleteGrade}
             color="error"
             variant="contained"
             startIcon={<DeleteIcon />}
@@ -1003,7 +1035,6 @@ const Grades = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
