@@ -243,20 +243,19 @@ def verify_email(request, verification_code):
         student = get_object_or_404(Student, verification_code=verification_code)
 
         if student.verified:
-            return redirect("http://localhost:5174/verified")
+            return redirect("http://localhost:5173/verified")
 
         student.verified = True
         student.verification_code = None
         student.save()
 
         logger.info(f"Student {student.id} email verified")
-        return redirect("http://localhost:5174/verified")
+        return redirect("http://localhost:5173/verified")
 
     except Exception as e:
         logger.error(f"Verification failed: {str(e)}")
-        return redirect("http://localhost:5174/not-verified")
+        return redirect("http://localhost:5173/not-verified")
 
-            
 from rest_framework.permissions import IsAuthenticated
 
 @api_view(['GET'])
