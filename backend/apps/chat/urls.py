@@ -1,9 +1,14 @@
+# File: apps/chat/urls.py
 from django.urls import path
-from .views import ChatHomeView, ChatRoomListCreateView, MyChatRoomsView, MessageListCreateView
+from .views import (
+    ChatRoomListCreateView, MyChatRoomsView,
+    MessageListCreateView, SearchUsersView
+)
 
+app_name = 'chat'
 urlpatterns = [
-    path("", ChatHomeView.as_view(), name="chat_home"),
-    path("rooms/", ChatRoomListCreateView.as_view(), name="chat_rooms"),
-    path("my_chats/", MyChatRoomsView.as_view(), name="my_chats"),  # List chat rooms for the authenticated user
-    path("rooms/<int:room_id>/messages/", MessageListCreateView.as_view(), name="room_messages"),  # Messages for a specific chat room
+    path('rooms/', ChatRoomListCreateView.as_view(), name='chat_rooms'),
+    path('rooms/my/', MyChatRoomsView.as_view(), name='my_chat_rooms'),
+    path('rooms/<int:room_id>/messages/', MessageListCreateView.as_view(), name='chat_room_messages'),
+    path('users/', SearchUsersView.as_view(), name='search_users'),
 ]

@@ -12,6 +12,7 @@ import createAssignmentReducer from './createassignmentsSlice';
 import listAssignmentsReducer from './viewassignmentSlice';
 import branchesReducer from './branchSlice';
 import staffReducer from './staffSlice'; // Import staff reducer
+import chatReducer from './chatSlice'; // Import chat reducer
 const store = configureStore({
   reducer: {
     courses: coursesReducer,
@@ -26,7 +27,7 @@ const store = configureStore({
     listassignments: listAssignmentsReducer,
     branches: branchesReducer, // Add branches reducer
     staff: staffReducer, // Add staff reducer
-
+    chat: chatReducer, // Add chat reducer
   },
 });
 

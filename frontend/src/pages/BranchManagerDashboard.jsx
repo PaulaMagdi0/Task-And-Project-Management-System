@@ -1,11 +1,14 @@
 // File: src/components/BranchManagerDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { FiMenu, FiX, FiMap, FiUserPlus, FiLink, FiList } from 'react-icons/fi';
+import { FiMenu, FiX, FiMap, FiUserPlus, FiLink, FiList, FiMessageCircle } from 'react-icons/fi';
 import AddTrack from '../components/AddTrack';
 import AddSupervisor from '../components/AddSupervisor';
 import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
 import TracksTable from '../components/TracksTable';
+// ** Chat imports **
+import ChatRoomList from '../components/ChatRoomList';
+import ChatRoomView from '../components/ChatRoomView';
 import './BranchManagerDashboard.css';
 
 const BranchManagerDashboard = () => {
@@ -18,6 +21,7 @@ const BranchManagerDashboard = () => {
     { id: 'addStaff', icon: <FiUserPlus />, label: 'Add Staff' },
     { id: 'assignSupervisor', icon: <FiLink />, label: 'Assign Supervisor' },
     { id: 'viewTracks', icon: <FiList />, label: 'View Tracks' },
+    { id: 'chat', icon: <FiMessageCircle />, label: 'Chat' },
   ];
 
   return (
@@ -86,6 +90,15 @@ const BranchManagerDashboard = () => {
               <h1 className="section-title"><FiList /> Current Tracks</h1>
               <TracksTable />
             </>
+          )}
+
+          {selectedOption === 'chat' && (
+            <Routes>
+              {/* Chat root path shows list */}
+              <Route path="/branchmanager/dashboard/chat" element={<ChatRoomList />} />
+              {/* Single room view */}
+              <Route path="/branchmanager/dashboard/chat/rooms/:roomId" element={<ChatRoomView />} />
+            </Routes>
           )}
         </div>
       </div>

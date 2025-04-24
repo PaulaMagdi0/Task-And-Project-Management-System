@@ -16,7 +16,6 @@ urlpatterns = [
     path("api/auth/", include("apps.custom_auth.urls")),
     path("api/branch_location/", include("apps.branch_location.urls")),
     # path('api/', include('apps.student.urls')),
-    path("api/chat/", include("apps.chat.urls")),
     path("api/contact/", include("apps.contact.urls")),
     path('ai/', include('ai_recommendations.urls')),
     path('api/', include('chat_ai.urls')),  # 👈 Add this line
@@ -24,5 +23,6 @@ urlpatterns = [
     path('api/github/', include('githubStat.urls')),
     path('book_search/', include('book_search.urls')),
     path('movie_search/', include('movie_search.urls')),
+    path("api/chat/", include("apps.chat.urls", namespace="chat")),
 
 ]
