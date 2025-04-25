@@ -258,26 +258,27 @@ def verify_email(request, verification_code):
         logger.error(f"Verification failed: {str(e)}")
         return redirect("http://localhost:5174/not-verified")
 
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get the student
+        # Get the student (from database, using select_related for track)
         student = Student.objects.select_related('track').get(id=student_id)
 
-        if hasattr(student, 'user'):
-            if request.user != student.user and not request.user.is_staff:
-                return Response({"error": "Unauthorized access"}, status=403)
-        else:
-            if not request.user.is_staff:
-                return Response({"error": "Unauthorized access"}, status=403)
+        # Authorization check
+        if request.user.id != student.id and not request.user.is_staff:
+            return Response({"error": "Unauthorized access"}, status=403)
 
         # Get all courses for the student's track
         courses = Course.objects.filter(tracks=student.track)
 
-        # Prepare course data
         course_data = [
             {
                 'course_id': course.id,
@@ -288,7 +289,6 @@ def student_courses(request, student_id):
             for course in courses
         ]
 
-        # Get all assignments related to these courses
         assignments = Assignment.objects.filter(course__in=courses)
         assignments_serializer = AssignmentSerializer(assignments, many=True)
 
@@ -307,9 +307,7 @@ def student_courses(request, student_id):
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=404)
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        return Response({"error": "Server error"}, status=500)
-
+        return Response({"error": str(e)}, status=500)
 
     
 #UPdate student Info View

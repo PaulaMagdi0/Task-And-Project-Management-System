@@ -1,9 +1,25 @@
 from rest_framework import serializers
+from .models import Assignment , AssignmentStudent
 from apps.student.models import Student  # Ensure correct import path
 from apps.student.serializers import MinimalStudentSerializer  # Ensure correct import path
 from apps.courses.serializers import MinimalCourseSerializer  # Ensure correct import path
+
+from rest_framework import serializers
+from .models import Assignment, AssignmentStudent
+from apps.student.models import Student
 from apps.courses.models import Course
 from apps.tracks.models import Track
+from rest_framework import serializers
+from .models import Assignment, AssignmentStudent
+from apps.tracks.models import  Track
+from apps.student.models import Student
+
+from rest_framework import serializers
+
+from rest_framework import serializers
+from .models import Assignment, Track, Student, AssignmentStudent
+
+from rest_framework import serializers
 from .models import Assignment, Track, Student, AssignmentStudent
 
 class AssignmentSerializer(serializers.ModelSerializer):
@@ -92,7 +108,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
                 print(f"❌ Student {student.id} is already assigned to assignment {assignment.id}, skipping...")
 
         return assignment
-
 
 
 class AssignmentStudentSerializer(serializers.ModelSerializer):

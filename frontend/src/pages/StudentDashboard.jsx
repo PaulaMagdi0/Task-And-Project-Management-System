@@ -192,7 +192,7 @@ const StudentDashboard = () => {
                     return diffInDays >= 0 && diffInDays <= 3;
                   })
                   .sort((a, b) => new Date(a.end_date) - new Date(b.end_date)) // 👈 Sorting by end_date ascending
-                  .map((assignment, index) => (
+                  ?.map((assignment, index) => (
                     <ListItem key={index}>
                       <ListItemIcon>
                         <FiCalendar style={{ color: '#e53935' }} />
@@ -245,7 +245,7 @@ const StudentDashboard = () => {
               subheader={`${dashboardData.pendingCorrectives.length} items`}
             />
             <List>
-              {dashboardData.pendingCorrectives.map((item, index) => (
+              {dashboardData.pendingCorrectives?.map((item, index) => (
                 <React.Fragment key={index}>
                   <ListItem>
                     <ListItemIcon>
@@ -269,11 +269,11 @@ const StudentDashboard = () => {
             <CardHeader
               title="My Courses"
               avatar={<FiBook style={{ color: '#e53935' }} />}
-              subheader={`Track: ${studentData.assignments[0].track_name || 'Not assigned'}`}
+              subheader={`Track: ${studentData?.assignments[0]?.track_name || 'Not assigned'}`}
             />
             <CardContent>
               <Grid container spacing={2} >
-                {studentData.courses.map((course) => (
+                {studentData.courses?.map((course) => (
                   <Grid item xs={12} md={6} key={course.id}>
                     <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
                       <CardContent>
@@ -304,7 +304,7 @@ const StudentDashboard = () => {
             />
             <CardContent>
               <Grid container spacing={2}>
-                {dashboardData.pendingAssignments.map((assignment, index) => (
+                {dashboardData.pendingAssignments?.map((assignment, index) => (
                   <Grid item xs={12} key={index}>
                     <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935', p: 1 }}>
                       <CardContent sx={{ pl: 2 }}>
@@ -342,7 +342,7 @@ const StudentDashboard = () => {
               avatar={<FiUsers style={{ color: '#e53935' }} />}
             />
             <List>
-              {dashboardData.recentActivities.map((activity, index) => (
+              {dashboardData.recentActivities?.map((activity, index) => (
                 <ListItem key={index}>
                   <ListItemIcon>
                     {activity.type === 'grade' ? (
@@ -391,7 +391,7 @@ const StudentDashboard = () => {
         </div>
 
         <div className="menu-items">
-          {menuItems.map((item) => (
+          {menuItems?.map((item) => (
             <button
               key={item.id}
               className={`menu-item ${selectedSection === item.id ? 'active' : ''}`}
