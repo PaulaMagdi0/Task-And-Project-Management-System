@@ -149,7 +149,7 @@ class AssignmentStudentDetailView(APIView):
         # Safer fetching using get_object_or_404
         assignment = get_object_or_404(Assignment, id=assignment_id)
         student = get_object_or_404(Student, id=student_id)
-
+        
         course = assignment.course
         track = student.track
 
@@ -174,6 +174,7 @@ class AssignmentStudentDetailView(APIView):
 
             if submission:
                 submission_data.update({
+                    "id": submission.id,  # 👈 Add submission ID here
                     "submission_time": submission.submission_date,
                     "file_url": submission.file_url,
                 })
@@ -197,6 +198,7 @@ class AssignmentStudentDetailView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
             
     def post(self, request, assignment_id, student_id):
         return self._update_feedback(request, assignment_id, student_id, create_only=True)
@@ -261,20 +263,19 @@ class AssignmentStudentDetailView(APIView):
 
 class AssignmentReportView(APIView):
     permission_classes = [IsAuthenticated, IsInstructor]
-
     def get(self, request, pk, format=None):
         try:
-            # Fetch assignment with related data
             assignment = Assignment.objects.prefetch_related(
                 'assignmentstudent_set__student',
                 'assignmentstudent_set__course',
                 'assignmentstudent_set__track'
             ).get(id=pk)
 
-            # Get all related submissions
-            submissions = AssignmentSubmission.objects.filter(
-                assignment=assignment
-            ).select_related('student')
+            # Get all grades for this assignment
+            grades = Grade.objects.filter(assignment=assignment).select_related('student')
+
+            # Map grades by student ID for quick lookup
+            grade_map = {grade.student_id: grade for grade in grades}
 
             # Create PDF buffer
             buffer = BytesIO()
@@ -304,22 +305,24 @@ class AssignmentReportView(APIView):
             elements.append(assignment_table)
             elements.append(Spacer(1, 24))
 
-            # --- Student Submissions Table ---
-            student_data = [['Student', 'Track', 'Course', 'Status', 'Score', 'Feedback']]
+            # --- Student Grades Table ---
+            student_data = [['Student', 'Track', 'Course', 'Score', 'Graded At', 'Feedback']]
             for as_student in sorted(assignment.assignmentstudent_set.all(), key=lambda s: s.student.full_name):
-                submission = submissions.filter(student=as_student.student).first()
+                student = as_student.student
+                grade = grade_map.get(student.id)
+
                 student_data.append([
-                    as_student.student.full_name,
+                    student.full_name,
                     as_student.track.name if as_student.track else "N/A",
                     assignment.course.name if assignment.course else "N/A",
-                    "Submitted" if submission else "Not Submitted",
-                    str(submission.score) if submission and submission.score is not None else "N/A",
-                    Paragraph(submission.feedback, styles['Normal']) if submission and submission.feedback else "N/A"
+                    str(grade.score) if grade else "N/A",
+                    grade.graded_date.strftime("%Y-%m-%d %H:%M") if grade else "N/A",
+                    Paragraph(grade.feedback, styles['Normal']) if grade and grade.feedback else "N/A"
                 ])
 
             student_table = Table(student_data,
-                                  colWidths=[120, 100, 80, 80, 60, 120],
-                                  repeatRows=1)
+                                colWidths=[120, 100, 80, 60, 80, 140],
+                                repeatRows=1)
             student_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -334,11 +337,9 @@ class AssignmentReportView(APIView):
             elements.append(student_table)
             elements.append(Spacer(1, 12))
 
-            # --- Build PDF ---
             doc.build(elements)
             buffer.seek(0)
 
-            # --- Return PDF Response ---
             response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="assignment_{pk}_report.pdf"'
             return response
@@ -351,6 +352,96 @@ class AssignmentReportView(APIView):
                 {"error": "Failed to generate report. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    # def get(self, request, pk, format=None):
+    #     try:
+    #         # Fetch assignment with related data
+    #         assignment = Assignment.objects.prefetch_related(
+    #             'assignmentstudent_set__student',
+    #             'assignmentstudent_set__course',
+    #             'assignmentstudent_set__track'
+    #         ).get(id=pk)
+
+    #         # Get all related submissions
+    #         submissions = AssignmentSubmission.objects.filter(
+    #             assignment=assignment
+    #         ).select_related('student')
+
+    #         # Create PDF buffer
+    #         buffer = BytesIO()
+    #         doc = SimpleDocTemplate(buffer, pagesize=letter)
+    #         styles = getSampleStyleSheet()
+    #         elements = []
+
+    #         # --- Title Section ---
+    #         elements.append(Paragraph(f"Assignment Report: {assignment.title}", styles['Title']))
+    #         elements.append(Spacer(1, 12))
+
+    #         # --- Assignment Details Table ---
+    #         assignment_data = [
+    #             ['Title:', assignment.title],
+    #             ['Course:', assignment.course.name if assignment.course else "N/A"],
+    #             ['Due Date:', assignment.due_date.strftime("%Y-%m-%d %H:%M")],
+    #             ['End Date:', assignment.end_date.strftime("%Y-%m-%d %H:%M")],
+    #             ['Type:', assignment.get_assignment_type_display()],
+    #         ]
+    #         assignment_table = Table(assignment_data, colWidths=[100, 400])
+    #         assignment_table.setStyle(TableStyle([
+    #             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+    #             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+    #             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    #         ]))
+
+    #         elements.append(assignment_table)
+    #         elements.append(Spacer(1, 24))
+
+    #         # --- Student Submissions Table ---
+    #         student_data = [['Student', 'Track', 'Course', 'Status', 'Score', 'Feedback']]
+    #         for as_student in sorted(assignment.assignmentstudent_set.all(), key=lambda s: s.student.full_name):
+    #             submission = submissions.filter(student=as_student.student).first()
+    #             student_data.append([
+    #                 as_student.student.full_name,
+    #                 as_student.track.name if as_student.track else "N/A",
+    #                 assignment.course.name if assignment.course else "N/A",
+    #                 "Submitted" if submission else "Not Submitted",
+    #                 str(submission.score) if submission and submission.score is not None else "N/A",
+    #                 Paragraph(submission.feedback, styles['Normal']) if submission and submission.feedback else "N/A"
+    #             ])
+
+    #         student_table = Table(student_data,
+    #                               colWidths=[120, 100, 80, 80, 60, 120],
+    #                               repeatRows=1)
+    #         student_table.setStyle(TableStyle([
+    #             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
+    #             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+    #             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    #             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    #             ('FONTSIZE', (0, 0), (-1, 0), 10),
+    #             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+    #             ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#D9E1F2')),
+    #             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#5B9BD5')),
+    #         ]))
+
+    #         elements.append(student_table)
+    #         elements.append(Spacer(1, 12))
+
+    #         # --- Build PDF ---
+    #         doc.build(elements)
+    #         buffer.seek(0)
+
+    #         # --- Return PDF Response ---
+    #         response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    #         response['Content-Disposition'] = f'attachment; filename="assignment_{pk}_report.pdf"'
+    #         return response
+
+    #     except Assignment.DoesNotExist:
+    #         return Response({"error": "Assignment not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     except Exception as e:
+    #         logger.error(f"Error generating report: {str(e)}", exc_info=True)
+    #         return Response(
+    #             {"error": "Failed to generate report. Please try again later."},
+    #             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    #         )
 
 class SubmissionByStudentAssignmentView(generics.ListAPIView):
     serializer_class = AssignmentSubmissionSerializer

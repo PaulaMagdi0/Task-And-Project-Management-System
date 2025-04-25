@@ -11,6 +11,10 @@ from rest_framework import status
 from apps.grades.models import Grade
 from rest_framework.generics import ListAPIView
 from apps.submission.models import AssignmentSubmission
+from django.shortcuts import get_object_or_404
+from apps.tracks.models import Track
+from apps.courses.models import Course
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -24,35 +28,78 @@ class GradeDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = GradeSerializer
     lookup_field = 'id'
 
-    def put(self, request, *args, **kwargs):
-            """
-            Handle PUT request to update the grade.
-            """
-            grade = self.get_object()
-            logger.debug(f"[PUT] Incoming data for grade ID {grade.id}: {request.data}")
+    # def put(self, request, *args, **kwargs):
+    #         """
+    #         Handle PUT request to update the grade.
+    #         """
+    #         grade = self.get_object()
+    #         logger.debug(f"[PUT] Incoming data for grade ID {grade.id}: {request.data}")
 
-            # Perform partial update
-            serializer = self.get_serializer(grade, data=request.data, partial=True, context={'request': request})
+    #         # Perform partial update
+    #         serializer = self.get_serializer(grade, data=request.data, partial=True, context={'request': request})
 
-            if serializer.is_valid():
-                try:
-                    # Automatically ensure track and course are set properly from submission data
-                    track = request.data.get('track', grade.track)  # Use the existing track if not provided
-                    course = request.data.get('course', grade.course)  # Use the existing course if not provided
+    #         if serializer.is_valid():
+    #             try:
+    #                 # Automatically ensure track and course are set properly from submission data
+    #                 track = request.data.get('track', grade.track)  # Use the existing track if not provided
+    #                 course = request.data.get('course', grade.course)  # Use the existing course if not provided
                     
-                    # Update grade with track and course if needed
-                    grade.track = track
-                    grade.course = course
+    #                 # Update grade with track and course if needed
+    #                 grade.track = track
+    #                 grade.course = course
 
-                    self.perform_update(serializer)
-                    logger.info(f"[PUT] Grade ID {grade.id} successfully updated by {request.user.username}")
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-                except Exception as e:
-                    logger.error(f"[PUT] Exception during update of grade ID {grade.id}: {str(e)}")
-                    return Response({'detail': 'An error occurred while updating the grade.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                logger.warning(f"[PUT] Validation failed for grade ID {grade.id}: {serializer.errors}")
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #                 self.perform_update(serializer)
+    #                 logger.info(f"[PUT] Grade ID {grade.id} successfully updated by {request.user.username}")
+    #                 return Response(serializer.data, status=status.HTTP_200_OK)
+    #             except Exception as e:
+    #                 logger.error(f"[PUT] Exception during update of grade ID {grade.id}: {str(e)}")
+    #                 return Response({'detail': 'An error occurred while updating the grade.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    #         else:
+    #             logger.warning(f"[PUT] Validation failed for grade ID {grade.id}: {serializer.errors}")
+    #             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, *args, **kwargs):
+        """
+        Handle PUT request to update the grade.
+        """
+        grade = self.get_object()
+        logger.debug(f"[PUT] Incoming data for grade ID {grade.id}: {request.data}")
+
+        # Perform partial update
+        serializer = self.get_serializer(grade, data=request.data, partial=True, context={'request': request})
+
+        if serializer.is_valid():
+            try:
+                # Retrieve the Track and Course instances if provided as IDs in request.data
+                track_id = request.data.get('track')
+                course_id = request.data.get('course')
+
+                # If track_id is provided, fetch the Track instance
+                if track_id:
+                    track = get_object_or_404(Track, id=track_id)
+                else:
+                    track = grade.track  # Use existing track if not provided
+
+                # If course_id is provided, fetch the Course instance
+                if course_id:
+                    course = get_object_or_404(Course, id=course_id)
+                else:
+                    course = grade.course  # Use existing course if not provided
+
+                # Update the grade with the Track and Course instances
+                grade.track = track
+                grade.course = course
+
+                self.perform_update(serializer)
+                logger.info(f"[PUT] Grade ID {grade.id} successfully updated by {request.user.username}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                logger.error(f"[PUT] Exception during update of grade ID {grade.id}: {str(e)}")
+                return Response({'detail': 'An error occurred while updating the grade.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning(f"[PUT] Validation failed for grade ID {grade.id}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, *args, **kwargs):
             """
