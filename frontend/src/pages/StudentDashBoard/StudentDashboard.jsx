@@ -40,6 +40,8 @@ const StudentDashboard = () => {
   const [assignmentTab, setAssignmentTab] = useState('pending');
   const [courseFilter, setCourseFilter] = useState('all');
   const [deadlineFilter, setDeadlineFilter] = useState('');
+  const [gradeCourseFilter, setGradeCourseFilter] = useState('all');
+  const [gradeSubmissionDateFilter, setGradeSubmissionDateFilter] = useState('');
   const navigate = useNavigate();
 
   const { username } = useSelector((state) => state.auth);
@@ -55,7 +57,7 @@ const StudentDashboard = () => {
     error: null,
   });
 
-  // Get unique deadline dates for filter
+  // Get unique deadline dates for assignment filter
   const getUniqueDeadlines = () => {
     const deadlines = new Set(data.assignments
       .filter(assignment => 
@@ -66,6 +68,15 @@ const StudentDashboard = () => {
       .map(assignment => new Date(assignment.end_date).toISOString().slice(0, 10))
     );
     return Array.from(deadlines).sort();
+  };
+
+  // Get unique submission dates for grade filter
+  const getUniqueSubmissionDates = () => {
+    const submissionDates = new Set(data.grades
+      .filter(grade => grade.submitted_at)
+      .map(grade => new Date(grade.submitted_at).toISOString().slice(0, 10))
+    );
+    return Array.from(submissionDates).sort();
   };
 
   useEffect(() => {
@@ -183,7 +194,7 @@ const StudentDashboard = () => {
 
   const handleSubmitAssignment = async (assignment) => {
     const { id: assignmentId, course: courseId } = assignment;
-    const fileUrl = urlInputs[assignmentId]?.trim();
+    let fileUrl = urlInputs[assignmentId]?.trim();
     const userRole = localStorage.getItem('role');
 
     if (userRole !== 'student') {
@@ -195,6 +206,21 @@ const StudentDashboard = () => {
     }
 
     if (!fileUrl) {
+      setSubmissionStatus((prev) => ({
+        ...prev,
+        [assignmentId]: { success: false, message: 'Please enter a valid URL' },
+      }));
+      return;
+    }
+
+    // Automatically prepend "https://" if the URL doesn't start with a protocol
+    if (!fileUrl.match(/^https?:\/\//)) {
+      fileUrl = `https://${fileUrl}`;
+    }
+
+    // Validate the URL
+    const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+    if (!urlPattern.test(fileUrl)) {
       setSubmissionStatus((prev) => ({
         ...prev,
         [assignmentId]: { success: false, message: 'Please enter a valid URL' },
@@ -273,20 +299,27 @@ const StudentDashboard = () => {
     });
   };
 
-  const filterCourses = () => {
-    return data.courses.filter(course => {
-      const courseAssignments = data.assignments.filter(
-        assignment => assignment.course === course.course_id
+  const filterGrades = (grades) => {
+    return grades.filter(grade => {
+      const matchingAssignment = data.assignments.find(
+        assignment => assignment.id === grade.assignment
       );
+      const courseName = matchingAssignment?.course_name || '';
       
-      if (courseAssignments.length === 0) return true;
-
-      return courseAssignments.some(
-        assignment => 
-          !submittedAssignments[assignment.id]?.submitted && 
-          new Date(assignment.end_date) >= new Date()
+      const matchesCourse = gradeCourseFilter === 'all' || courseName === gradeCourseFilter;
+      
+      const matchesSubmissionDate = !gradeSubmissionDateFilter || (
+        grade.submitted_at && 
+        new Date(grade.submitted_at).toISOString().slice(0, 10) === gradeSubmissionDateFilter
       );
+
+      return matchesCourse && matchesSubmissionDate;
     });
+  };
+
+  const filterCourses = () => {
+    // Show all courses assigned to the student
+    return data.courses;
   };
 
   const getCourseProgress = (courseId) => {
@@ -386,9 +419,55 @@ const StudentDashboard = () => {
               subheader={`Average Grade: ${data.averageGrade ? (data.averageGrade) : 'N/A'}/100`}
             />
             <CardContent>
-              {data.grades && data.grades.length > 0 ? (
+              <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Filter by Course</InputLabel>
+                  <Select
+                    value={gradeCourseFilter}
+                    label="Filter by Course"
+                    onChange={(e) => setGradeCourseFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All Courses</MenuItem>
+                    {data.courses.map((course) => (
+                      <MenuItem key={course.course_id} value={course.name}>
+                        {course.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Filter by Submission Date</InputLabel>
+                  <Select
+                    value={gradeSubmissionDateFilter}
+                    label="Filter by Submission Date"
+                    onChange={(e) => setGradeSubmissionDateFilter(e.target.value)}
+                  >
+                    <MenuItem value="">All Dates</MenuItem>
+                    {getUniqueSubmissionDates().map((date) => (
+                      <MenuItem key={date} value={date}>
+                        {new Date(date).toLocaleDateString()}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {(gradeCourseFilter !== 'all' || gradeSubmissionDateFilter) && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setGradeCourseFilter('all');
+                      setGradeSubmissionDateFilter('');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </Box>
+
+              {filterGrades(data.grades).length > 0 ? (
                 <Grid container spacing={2}>
-                  {data.grades.map((grade, index) => {
+                  {filterGrades(data.grades).map((grade, index) => {
                     const matchingAssignment = data.assignments.find(
                       assignment => assignment.id === grade.assignment
                     );
@@ -465,10 +544,10 @@ const StudentDashboard = () => {
                 <Box textAlign="center" py={4}>
                   <FiAward size={48} style={{ color: '#bdbdbd', marginBottom: 16 }} />
                   <Typography variant="body1" color="text.secondary">
-                    No grades available yet
+                    No grades available for the selected filters
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Your submitted work hasn't been graded
+                    Try adjusting the course or submission date filters
                   </Typography>
                 </Box>
               )}
@@ -487,7 +566,7 @@ const StudentDashboard = () => {
             <CardContent>
               {filterCourses().length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  No active courses with pending assignments
+                  No courses assigned
                 </Typography>
               ) : (
                 <Grid container spacing={2}>
@@ -767,17 +846,19 @@ const StudentDashboard = () => {
                                     <Box component="span" fontWeight="bold">Submitted on:</Box>{' '}
                                     {new Date(submissionData.submission_date).toLocaleString()}
                                   </Typography>
-                                  <Typography variant="body2" sx={{ mt: 1 }}>
-                                  <strong>Assignment File:</strong>{' '}
-                                  <a
-                                    href={assignment.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ color: '#e53935', textDecoration: 'underline' }}
-                                  >
-                                    View File
-                                  </a>
-                                </Typography>
+                                  {assignment.file_url && (
+                                    <Typography variant="body2" sx={{ mt: 1 }}>
+                                      <strong>Assignment File:</strong>{' '}
+                                      <a
+                                        href={assignment.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: '#e53935', textDecoration: 'underline' }}
+                                      >
+                                        View File
+                                      </a>
+                                    </Typography>
+                                  )}
                                   {gradeData ? (
                                     <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
                                       <Typography variant="body1" fontWeight="bold">

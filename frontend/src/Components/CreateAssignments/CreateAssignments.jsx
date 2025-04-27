@@ -187,9 +187,18 @@ const CreateAssignment = () => {
 
   const handleChange = (e) => {
     const { name, value, checked, type } = e.target;
+    let updatedValue = value;
+
+    // Automatically prepend "https://" to file_url if it doesn't start with a protocol
+    if (name === "file_url") {
+      if (value.trim() && !value.match(/^https?:\/\//)) {
+        updatedValue = `https://${value.trim()}`;
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : updatedValue,
     }));
     setValidationErrors((prev) => ({ ...prev, [name]: false }));
   };
@@ -404,7 +413,7 @@ const CreateAssignment = () => {
                 required
                 error={validationErrors.file_url}
                 helperText={
-                  validationErrors.file_url ? "Valid URL required" : ""
+                  validationErrors.file_url ? "Valid URL required" : "Enter a URL (https:// will be added if omitted)"
                 }
                 InputProps={{
                   startAdornment: (
