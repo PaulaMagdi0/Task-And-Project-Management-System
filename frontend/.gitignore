@@ -23,3 +23,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+**/migrations/*.py
+!**/migrations/__init__.py
