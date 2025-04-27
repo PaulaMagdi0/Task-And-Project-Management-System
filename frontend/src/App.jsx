@@ -46,15 +46,15 @@ import MovieSearch from './Components/MovieSearch/MovieSearch';
 import ChatWithAI from './Components/ChatAI/ChatWithAI';
 
 // ** Chat Components **
-import ChatRoomList from './components/ChatRoomList';
-import ChatRoomMessages from './components/ChatRoomMessages';
+import ChatRoomList from './Components/ChatRoomList';
+import ChatRoomMessages from './Components/ChatRoomMessages';
 
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
-import ChatWithAI from './Components/ChatAI/ChatWithAI';
 import NotVerifiedPage from './pages/NotVerifiedPage';
+
 const App = () => {
   useCustomScripts();
   const { userType, role } = useSelector((state) => state.auth);

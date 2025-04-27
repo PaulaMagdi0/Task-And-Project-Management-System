@@ -1,26 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { FiMenu, FiX, FiBook, FiCalendar, FiAward, FiAlertTriangle, FiClipboard, FiUsers } from 'react-icons/fi';
-import { Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert } from '@mui/material';
+import { FiMenu, FiX, FiBook, FiCalendar, FiAward, FiAlertTriangle, FiClipboard, FiUsers, FiUpload, FiPaperclip } from 'react-icons/fi';
+import {
+  Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert, Input, Button, IconButton, InputAdornment, TextField, Collapse
+} from '@mui/material';
 import axios from 'axios';
 import './StudentDashboard.css';
+import { useNavigate } from 'react-router-dom';
 
 const menuItems = [
-  {
-    id: 'deadlines',
-    icon: <FiCalendar style={{ color: 'inherit' }} />,
-    label: 'Upcoming Deadlines'
-  },
-  {
-    id: 'averageGrade',
-    icon: <FiAward style={{ color: 'inherit' }} />,
-    label: 'Average Grade'
-  },
-  {
-    id: 'correctives',
-    icon: <FiAlertTriangle style={{ color: 'inherit' }} />,
-    label: 'Pending Correctives'
-  },
   {
     id: 'courses',
     icon: <FiBook style={{ color: 'inherit' }} />,
@@ -32,41 +20,49 @@ const menuItems = [
     label: 'Pending Assignments'
   },
   {
-    id: 'activities',
-    icon: <FiUsers style={{ color: 'inherit' }} />,
-    label: 'Recent Activities'
+    id: 'deadlines',
+    icon: <FiAlertTriangle style={{ color: 'inherit' }} />,
+    label: 'Upcoming Deadlines'
+  },
+  {
+    id: 'averageGrade',
+    icon: <FiAward style={{ color: 'inherit' }} />,
+    label: 'Average Grade'
   },
 ];
 
 const StudentDashboard = () => {
+  const [expandedAssignment, setExpandedAssignment] = useState(null);
+  const [urlInputs, setUrlInputs] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState({});
+  const [submissionStatus, setSubmissionStatus] = useState({});
+  const [submittedAssignments, setSubmittedAssignments] = useState({});
+  const navigate = useNavigate();
+
   const { username } = useSelector((state) => state.auth);
   const [selectedSection, setSelectedSection] = useState('courses');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [studentData, setStudentData] = useState({
+  const [data, setData] = useState({
     student: null,
     courses: [],
     assignments: [],
-    loading: true,
-    error: null
-  });
-  const [dashboardData, setDashboardData] = useState({
-    pendingAssignments: [],
-    pendingCorrectives: [],
-    upcomingDeadlines: 0,
-    recentActivities: [],
+    grades: [],
     averageGrade: null,
-    gradeTrend: 0,
+    loading: true,
+    error: null,
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Load persisted submission status from localStorage
+    const savedSubmissions = JSON.parse(localStorage.getItem('submittedAssignments')) || {};
+    setSubmittedAssignments(savedSubmissions);
+
     const fetchData = async () => {
       try {
-        setStudentData((prevState) => ({
+        setData((prevState) => ({
           ...prevState,
           loading: true,
-          error: null,  // Reset error before retrying
+          error: null,
         }));
 
         const studentId = localStorage.getItem('user_id');
@@ -76,6 +72,7 @@ const StudentDashboard = () => {
           throw new Error('Missing authentication token or student ID');
         }
 
+        // Fetch student data
         const response = await axios.get(
           `http://127.0.0.1:8000/api/student/${studentId}/courses/`,
           {
@@ -87,50 +84,168 @@ const StudentDashboard = () => {
           }
         );
 
-        console.log('Courses and Assignments response:', response.data); // Can remove this later
-        setLoading(false)
-        // Update state with fetched data
-        setStudentData({
+        // Fetch grades and submissions in parallel
+        const [gradesResponse, ...submissionResponses] = await Promise.all([
+          axios.get(`http://127.0.0.1:8000/api/grades/student/${studentId}/`, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          }),
+          ...(response.data.assignments || []).map((assignment) =>
+            axios
+              .get(`http://127.0.0.1:8000/api/submission/assignment/${assignment.id}/`, {
+                headers: { 'Authorization': `Bearer ${authToken}` },
+              })
+              .catch((error) => ({
+                error,
+                data: { exists: false },
+              }))
+          ),
+        ]);
+
+        const grades = gradesResponse.data;
+        const averageGrade = grades.length
+          ? (grades.reduce((sum, grade) => sum + grade.score, 0) / grades.length).toFixed(1)
+          : null;
+
+        // Process submission status
+        const submissions = {};
+        (response.data.assignments || []).forEach((assignment, index) => {
+          const submission = submissionResponses[index];
+          if (submission.data.exists && !submission.error) {
+            submissions[assignment.id] = {
+              submission_date: submission.data.submission_date,
+              submitted: true,
+            };
+          }
+        });
+
+        setData({
           student: response.data.student,
           courses: response.data.courses || [],
           assignments: response.data.assignments || [],
+          grades: grades || [],
+          averageGrade,
           loading: false,
           error: null,
         });
 
-        // Set dashboard data based on response
-        setDashboardData({
-          pendingAssignments: response.data.assignments || [],
-          pendingCorrectives: [], // Update as needed
-          upcomingDeadlines: 0, // Update as needed
-          recentActivities: [], // Update as needed
-          averageGrade: null, // Update as needed
-          gradeTrend: 0, // Update as needed
+        setSubmittedAssignments((prev) => {
+          const updatedSubmissions = { ...prev, ...submissions };
+          localStorage.setItem('submittedAssignments', JSON.stringify(updatedSubmissions));
+          return updatedSubmissions;
         });
       } catch (error) {
         console.error('Error fetching data:', error);
-
-        // Handle Unauthorized error and remove token
+        setData((prevState) => ({
+          ...prevState,
+          loading: false,
+          error: error.response?.data?.error || error.message,
+        }));
         if (error.response?.status === 401) {
           localStorage.removeItem('authToken');
           navigate('/login');
-        } else {
-          setStudentData((prevState) => ({
-            ...prevState,
-            loading: false,
-            error: error.response?.data?.error || error.message,
-          }));
         }
       }
     };
 
     fetchData();
-  }, []);
-  // console.log(dashboardData);
+  }, [navigate]);
 
+  // Clear submission status messages after 5 seconds
+  useEffect(() => {
+    const timers = Object.keys(submissionStatus).map((assignmentId) => {
+      return setTimeout(() => {
+        setSubmissionStatus((prev) => ({ ...prev, [assignmentId]: null }));
+      }, 5000);
+    });
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, [submissionStatus]);
+
+  const handleUrlChange = (assignmentId, value) => {
+    setUrlInputs((prev) => ({ ...prev, [assignmentId]: value }));
+  };
+
+  const toggleUrlInput = (assignmentId) => {
+    setExpandedAssignment((prev) => (prev === assignmentId ? null : assignmentId));
+    setUrlInputs((prev) => ({ ...prev, [assignmentId]: '' }));
+    setSubmissionStatus((prev) => ({ ...prev, [assignmentId]: null }));
+  };
+
+  const handleSubmitAssignment = async (assignment) => {
+    const { id: assignmentId, course: courseId } = assignment;
+    const fileUrl = urlInputs[assignmentId]?.trim();
+    const userRole = localStorage.getItem('role');
+
+    if (userRole !== 'student') {
+      setSubmissionStatus({
+        success: false,
+        message: 'Only students can submit assignments',
+      });
+      return;
+    }
+
+    if (!fileUrl) {
+      setSubmissionStatus((prev) => ({
+        ...prev,
+        [assignmentId]: { success: false, message: 'Please enter a valid URL' },
+      }));
+      return;
+    }
+
+    setIsSubmitting((prev) => ({ ...prev, [assignmentId]: true }));
+
+    const authToken = localStorage.getItem('authToken');
+    const studentId = localStorage.getItem('user_id');
+
+    try {
+      const response = await axios.post(
+        'http://127.0.0.1:8000/api/submission/submit/',
+        {
+          student: studentId,
+          course: courseId,
+          assignment: assignmentId,
+          track: data.student.track_id,
+          file_url: fileUrl,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      setSubmittedAssignments((prev) => {
+        const updated = {
+          ...prev,
+          [assignmentId]: { submitted: true, submission_date: new Date().toISOString() },
+        };
+        localStorage.setItem('submittedAssignments', JSON.stringify(updated));
+        return updated;
+      });
+
+      setSubmissionStatus((prev) => ({
+        ...prev,
+        [assignmentId]: { success: true, message: 'Assignment submitted successfully!' },
+      }));
+
+      setUrlInputs((prev) => ({ ...prev, [assignmentId]: '' }));
+      setExpandedAssignment(null);
+    } catch (error) {
+      console.error('Error submitting assignment:', error);
+      setSubmissionStatus((prev) => ({
+        ...prev,
+        [assignmentId]: {
+          success: false,
+          message: error.response?.data?.message || 'Submission failed. Please try again.',
+        },
+      }));
+    } finally {
+      setIsSubmitting((prev) => ({ ...prev, [assignmentId]: false }));
+    }
+  };
 
   const renderSection = () => {
-    if (loading) {
+    if (data.loading) {
       return (
         <Box display="flex" justifyContent="center" p={4}>
           <CircularProgress sx={{ color: '#e53935' }} />
@@ -138,13 +253,15 @@ const StudentDashboard = () => {
       );
     }
 
-    if (error) {
+    if (data.error) {
       return (
         <Alert severity="error" sx={{ m: 2 }}>
-          Error loading data: {error}
+          Error loading data: {data.error}
         </Alert>
       );
     }
+    console.log(data.grades[0].assignment);
+    console.log('yoooooo', data);
 
     switch (selectedSection) {
       case 'deadlines':
@@ -152,24 +269,23 @@ const StudentDashboard = () => {
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
             <CardHeader
               title="Upcoming Deadlines"
-              avatar={<FiCalendar style={{ color: '#e53935' }} />}
-              subheader={`${dashboardData.pendingAssignments.filter((a) => {
+              avatar={<FiAlertTriangle style={{ color: '#e53935' }} />}
+              subheader={`${data.assignments.filter((a) => {
                 const endDate = new Date(a.end_date);
                 const now = new Date();
                 const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
-                return diffInDays >= 0 && diffInDays <= 3;
-              }).length
-                } urgent items`}
+                return diffInDays >= 0 && diffInDays <= 3 && !submittedAssignments[a.id]?.submitted;
+              }).length} urgent items`}
             />
             <CardContent>
               <LinearProgress
                 variant="determinate"
                 value={Math.min(
-                  dashboardData.pendingAssignments.filter((a) => {
+                  data.assignments.filter((a) => {
                     const endDate = new Date(a.end_date);
                     const now = new Date();
                     const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
-                    return diffInDays >= 0 && diffInDays <= 3;
+                    return diffInDays >= 0 && diffInDays <= 3 && !submittedAssignments[a.id]?.submitted;
                   }).length * 10,
                   100
                 )}
@@ -178,88 +294,136 @@ const StudentDashboard = () => {
                   borderRadius: 5,
                   backgroundColor: '#ffcdd2',
                   '& .MuiLinearProgress-bar': {
-                    backgroundColor: '#e53935'
-                  }
+                    backgroundColor: '#e53935',
+                  },
                 }}
               />
-
               <List sx={{ mt: 2 }}>
-                {dashboardData.pendingAssignments
+                {data.assignments
                   .filter((assignment) => {
                     const endDate = new Date(assignment.end_date);
                     const now = new Date();
                     const diffInDays = Math.floor((endDate - now) / (1000 * 60 * 60 * 24));
-                    return diffInDays >= 0 && diffInDays <= 3;
+                    return (
+                      diffInDays >= 0 &&
+                      diffInDays <= 3 &&
+                      !submittedAssignments[assignment.id]?.submitted
+                    );
                   })
-                  .sort((a, b) => new Date(a.end_date) - new Date(b.end_date)) // 👈 Sorting by end_date ascending
+                  .sort((a, b) => new Date(a.end_date) - new Date(b.end_date))
                   ?.map((assignment, index) => (
                     <ListItem key={index}>
                       <ListItemIcon>
-                        <FiCalendar style={{ color: '#e53935' }} />
+                        <FiAlertTriangle style={{ color: '#e53935' }} />
                       </ListItemIcon>
                       <ListItemText
                         primary={assignment.title}
-                        secondary={`Ends: ${new Date(assignment.end_date).toLocaleDateString()} (${assignment.course_name})`}
+                        secondary={`Ends: ${new Date(assignment.end_date).toLocaleDateString()} (${assignment.course_name
+                          })`}
                       />
                     </ListItem>
                   ))}
               </List>
-
             </CardContent>
           </Card>
-
-
         );
 
       case 'averageGrade':
         return (
-          <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
+          <Card elevation={3} sx={{ borderTop: '4px solid #43a047' }}>
             <CardHeader
-              title="Average Grade"
-              avatar={<FiAward style={{ color: '#e53935' }} />}
-              subheader={
-                <Typography
-                  sx={{
-                    color: dashboardData.gradeTrend >= 0 ? '#43a047' : '#e53935',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {`${dashboardData.gradeTrend >= 0 ? '+' : ''}${dashboardData.gradeTrend.toFixed(1)}%`}
-                </Typography>
-              }
+              title="Grades & Feedback"
+              avatar={<FiAward style={{ color: '#43a047' }} />}
+              subheader={`Average Grade: ${data.averageGrade ? (data.averageGrade) : 'N/A'}/100`}
             />
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h3" sx={{ color: '#e53935' }}>
-                {dashboardData.averageGrade?.toFixed(1) || 'N/A'}%
-              </Typography>
-            </CardContent>
-          </Card>
-        );
+            <CardContent>
+              {data.grades && data.grades.length > 0 ? (
+                <Grid container spacing={2}>
+                  {data.grades.map((grade, index) => {
+                    const matchingAssignment = data.assignments.find(
+                      assignment => assignment.id === grade.assignment
+                    );
 
-      case 'correctives':
-        return (
-          <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
-            <CardHeader
-              title="Pending Correctives"
-              avatar={<FiAlertTriangle style={{ color: '#e53935' }} />}
-              subheader={`${dashboardData.pendingCorrectives.length} items`}
-            />
-            <List>
-              {dashboardData.pendingCorrectives?.map((item, index) => (
-                <React.Fragment key={index}>
-                  <ListItem>
-                    <ListItemIcon>
-                      <FiAlertTriangle style={{ color: '#e53935' }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={item.title}
-                      secondary={item.description}
-                    />
-                  </ListItem>
-                  {index < dashboardData.pendingCorrectives.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-            </List>
+                    const courseName = matchingAssignment?.course_name || 'No Course Name';
+                    const assignmentTitle = matchingAssignment?.title || 'No Assignment Name';
+                    const gradeOutOf10 = grade.score;
+
+                    return (
+                      <Grid item xs={12} md={6} key={index}>
+                        <Card variant="outlined" sx={{
+                          borderLeft: '4px solid #43a047',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}>
+                          <CardContent sx={{ flexGrow: 1 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                              <Typography variant="h6" sx={{ color: '#43a047' }}>
+                                {courseName}
+                              </Typography>
+                              <Typography
+                                variant="h6"
+                                fontWeight="bold"
+                                color={
+                                  grade.score >= 70 ? '#43a047' :
+                                    grade.score >= 50 ? '#ff9800' : '#e53935'
+                                }
+                              >
+                                {gradeOutOf10}/10
+                              </Typography>
+                            </Box>
+
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                              {assignmentTitle}
+                            </Typography>
+
+                            {grade.feedback && (
+                              <Box sx={{
+                                mt: 2,
+                                p: 2,
+                                backgroundColor: '#f5f5f5',
+                                borderRadius: 1,
+                                borderLeft: '3px solid #43a047'
+                              }}>
+                                <Typography variant="body2" component="div">
+                                  <Box component="span" fontWeight="bold" color="#43a047">
+                                    Feedback:
+                                  </Box>{' '}
+                                  {grade.feedback}
+                                </Typography>
+
+                                <Box sx={{ mt: 1 }}>
+                                  {grade.submitted_at && (
+                                    <Typography variant="caption" display="block" color="text.secondary">
+                                      Submitted: {new Date(grade.submitted_at).toLocaleDateString()}
+                                    </Typography>
+                                  )}
+                                  {grade.graded_at && (
+                                    <Typography variant="caption" display="block" color="text.secondary">
+                                      Graded: {new Date(grade.graded_at).toLocaleDateString()}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <FiAward size={48} style={{ color: '#bdbdbd', marginBottom: 16 }} />
+                  <Typography variant="body1" color="text.secondary">
+                    No grades available yet
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Your submitted work hasn't been graded
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
           </Card>
         );
 
@@ -269,19 +433,19 @@ const StudentDashboard = () => {
             <CardHeader
               title="My Courses"
               avatar={<FiBook style={{ color: '#e53935' }} />}
-              subheader={`Track: ${studentData?.assignments[0]?.track_name || 'Not assigned'}`}
+              subheader={`Track: ${data?.assignments[0]?.track_name || 'Not assigned'}`}
             />
             <CardContent>
-              <Grid container spacing={2} >
-                {studentData.courses?.map((course) => (
-                  <Grid item xs={12} md={6} key={course.id}>
+              <Grid container spacing={2}>
+                {data.courses?.map((course) => (
+                  <Grid item xs={12} md={6} key={course.course_id}>
                     <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: '#e53935' }}>
-                          {course.name} {/* Use course.name to display each course */}
+                          {course.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {course.description} {/* Use course.description to display each course */}
+                          {course.description}
                         </Typography>
                         <Typography variant="caption" display="block" mt={1}>
                           Started: {new Date(course.created_at).toLocaleDateString()}
@@ -303,61 +467,131 @@ const StudentDashboard = () => {
               avatar={<FiClipboard style={{ color: '#e53935' }} />}
             />
             <CardContent>
-              <Grid container spacing={2}>
-                {dashboardData.pendingAssignments?.map((assignment, index) => (
-                  <Grid item xs={12} key={index}>
-                    <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935', p: 1 }}>
-                      <CardContent sx={{ pl: 2 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#e53935' }}>
-                          {assignment.course_name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          {assignment.title}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          Due: {new Date(assignment.due_date).toLocaleDateString()}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          Ends: {new Date(assignment.end_date).toLocaleDateString()}
-                        </Typography>
-                        {assignment.file_url && (
-                          <Typography variant="caption" display="block">
-                            File: <a href={assignment.file_url} target="_blank" rel="noopener noreferrer">Open File</a>
-                          </Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </CardContent>
-          </Card>
-        );
+              {data.assignments && data.assignments.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No pending assignments
+                </Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {data.assignments?.map((assignment) => {
+                    const submissionData = submittedAssignments[assignment.id];
+                    const isSubmitted = submissionData?.submitted || submissionStatus[assignment.id]?.success;
 
-      case 'activities':
-        return (
-          <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
-            <CardHeader
-              title="Recent Activities"
-              avatar={<FiUsers style={{ color: '#e53935' }} />}
-            />
-            <List>
-              {dashboardData.recentActivities?.map((activity, index) => (
-                <ListItem key={index}>
-                  <ListItemIcon>
-                    {activity.type === 'grade' ? (
-                      <FiAward style={{ color: '#43a047' }} />
-                    ) : (
-                      <FiUsers style={{ color: '#e53935' }} />
-                    )}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={activity.title}
-                    secondary={activity.date}
-                  />
-                </ListItem>
-              ))}
-            </List>
+                    return (
+                      <Grid item xs={12} key={assignment.id}>
+                        <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
+                          <CardContent>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                              <Box>
+                                <Typography
+                                  variant="subtitle1"
+                                  fontWeight="bold"
+                                  sx={{ color: '#e53935' }}
+                                >
+                                  {assignment.course_name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                  {assignment.title}
+                                </Typography>
+                              </Box>
+                              {isSubmitted ? (
+                                <Typography variant="body2" color="success.main">
+                                  Submitted
+                                </Typography>
+                              ) : (
+                                <Button
+                                  variant="text"
+                                  size="small"
+                                  endIcon={expandedAssignment === assignment.id ? <FiX /> : <FiPaperclip />}
+                                  onClick={() => toggleUrlInput(assignment.id)}
+                                  aria-label="Submit assignment"
+                                  sx={{
+                                    color: '#e53935',
+                                    textTransform: 'none',
+                                    '&:hover': {
+                                      color: '#c62828',
+                                      backgroundColor: 'transparent',
+                                    },
+                                  }}
+                                >
+                                  Submit Lab
+                                </Button>
+                              )}
+                            </Box>
+
+                            {!isSubmitted && (
+                              <>
+                                <Typography variant="caption" display="block">
+                                  Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}
+                                </Typography>
+                                <Typography variant="caption" display="block">
+                                  Ends: {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'N/A'}
+                                </Typography>
+                              </>
+                            )}
+
+                            {!isSubmitted && (
+                              <Collapse in={expandedAssignment === assignment.id}>
+                                <Box sx={{ mt: 2 }}>
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    size="small"
+                                    placeholder="Paste your Google Drive/Dropbox link"
+                                    value={urlInputs[assignment.id] || ''}
+                                    onChange={(e) => handleUrlChange(assignment.id, e.target.value)}
+                                    sx={{ mb: 1 }}
+                                  />
+                                  <Box display="flex" justifyContent="flex-end">
+                                    <Button
+                                      variant="contained"
+                                      size="small"
+                                      endIcon={<FiUpload />}
+                                      disabled={!urlInputs[assignment.id] || isSubmitting[assignment.id]}
+                                      onClick={() => handleSubmitAssignment(assignment)}
+                                      sx={{
+                                        backgroundColor: '#e53935',
+                                        '&:hover': { backgroundColor: '#c62828' },
+                                      }}
+                                    >
+                                      {isSubmitting[assignment.id] ? 'Submitting...' : 'Submit'}
+                                    </Button>
+                                  </Box>
+                                </Box>
+                              </Collapse>
+                            )}
+
+                            {isSubmitted && submissionData && (
+                              <>
+                                <Typography variant="caption" display="block">
+                                  Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}
+                                </Typography>
+                                <Typography variant="caption" display="block">
+                                  Ends: {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                                  Submitted Successfully On:{' '}
+                                  {new Date(submissionData.submission_date).toLocaleString()}
+                                </Typography>
+                              </>
+                            )}
+
+                            {submissionStatus[assignment.id] && (
+                              <Alert
+                                severity={submissionStatus[assignment.id].success ? 'success' : 'error'}
+                                sx={{ mt: 2 }}
+                              >
+                                {submissionStatus[assignment.id].message}
+                              </Alert>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              )}
+            </CardContent>
           </Card>
         );
 
@@ -376,7 +610,9 @@ const StudentDashboard = () => {
             <>
               <div className="welcome-message">
                 <h3>Welcome back,</h3>
-                <h3><b>{displayName}</b></h3>
+                <h3>
+                  <b>{displayName}</b>
+                </h3>
               </div>
               <button className="toggle-btn" onClick={() => setSidebarOpen(false)}>
                 <FiX size={24} />
@@ -408,9 +644,7 @@ const StudentDashboard = () => {
       </div>
 
       <div className="main-content">
-        <div className="content-card">
-          {renderSection()}
-        </div>
+        <div className="content-card">{renderSection()}</div>
       </div>
     </div>
   );

@@ -7,9 +7,10 @@ import AddSupervisor from '../components/AddSupervisor';
 import AssignSupervisorToTrack from '../components/AssignSupervisorToTrack';
 import TracksTable from '../components/TracksTable';
 // ** Chat imports **
-import ChatRoomList from '../components/ChatRoomList';
-import ChatRoomView from '../components/ChatRoomView';
+import ChatRoomList from '../Components/ChatRoomList';
+import ChatRoomView from '../Components/ChatRoomView';
 import './BranchManagerDashboard.css';
+
 
 const BranchManagerDashboard = () => {
   const { username } = useSelector((state) => state.auth);
