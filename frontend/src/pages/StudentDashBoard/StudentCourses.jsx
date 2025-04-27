@@ -1,6 +1,6 @@
 // src/pages/StudentCourses.jsx
 import React, { useEffect, useState } from 'react';
-import apiClient from '../services/api';
+import apiClient from '../../services/api';
 
 const StudentCourses = () => {
   const [courses, setCourses] = useState([]);

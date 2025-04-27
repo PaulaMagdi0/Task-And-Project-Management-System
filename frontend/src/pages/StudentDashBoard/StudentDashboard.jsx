@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { FiMenu, FiX, FiBook, FiCalendar, FiAward, FiAlertTriangle, FiClipboard, FiUsers, FiUpload, FiPaperclip } from 'react-icons/fi';
+import { FiMenu, FiX, FiBook, FiCalendar, FiAward, FiAlertTriangle, FiClipboard, FiUsers, FiUpload, FiPaperclip, FiCheckCircle } from 'react-icons/fi';
 import {
-  Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert, Input, Button, IconButton, InputAdornment, TextField, Collapse
+  Box, Card, CardHeader, CardContent, LinearProgress, Grid, Typography, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Alert, Input, Button, IconButton, InputAdornment, TextField, Collapse, Tabs, Tab, Select, MenuItem, FormControl, InputLabel, Chip
 } from '@mui/material';
 import axios from 'axios';
 import './StudentDashboard.css';
@@ -17,7 +17,7 @@ const menuItems = [
   {
     id: 'assignments',
     icon: <FiClipboard style={{ color: 'inherit' }} />,
-    label: 'Pending Assignments'
+    label: 'Assignments'
   },
   {
     id: 'deadlines',
@@ -37,6 +37,9 @@ const StudentDashboard = () => {
   const [isSubmitting, setIsSubmitting] = useState({});
   const [submissionStatus, setSubmissionStatus] = useState({});
   const [submittedAssignments, setSubmittedAssignments] = useState({});
+  const [assignmentTab, setAssignmentTab] = useState('pending');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [deadlineFilter, setDeadlineFilter] = useState('');
   const navigate = useNavigate();
 
   const { username } = useSelector((state) => state.auth);
@@ -52,8 +55,20 @@ const StudentDashboard = () => {
     error: null,
   });
 
+  // Get unique deadline dates for filter
+  const getUniqueDeadlines = () => {
+    const deadlines = new Set(data.assignments
+      .filter(assignment => 
+        assignment.end_date && 
+        !submittedAssignments[assignment.id]?.submitted && 
+        new Date(assignment.end_date) >= new Date()
+      )
+      .map(assignment => new Date(assignment.end_date).toISOString().slice(0, 10))
+    );
+    return Array.from(deadlines).sort();
+  };
+
   useEffect(() => {
-    // Load persisted submission status from localStorage
     const savedSubmissions = JSON.parse(localStorage.getItem('submittedAssignments')) || {};
     setSubmittedAssignments(savedSubmissions);
 
@@ -72,7 +87,6 @@ const StudentDashboard = () => {
           throw new Error('Missing authentication token or student ID');
         }
 
-        // Fetch student data
         const response = await axios.get(
           `http://127.0.0.1:8000/api/student/${studentId}/courses/`,
           {
@@ -84,7 +98,6 @@ const StudentDashboard = () => {
           }
         );
 
-        // Fetch grades and submissions in parallel
         const [gradesResponse, ...submissionResponses] = await Promise.all([
           axios.get(`http://127.0.0.1:8000/api/grades/student/${studentId}/`, {
             headers: { 'Authorization': `Bearer ${authToken}` },
@@ -106,7 +119,6 @@ const StudentDashboard = () => {
           ? (grades.reduce((sum, grade) => sum + grade.score, 0) / grades.length).toFixed(1)
           : null;
 
-        // Process submission status
         const submissions = {};
         (response.data.assignments || []).forEach((assignment, index) => {
           const submission = submissionResponses[index];
@@ -150,7 +162,6 @@ const StudentDashboard = () => {
     fetchData();
   }, [navigate]);
 
-  // Clear submission status messages after 5 seconds
   useEffect(() => {
     const timers = Object.keys(submissionStatus).map((assignmentId) => {
       return setTimeout(() => {
@@ -244,6 +255,47 @@ const StudentDashboard = () => {
     }
   };
 
+  const filterAssignments = (assignments, isSubmitted) => {
+    return assignments.filter(assignment => {
+      const matchesSubmissionStatus = isSubmitted 
+        ? submittedAssignments[assignment.id]?.submitted
+        : !submittedAssignments[assignment.id]?.submitted;
+      
+      const matchesCourse = courseFilter === 'all' || assignment.course_name === courseFilter;
+      
+      const matchesDeadline = !deadlineFilter || (
+        new Date(assignment.end_date).toISOString().slice(0, 10) === deadlineFilter
+      );
+
+      const isFutureDeadline = !isSubmitted ? new Date(assignment.end_date) >= new Date() : true;
+
+      return matchesSubmissionStatus && matchesCourse && matchesDeadline && isFutureDeadline;
+    });
+  };
+
+  const filterCourses = () => {
+    return data.courses.filter(course => {
+      const courseAssignments = data.assignments.filter(
+        assignment => assignment.course === course.course_id
+      );
+      
+      if (courseAssignments.length === 0) return true;
+
+      return courseAssignments.some(
+        assignment => 
+          !submittedAssignments[assignment.id]?.submitted && 
+          new Date(assignment.end_date) >= new Date()
+      );
+    });
+  };
+
+  const getCourseProgress = (courseId) => {
+    const courseAssignments = data.assignments.filter(a => a.course === courseId);
+    if (courseAssignments.length === 0) return 0;
+    const completed = courseAssignments.filter(a => submittedAssignments[a.id]?.submitted).length;
+    return Math.round((completed / courseAssignments.length) * 100);
+  };
+
   const renderSection = () => {
     if (data.loading) {
       return (
@@ -260,8 +312,6 @@ const StudentDashboard = () => {
         </Alert>
       );
     }
-    console.log(data.grades[0].assignment);
-    console.log('yoooooo', data);
 
     switch (selectedSection) {
       case 'deadlines':
@@ -318,8 +368,7 @@ const StudentDashboard = () => {
                       </ListItemIcon>
                       <ListItemText
                         primary={assignment.title}
-                        secondary={`Ends: ${new Date(assignment.end_date).toLocaleDateString()} (${assignment.course_name
-                          })`}
+                        secondary={`Ends: ${new Date(assignment.end_date).toLocaleDateString()} (${assignment.course_name})`}
                       />
                     </ListItem>
                   ))}
@@ -429,32 +478,56 @@ const StudentDashboard = () => {
 
       case 'courses':
         return (
-          <Card elevation={3} sx={{ borderTop: '4px solid #e53935' }}>
+          <Card className="modern-card">
             <CardHeader
               title="My Courses"
-              avatar={<FiBook style={{ color: '#e53935' }} />}
+              avatar={<FiBook className="icon" />}
               subheader={`Track: ${data?.assignments[0]?.track_name || 'Not assigned'}`}
             />
             <CardContent>
-              <Grid container spacing={2}>
-                {data.courses?.map((course) => (
-                  <Grid item xs={12} md={6} key={course.course_id}>
-                    <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
-                      <CardContent>
-                        <Typography variant="h6" sx={{ color: '#e53935' }}>
-                          {course.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {course.description}
-                        </Typography>
-                        <Typography variant="caption" display="block" mt={1}>
-                          Started: {new Date(course.created_at).toLocaleDateString()}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+              {filterCourses().length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No active courses with pending assignments
+                </Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {filterCourses().map((course) => (
+                    <Grid item xs={12} sm={6} key={course.course_id}>
+                      <Card className="sub-card">
+                        <CardContent>
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Typography variant="h6" className="course-title">
+                              {course.name}
+                            </Typography>
+                            <Chip
+                              label={`${getCourseProgress(course.course_id)}%`}
+                              size="small"
+                              className="progress-chip"
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            {course.description}
+                          </Typography>
+                          <Typography variant="caption" display="block" mt={1}>
+                            Started: {new Date(course.created_at).toLocaleDateString()}
+                          </Typography>
+                          <LinearProgress
+                            variant="determinate"
+                            value={getCourseProgress(course.course_id)}
+                            sx={{
+                              mt: 2,
+                              height: 6,
+                              borderRadius: 3,
+                              backgroundColor: '#e0e0e0',
+                              '& .MuiLinearProgress-bar': { backgroundColor: '#e53935' },
+                            }}
+                          />
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
             </CardContent>
           </Card>
         );
@@ -463,42 +536,103 @@ const StudentDashboard = () => {
         return (
           <Card elevation={3} sx={{ borderTop: '4px solid #e53935', mb: 4 }}>
             <CardHeader
-              title="Pending Assignments"
+              title="Assignments"
               avatar={<FiClipboard style={{ color: '#e53935' }} />}
             />
             <CardContent>
-              {data.assignments && data.assignments.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No pending assignments
-                </Typography>
-              ) : (
-                <Grid container spacing={2}>
-                  {data.assignments?.map((assignment) => {
-                    const submissionData = submittedAssignments[assignment.id];
-                    const isSubmitted = submissionData?.submitted || submissionStatus[assignment.id]?.success;
+              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs 
+                  value={assignmentTab} 
+                  onChange={(e, newValue) => setAssignmentTab(newValue)}
+                  indicatorColor="secondary"
+                  textColor="inherit"
+                >
+                  <Tab 
+                    label="Pending Assignments" 
+                    value="pending" 
+                    icon={<FiAlertTriangle />}
+                    iconPosition="start"
+                  />
+                  <Tab 
+                    label="Submitted Assignments" 
+                    value="submitted" 
+                    icon={<FiCheckCircle />}
+                    iconPosition="start"
+                  />
+                </Tabs>
+              </Box>
 
-                    return (
-                      <Grid item xs={12} key={assignment.id}>
-                        <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
-                          <CardContent>
-                            <Box display="flex" justifyContent="space-between" alignItems="center">
-                              <Box>
-                                <Typography
-                                  variant="subtitle1"
-                                  fontWeight="bold"
-                                  sx={{ color: '#e53935' }}
-                                >
-                                  {assignment.course_name}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                  {assignment.title}
-                                </Typography>
-                              </Box>
-                              {isSubmitted ? (
-                                <Typography variant="body2" color="success.main">
-                                  Submitted
-                                </Typography>
-                              ) : (
+              <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Filter by Course</InputLabel>
+                  <Select
+                    value={courseFilter}
+                    label="Filter by Course"
+                    onChange={(e) => setCourseFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All Courses</MenuItem>
+                    {data.courses.map((course) => (
+                      <MenuItem key={course.course_id} value={course.name}>
+                        {course.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Filter by Deadline</InputLabel>
+                  <Select
+                    value={deadlineFilter}
+                    label="Filter by Deadline"
+                    onChange={(e) => setDeadlineFilter(e.target.value)}
+                  >
+                    <MenuItem value="">All Deadlines</MenuItem>
+                    {getUniqueDeadlines().map((deadline) => (
+                      <MenuItem key={deadline} value={deadline}>
+                        {new Date(deadline).toLocaleDateString()}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                {(courseFilter !== 'all' || deadlineFilter) && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setCourseFilter('all');
+                      setDeadlineFilter('');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </Box>
+
+              {assignmentTab === 'pending' ? (
+                filterAssignments(data.assignments, false).length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No pending assignments match the selected filters
+                  </Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filterAssignments(data.assignments, false)
+                      ?.map((assignment) => (
+                        <Grid item xs={12} key={assignment.id}>
+                          <Card variant="outlined" sx={{ borderLeft: '4px solid #e53935' }}>
+                            <CardContent>
+                              <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Box>
+                                  <Typography
+                                    variant="subtitle1"
+                                    fontWeight="bold"
+                                    sx={{ color: '#e53935' }}
+                                  >
+                                    {assignment.course_name}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    {assignment.title}
+                                  </Typography>
+                                </Box>
                                 <Button
                                   variant="text"
                                   size="small"
@@ -516,21 +650,31 @@ const StudentDashboard = () => {
                                 >
                                   Submit Lab
                                 </Button>
+                              </Box>
+
+                              <Typography variant="caption" display="block">
+                                Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}
+                              </Typography>
+                              <Typography variant="caption" display="block">
+                                Ends: {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'N/A'}
+                              </Typography>
+                              <Typography variant="body2" sx={{ mt: 1 }}>
+                                <strong>Description:</strong> {assignment.description || 'No description provided'}
+                              </Typography>
+                              {assignment.file_url && (
+                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                  <strong>Assignment File:</strong>{' '}
+                                  <a
+                                    href={assignment.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#e53935', textDecoration: 'underline' }}
+                                  >
+                                    View File
+                                  </a>
+                                </Typography>
                               )}
-                            </Box>
 
-                            {!isSubmitted && (
-                              <>
-                                <Typography variant="caption" display="block">
-                                  Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}
-                                </Typography>
-                                <Typography variant="caption" display="block">
-                                  Ends: {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'N/A'}
-                                </Typography>
-                              </>
-                            )}
-
-                            {!isSubmitted && (
                               <Collapse in={expandedAssignment === assignment.id}>
                                 <Box sx={{ mt: 2 }}>
                                   <TextField
@@ -559,37 +703,111 @@ const StudentDashboard = () => {
                                   </Box>
                                 </Box>
                               </Collapse>
-                            )}
 
-                            {isSubmitted && submissionData && (
-                              <>
+                              {submissionStatus[assignment.id] && (
+                                <Alert
+                                  severity={submissionStatus[assignment.id].success ? 'success' : 'error'}
+                                  sx={{ mt: 2 }}
+                                >
+                                  {submissionStatus[assignment.id].message}
+                                </Alert>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                  </Grid>
+                )
+              ) : (
+                filterAssignments(data.assignments, true).length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No submitted assignments match the selected filters
+                  </Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filterAssignments(data.assignments, true)
+                      ?.map((assignment) => {
+                        const submissionData = submittedAssignments[assignment.id];
+                        const gradeData = data.grades.find(g => g.assignment === assignment.id);
+
+                        return (
+                          <Grid item xs={12} key={assignment.id}>
+                            <Card variant="outlined" sx={{ borderLeft: '4px solid #43a047' }}>
+                              <CardContent>
+                                <Box display="flex" justifyContent="space-between" alignItems="center">
+                                  <Box>
+                                    <Typography
+                                      variant="subtitle1"
+                                      fontWeight="bold"
+                                      sx={{ color: '#43a047' }}
+                                    >
+                                      {assignment.course_name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                      {assignment.title}
+                                    </Typography>
+                                  </Box>
+                                  <Box display="flex" alignItems="center">
+                                    <FiCheckCircle style={{ color: '#43a047', marginRight: 8 }} />
+                                    <Typography variant="body2" color="success.main">
+                                      Submitted
+                                    </Typography>
+                                  </Box>
+                                </Box>
+
                                 <Typography variant="caption" display="block">
                                   Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}
                                 </Typography>
                                 <Typography variant="caption" display="block">
                                   Ends: {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'N/A'}
                                 </Typography>
-                                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
-                                  Submitted Successfully On:{' '}
-                                  {new Date(submissionData.submission_date).toLocaleString()}
-                                </Typography>
-                              </>
-                            )}
 
-                            {submissionStatus[assignment.id] && (
-                              <Alert
-                                severity={submissionStatus[assignment.id].success ? 'success' : 'error'}
-                                sx={{ mt: 2 }}
-                              >
-                                {submissionStatus[assignment.id].message}
-                              </Alert>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="body2">
+                                    <Box component="span" fontWeight="bold">Submitted on:</Box>{' '}
+                                    {new Date(submissionData.submission_date).toLocaleString()}
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ mt: 1 }}>
+                                  <strong>Assignment File:</strong>{' '}
+                                  <a
+                                    href={assignment.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#e53935', textDecoration: 'underline' }}
+                                  >
+                                    View File
+                                  </a>
+                                </Typography>
+                                  {gradeData ? (
+                                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                                      <Typography variant="body1" fontWeight="bold">
+                                        Grade: <span style={{ 
+                                          color: gradeData.score >= 70 ? '#43a047' :
+                                            gradeData.score >= 50 ? '#ff9800' : '#e53935'
+                                        }}>
+                                          {gradeData.score}/10
+                                        </span>
+                                      </Typography>
+                                      {gradeData.feedback && (
+                                        <Typography variant="body2" sx={{ mt: 1 }}>
+                                          <Box component="span" fontWeight="bold">Feedback:</Box>{' '}
+                                          {gradeData.feedback}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  ) : (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                      Not graded yet
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        );
+                      })}
+                  </Grid>
+                )
               )}
             </CardContent>
           </Card>

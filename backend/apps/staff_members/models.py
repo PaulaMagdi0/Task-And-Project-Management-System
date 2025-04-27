@@ -17,7 +17,7 @@ class StaffMember(AbstractUser):
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
-        default=Role.INSTRUCTOR,
+        default=Role.ADMIN,
         verbose_name=_('staff role')
     )
 

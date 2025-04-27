@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchAssignments } from '../../redux/viewassignmentSlice';
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchAssignments } from "../../redux/viewassignmentSlice";
+import apiClient from "../../services/api";
 import {
   Box,
   Typography,
-  CircularProgress,
   Alert,
   Table,
   TableBody,
@@ -18,190 +18,474 @@ import {
   IconButton,
   useTheme,
   useMediaQuery,
-} from '@mui/material';
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  MenuItem,
+} from "@mui/material";
 import {
-  School as SchoolIcon,
-  Assignment as AssignmentIcon,
-  CalendarToday as CalendarIcon,
-  Description as DescriptionIcon,
-  Info as InfoIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Warning as WarningIcon,
+  GetApp as DownloadIcon,
+} from "@mui/icons-material";
 
 const Assignments = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const dispatch = useDispatch();
-  const { assignments, loading, error } = useSelector((state) => state.listassignments);
-  const { user_id } = useSelector((state) => state.auth);
+  const { assignments, loading, error } = useSelector(
+    (state) => state.listassignments
+  );
+  const { user_id, token } = useSelector((state) => state.auth);
+
+  // State management
+  const [expandedAssignment, setExpandedAssignment] = useState(null);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [editData, setEditData] = useState({});
+  const [alert, setAlert] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   useEffect(() => {
-    if (user_id) {
-      dispatch(fetchAssignments(user_id));
-    }
+    if (user_id) dispatch(fetchAssignments(user_id));
   }, [dispatch, user_id]);
 
-  const getAssignmentTypeColor = (type) => {
-    switch (type) {
-      case 'task':
-        return 'primary';
-      case 'project':
-        return 'secondary';
-      case 'exam':
-        return 'error';
-      default:
-        return 'default';
-    }
+  // Accordion toggle handler
+  const handleAccordionToggle = (assignmentId) => {
+    setExpandedAssignment(
+      expandedAssignment === assignmentId ? null : assignmentId
+    );
   };
 
-  const formatDate = (dateString) => {
+  // Delete handlers
+  const handleDeleteInitiate = (assignment) => {
+    setSelectedAssignment(assignment);
+    setDeleteConfirmationOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return 'Invalid Date';
+      await apiClient.delete(`/assignments/${selectedAssignment.id}/`);
+      setAlert({
+        open: true,
+        message: "Assignment deleted successfully",
+        severity: "success",
+      });
+      dispatch(fetchAssignments(user_id));
+    } catch (error) {
+      setAlert({ open: true, message: "Delete failed", severity: "error" });
+    }
+    setDeleteConfirmationOpen(false);
+  };
+
+  // Report download handler
+  const handleDownloadReport = async (assignmentId) => {
+    try {
+      const response = await apiClient.get(
+        `/submission/assignments/${assignmentId}/report/`,
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `assignment-${assignmentId}-report.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      setAlert({
+        open: true,
+        message: "Failed to download report",
+        severity: "error",
+      });
     }
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress size={60} />
-      </Box>
-    );
-  }
+  const handleEditInitiate = (assignment) => {
+    setEditData({
+      title: assignment.title,
+      description: assignment.description,
+      due_date: assignment.due_date.slice(0, 10),
+      end_date: assignment.end_date.slice(0, 10),
+      assignment_type: assignment.assignment_type,
+      file_url: assignment.file_url || "",
+    });
+    handleAccordionToggle(assignment.id);
+  };
 
-  if (error) {
-    return (
-      <Box sx={{ mt: 2 }}>
-        <Alert severity="error" sx={{ mb: 1 }}>
-          {error}
-          <IconButton 
-            size="small" 
-            onClick={() => dispatch(fetchAssignments(user_id))} 
-            sx={{ ml: 1 }}
-            aria-label="Retry fetching assignments"
-          >
-            <RefreshIcon fontSize="small" />
-          </IconButton>
-        </Alert>
-      </Box>
-    );
-  }
+  const handleEditSubmit = async (assignmentId) => {
+    try {
+      const payload = {
+        ...editData,
+        due_date: editData.due_date
+          ? `${editData.due_date}T23:59:00Z`
+          : undefined,
+        end_date: editData.end_date
+          ? `${editData.end_date}T23:59:00Z`
+          : undefined,
+      };
+
+      const cleanPayload = Object.fromEntries(
+        Object.entries(payload).filter(([_, v]) => v !== undefined)
+      );
+
+      await apiClient.patch(`/assignments/${assignmentId}/`, cleanPayload);
+      setAlert({
+        open: true,
+        message: "Assignment updated successfully",
+        severity: "success",
+      });
+      dispatch(fetchAssignments(user_id));
+      handleAccordionToggle(null);
+    } catch (error) {
+      setAlert({ open: true, message: "Update failed", severity: "error" });
+    }
+  };
 
   return (
     <Box sx={{ p: isMobile ? 2 : 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold' }}>
-          Assignments
-        </Typography>
-        <Tooltip title="Refresh data">
-          <IconButton 
-            onClick={() => dispatch(fetchAssignments(user_id))} 
-            color="primary"
-            aria-label="Refresh assignments"
+      <Typography
+        variant="h4"
+        component="h2"
+        sx={{ fontWeight: "bold", mb: 3 }}
+      >
+        Assignments
+      </Typography>
+
+      <Snackbar
+        open={alert.open}
+        autoHideDuration={6000}
+        onClose={() => setAlert({ ...alert, open: false })}
+      >
+        <Alert severity={alert.severity}>{alert.message}</Alert>
+      </Snackbar>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmationOpen}
+        onClose={() => setDeleteConfirmationOpen(false)}
+        PaperProps={{ sx: { borderRadius: 2, width: "450px" } }}
+      >
+        <DialogTitle sx={{ textAlign: "center", pt: 4 }}>
+          <WarningIcon color="warning" sx={{ fontSize: 48, mb: 2 }} />
+          <Typography variant="h6" component="div">
+            Delete Assignment
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent sx={{ textAlign: "center", pb: 3 }}>
+          <Typography variant="body1">
+            Are you sure you want to delete
+          </Typography>
+          <Typography variant="body1" fontWeight={600} color="text.primary">
+            "{selectedAssignment?.title}"?
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: "center", pb: 4, gap: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setDeleteConfirmationOpen(false)}
+            sx={{ width: 120 }}
           >
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      
-      {assignments.length === 0 ? (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          No assignments available. Create your first assignment to get started.
-        </Alert>
-      ) : (
-        <Box sx={{ overflowX: 'auto' }}>
-          <TableContainer component={Paper} sx={{ borderRadius: 2, minWidth: 650 }}>
-            <Table aria-label="assignments table">
-              <TableHead sx={{ bgcolor: theme.palette.primary.main }}>
-                <TableRow>
-                  <TableCell sx={{ color: 'white' }}>Title</TableCell>
-                  <TableCell sx={{ color: 'white' }}>Type</TableCell>
-                  <TableCell sx={{ color: 'white' }}>Track & Course</TableCell>
-                  <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
-                  <TableCell sx={{ color: 'white' }}>End Date</TableCell>
-                  <TableCell sx={{ color: 'white' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      Description
-                      <Tooltip title="Assignment details">
-                        <InfoIcon fontSize="small" sx={{ ml: 1 }} />
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteConfirm}
+            startIcon={<DeleteIcon />}
+            sx={{ width: 120 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", overflowY: "hidden" }}
+      >
+        <Table sx={{ minWidth: 650, tableLayout: "fixed" }}>
+          <TableHead sx={{ bgcolor: theme.palette.primary.main }}>
+            <TableRow>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Title
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Type
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Track & Course
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Due Date
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                End Date
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Report
+              </TableCell>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>
+                Actions
+              </TableCell>
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {assignments.map((assignment) => (
+              <React.Fragment key={assignment.id}>
+                <TableRow hover>
+                  {/* Existing table cells */}
+                  <TableCell sx={{ textAlign: "center" }}>
+                    {assignment.title}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    <Chip label={assignment.assignment_type} color="primary" />
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    {assignment.track_name} / {assignment.course_name}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    {new Date(assignment.due_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    {new Date(assignment.end_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    <Tooltip title="Download Report">
+                      <IconButton
+                        onClick={() => handleDownloadReport(assignment.id)}
+                        color="primary"
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center" }}>
+                    <Box display="flex" gap={1}>
+                      <Tooltip title="Edit">
+                        <IconButton
+                          onClick={() => handleEditInitiate(assignment)}
+                        >
+                          <EditIcon color="primary" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          onClick={() => handleDeleteInitiate(assignment)}
+                        >
+                          <DeleteIcon color="error" />
+                        </IconButton>
                       </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {assignments.map((assignment) => (
-                  <TableRow
-                    key={assignment.id}
-                    hover
-                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                  >
-                    <TableCell component="th" scope="row">
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <AssignmentIcon color="action" sx={{ mr: 1 }} />
-                        {assignment.title}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={assignment.assignment_type}
-                        color={getAssignmentTypeColor(assignment.assignment_type)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                          <SchoolIcon color="primary" sx={{ fontSize: 16, mr: 1 }} />
-                          <Typography variant="body2">
-                            {assignment.track_name || 'N/A'}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <DescriptionIcon color="secondary" sx={{ fontSize: 16, mr: 1 }} />
-                          <Typography variant="body2">
-                            {assignment.course_name || 'N/A'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <CalendarIcon color="action" sx={{ fontSize: 16, mr: 1 }} />
-                        {formatDate(assignment.due_date)}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <CalendarIcon color="action" sx={{ fontSize: 16, mr: 1 }} />
-                        {formatDate(assignment.end_date)}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title={assignment.description}>
-                        <Typography
-                          variant="body2"
+
+                {/* Updated Accordion Section */}
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ p: 0 }}>
+                    {" "}
+                    {/* Updated colSpan to 7 */}
+                    <Accordion
+                      expanded={expandedAssignment === assignment.id}
+                      sx={{
+                        width: "100%",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 2,
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <AccordionSummary sx={{ display: "none" }} />
+                      <AccordionDetails sx={{ px: 0 }}>
+                        <Box
+                          component="form"
                           sx={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: 200,
+                            p: 3,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 3,
+                            width: "100%",
+                            bgcolor: "background.paper",
                           }}
                         >
-                          {assignment.description}
-                        </Typography>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      )}
+                          {/* Form Fields */}
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gap: 3,
+                              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                              "& .MuiTextField-root": { mb: 0 },
+                            }}
+                          >
+                            <TextField
+                              variant="outlined"
+                              fullWidth
+                              label="Title"
+                              value={editData.title || ""}
+                              onChange={(e) =>
+                                setEditData({
+                                  ...editData,
+                                  title: e.target.value,
+                                })
+                              }
+                              InputLabelProps={{ shrink: true }}
+                            />
+
+                            <TextField
+                              variant="outlined"
+                              fullWidth
+                              select
+                              label="Assignment Type"
+                              value={editData.assignment_type || ""}
+                              onChange={(e) =>
+                                setEditData({
+                                  ...editData,
+                                  assignment_type: e.target.value,
+                                })
+                              }
+                              InputLabelProps={{ shrink: true }}
+                            >
+                              <MenuItem value="task">Task</MenuItem>
+                              <MenuItem value="project">Project</MenuItem>
+                              <MenuItem value="exam">Exam</MenuItem>
+                            </TextField>
+                          </Box>
+
+                          <TextField
+                            variant="outlined"
+                            fullWidth
+                            multiline
+                            rows={4}
+                            label="Description"
+                            value={editData.description || ""}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                description: e.target.value,
+                              })
+                            }
+                            InputLabelProps={{ shrink: true }}
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                alignItems: "flex-start",
+                              },
+                            }}
+                          />
+
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gap: 3,
+                              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                            }}
+                          >
+                            <TextField
+                              variant="outlined"
+                              fullWidth
+                              type="date"
+                              label="Due Date"
+                              InputLabelProps={{ shrink: true }}
+                              value={editData.due_date || ""}
+                              onChange={(e) =>
+                                setEditData({
+                                  ...editData,
+                                  due_date: e.target.value,
+                                })
+                              }
+                            />
+
+                            <TextField
+                              variant="outlined"
+                              fullWidth
+                              type="date"
+                              label="End Date"
+                              InputLabelProps={{ shrink: true }}
+                              value={editData.end_date || ""}
+                              onChange={(e) =>
+                                setEditData({
+                                  ...editData,
+                                  end_date: e.target.value,
+                                })
+                              }
+                            />
+                          </Box>
+
+                          <TextField
+                            variant="outlined"
+                            fullWidth
+                            label="File URL"
+                            value={editData.file_url || ""}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                file_url: e.target.value,
+                              })
+                            }
+                            InputLabelProps={{ shrink: true }}
+                            placeholder="https://drive.google.com/..."
+                          />
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 2,
+                              justifyContent: "flex-end",
+                              mt: 2,
+                              borderTop: "1px solid #eee",
+                              pt: 3,
+                            }}
+                          >
+                            <Button
+                              variant="contained"
+                              onClick={() => handleEditSubmit(assignment.id)}
+                              sx={{
+                                minWidth: 140,
+                                textTransform: "uppercase",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              Save Changes
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              onClick={() => handleAccordionToggle(null)}
+                              sx={{
+                                minWidth: 100,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </Box>
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  </TableCell>
+                </TableRow>
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };

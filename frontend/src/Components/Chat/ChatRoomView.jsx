@@ -20,7 +20,7 @@ import {
   sendMessage,
   clearChatError,
   clearMessages
-} from '../redux/chatSlice';
+} from '../../redux/chatSlice';
 
 const ChatRoomView = () => {
   const { roomId } = useParams();

@@ -26,9 +26,9 @@ import ProfilePage from './pages/ProfilePage';
 
 // Dashboard Components
 import Dashboard from "./pages/DashBoard/Dashboard";
-import StudentDashboard from "./pages/StudentDashboard";
-import SupervisorDashboard from "./pages/SupervisorDashboard";
-import BranchManagerDashboard from "./pages/BranchManagerDashboard";
+import StudentDashboard from "./pages/StudentDashBoard/StudentDashboard";
+import SupervisorDashboard from "./pages/SupervisorDashBoard/SupervisorDashboard";
+import BranchManagerDashboard from "./pages/BranchManagerDashBoard/BranchManagerDashboard";
 import InstructorDashboard from "./pages/Instructor/Dashboard";
 import Course from "./pages/DashBoard/Courses";
 import Assignments from './Components/Assignments/Assignments';
@@ -46,8 +46,8 @@ import MovieSearch from './Components/MovieSearch/MovieSearch';
 import ChatWithAI from './Components/ChatAI/ChatWithAI';
 
 // ** Chat Components **
-import ChatRoomList from './Components/ChatRoomList';
-import ChatRoomMessages from './Components/ChatRoomMessages';
+import ChatRoomList from './Components/Chat/ChatRoomList';
+import ChatRoomMessages from './Components/Chat/ChatRoomMessages';
 
 // Styles
 import "./assets/css/main.css";

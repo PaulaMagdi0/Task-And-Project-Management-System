@@ -113,7 +113,7 @@ class GradeDetailView(generics.RetrieveUpdateDestroyAPIView):
             except Exception as e:
                 logger.error(f"Error deleting grade with ID {grade.id}: {str(e)}")
                 return Response({"error": "Failed to delete grade."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 class GradeListView(generics.ListCreateAPIView):
     serializer_class = GradeSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -124,21 +124,35 @@ class GradeListView(generics.ListCreateAPIView):
         instructor_id = self.request.query_params.get('instructor')
         queryset = Grade.objects.select_related('student', 'assignment', 'course')
 
+        # If the user is a staff member (admin), they can see all grades or filter by instructor
         if user.is_staff:
             if instructor_id:
                 try:
                     instructor_id = int(instructor_id)
                     queryset = queryset.filter(assignment__instructor__id=instructor_id)
                 except (ValueError, TypeError):
-                    return queryset.none()
+                    return queryset.none()  # Invalid instructor ID
             return queryset
 
+        # Allow only instructors or supervisors to view grades
+        if hasattr(user, 'instructor') or hasattr(user, 'supervisor'):
+            return queryset
+        
+        # If the user is a student, show only their grades
         if hasattr(user, 'student'):
             queryset = queryset.filter(student=user.student)
         
         return queryset
-
     def create(self, request, *args, **kwargs):
+        user = request.user
+
+        # ✅ Allow only instructors or supervisors to assign grades based on 'role'
+        if user.role not in ['instructor', 'supervisor']:
+            return Response(
+                {"error": "Permission denied. Only instructors or supervisors can assign grades."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         data = request.data.copy()
 
         # Extract required identifiers
@@ -177,19 +191,19 @@ class GradeListView(generics.ListCreateAPIView):
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        def list(self, request, *args, **kwargs):
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
 
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "count": len(serializer.data),
-            "grades": serializer.data,
-        })
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "count": len(serializer.data),
+                "grades": serializer.data,
+            })
 
 class StudentGradeListView(generics.ListAPIView):
     serializer_class = GradeSerializer

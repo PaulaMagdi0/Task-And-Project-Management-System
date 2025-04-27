@@ -43,7 +43,7 @@ class GradeSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
 
         if request and request.method in ['POST', 'PUT', 'PATCH']:
-            if not (request.user.is_staff or getattr(request.user, 'role', '') == 'instructor'):
+            if not (request.user.is_staff or getattr(request.user, 'role', '') in ['instructor', 'supervisor']):
                 raise PermissionDenied("Only instructors can grade assignments.")
 
         if request and request.method == 'POST':

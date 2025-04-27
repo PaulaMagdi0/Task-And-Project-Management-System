@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchMessages, sendMessage } from '../redux/chatSlice';
+import { fetchMessages, sendMessage } from '../../redux/chatSlice';
 import {
   Box,
   Button,

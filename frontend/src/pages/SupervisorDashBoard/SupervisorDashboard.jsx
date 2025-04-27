@@ -10,23 +10,23 @@ import {
   FiAward,
   FiClipboard,
   FiMessageCircle,
+  FiUploadCloud
 } from 'react-icons/fi';
 import './SupervisorDashboard.css';
 import { NotebookText, ArchiveRestore } from 'lucide-react';
 
 // Import your components
 import Courses from './Courses';
-import Assignments from '../Components/Assignments/Assignments';
-import Submissions from '../pages/Instructor/Submissions';
-import AddCourses from '../Components/AddCourses/AddCourss';
-import Grades from '../pages/Instructor/Grades';
-import CreateAssignment from '../Components/CreateAssignments/CreateAssignments';
-import UploadStudentPage from '../components/AddStudent';
-import UploadInstructor from '../Components/AddInstructor/AddInstructor';
-
+import Assignments from '../../Components/Assignments/Assignments';
+import Submissions from '../../Components/Submissions/Submissions';
+import AddCourses from '../../Components/AddCourses/AddCourss';
+import Grades from '../../Components/Grades/Grades';
+import CreateAssignment from '../../Components/CreateAssignments/CreateAssignments';
+import UploadStudentPage from '../../components/AddStudent';
+import UploadInstructor from '../../Components/AddInstructor/AddInstructor';
 // ** Chat imports **
-import ChatRoomView from '../Components/ChatRoomView';
-import ChatRoomList from '../Components/ChatRoomList';
+import ChatRoomView from '../../Components/Chat/ChatRoomView';
+import ChatRoomList from '../../Components/Chat/ChatRoomList';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -42,6 +42,8 @@ const SupervisorDashboard = () => {
     { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
+    { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
+    { text: "Grades",icon : <FiAward/>,path:"/supervisor/dashboard/Grades"},
     { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
   ];
 
@@ -93,6 +95,8 @@ const SupervisorDashboard = () => {
             <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
             <Route path="addcourses" element={<AddCourses />} />
+            <Route path="Grades" element={<Grades />} />
+
             {/* Chat routes */}
             <Route path="chat" element={<ChatRoomList />} />
             <Route path="chat/rooms/:roomId" element={<ChatRoomView />} />

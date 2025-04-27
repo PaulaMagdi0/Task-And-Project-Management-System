@@ -63,6 +63,7 @@ class Grade(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.assignment.title}: {self.score}"
+
     def clean(self):
         """Validation logic to ensure a matching submission exists."""
         # Check if course or track is None

@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import { Search, Chat as ChatIcon, FiberManualRecord } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchMyRooms, createRoom, searchUsers, clearSearchResults } from '../redux/chatSlice';
+import { fetchMyRooms, createRoom, searchUsers, clearSearchResults } from '../../redux/chatSlice';
 import debounce from 'lodash/debounce';
 import { useNavigate } from 'react-router-dom';
 
@@ -135,37 +135,42 @@ const ChatRoomList = () => {
           <List dense>
             {filteredResults.map(user => (
               <ListItem key={user.id} disablePadding sx={{ '&:hover': { bgcolor: 'action.hover' }, transition: '0.3s' }}>
-                <ListItemButton secondaryAction={
-                  <IconButton
-                    edge="end"
-                    onClick={() => handleCreateRoom(user)}
-                    disabled={createRoomLoading}
-                    sx={{ color: 'primary.main' }}
-                  >
-                    <ChatIcon />
-                  </IconButton>
-                }>
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}>
-                      {user.username.slice(0, 2).toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Typography variant="body1" fontWeight={500}>
-                        {user.username}
-                        <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                          ({user.role})
-                        </Typography>
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        {user.email}
-                      </Typography>
-                    }
-                  />
-                </ListItemButton>
+              <ListItem
+  secondaryAction={
+    <IconButton
+      edge="end"
+      onClick={() => handleCreateRoom(user)}
+      disabled={createRoomLoading}
+      sx={{ color: 'primary.main' }}
+    >
+      <ChatIcon />
+    </IconButton>
+  }
+>
+  <ListItemButton>
+    <ListItemAvatar>
+      <Avatar sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+        {user.username.slice(0, 2).toUpperCase()}
+      </Avatar>
+    </ListItemAvatar>
+    <ListItemText
+      primary={
+        <Typography variant="body1" fontWeight={500}>
+          {user.username}
+          <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+            ({user.role})
+          </Typography>
+        </Typography>
+      }
+      secondary={
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {user.email}
+        </Typography>
+      }
+    />
+  </ListItemButton>
+</ListItem>
+
               </ListItem>
             ))}
           </List>
