@@ -4,7 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from .models import AssignmentSubmission
 from apps.staff_members.permissions import IsInstructor  # Assuming this is in permissions.py
 import logging
-
+from datetime import datetime
 # Define a logger instance
 logger = logging.getLogger(__name__)
 import os
@@ -263,6 +263,7 @@ class AssignmentStudentDetailView(APIView):
 
 class AssignmentReportView(APIView):
     permission_classes = [IsAuthenticated, IsInstructor]
+<<<<<<< HEAD
 g
     # def get(self, request, pk, format=None):
     #     try:
@@ -354,6 +355,97 @@ g
     #             status=status.HTTP_500_INTERNAL_SERVER_ERROR
     #         )
 
+=======
+    def get(self, request, pk, format=None):
+        try:
+            assignment = Assignment.objects.prefetch_related(
+                'assignmentstudent_set__student',
+                'assignmentstudent_set__course',
+                'assignmentstudent_set__track'
+            ).get(id=pk)
+
+            # Get all grades for this assignment
+            grades = Grade.objects.filter(assignment=assignment).select_related('student')
+
+            # Map grades by student ID for quick lookup
+            grade_map = {grade.student_id: grade for grade in grades}
+
+            # Create PDF buffer
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter)
+            styles = getSampleStyleSheet()
+            elements = []
+
+            # --- Title Section ---
+            elements.append(Paragraph(f"Assignment Report: {assignment.title}", styles['Title']))
+            elements.append(Spacer(1, 12))
+
+            # --- Assignment Details Table ---
+            assignment_data = [
+                ['Title:', assignment.title],
+                ['Course:', assignment.course.name if assignment.course else "N/A"],
+                ['Due Date:', assignment.due_date.strftime("%Y-%m-%d %H:%M")],
+                ['End Date:', assignment.end_date.strftime("%Y-%m-%d %H:%M")],
+                ['Type:', assignment.get_assignment_type_display()],
+            ]
+            assignment_table = Table(assignment_data, colWidths=[100, 400])
+            assignment_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+
+            elements.append(assignment_table)
+            elements.append(Spacer(1, 24))
+
+            # --- Student Grades Table ---
+            student_data = [['Student', 'Track', 'Course', 'Score', 'Graded At', 'Feedback']]
+            for as_student in sorted(assignment.assignmentstudent_set.all(), key=lambda s: s.student.full_name):
+                student = as_student.student
+                grade = grade_map.get(student.id)
+
+                student_data.append([
+                    student.full_name,
+                    as_student.track.name if as_student.track else "N/A",
+                    assignment.course.name if assignment.course else "N/A",
+                    str(grade.score) if grade else "N/A",
+                    grade.graded_date.strftime("%Y-%m-%d %H:%M") if grade else "N/A",
+                    Paragraph(grade.feedback, styles['Normal']) if grade and grade.feedback else "N/A"
+                ])
+
+            student_table = Table(student_data,
+                                colWidths=[120, 100, 80, 60, 80, 140],
+                                repeatRows=1)
+            student_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#D9E1F2')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#5B9BD5')),
+            ]))
+
+            elements.append(student_table)
+            elements.append(Spacer(1, 12))
+
+            doc.build(elements)
+            buffer.seek(0)
+
+            response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="assignment_{pk}_report.pdf"'
+            return response
+
+        except Assignment.DoesNotExist:
+            return Response({"error": "Assignment not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error generating report: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to generate report. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+>>>>>>> 1977b15e7b17a4e8d548a6bc18a57b637516ff81
 class SubmissionByStudentAssignmentView(generics.ListAPIView):
     serializer_class = AssignmentSubmissionSerializer
 
@@ -380,3 +472,79 @@ class SubmissionByStudentAssignmentView(generics.ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class AssignmentSubmissionNoFileViewSet(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handle both:
+        - /api/submission/<pk>/ (submission detail)
+        - /api/submission/assignment/<assignment_id>/ (validate by assignment)
+        """
+        pk = kwargs.get('pk')
+        assignment_id = kwargs.get('assignment_id')
+
+        try:
+            if pk:
+                # Get by submission ID
+                submission = AssignmentSubmission.objects.get(id=pk)
+            elif assignment_id:
+                # Get by assignment ID for current user
+                student_id = request.user.id
+                submission = AssignmentSubmission.objects.get(
+                    assignment_id=assignment_id,
+                    student_id=student_id
+                )
+            else:
+                return Response(
+                    {"detail": "Missing ID parameter"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            return Response({
+                "exists": True,
+                "submission_date": submission.submission_date,
+                "data": AssignmentSubmissionSerializer(submission).data
+            }, status=status.HTTP_200_OK)
+            
+        except AssignmentSubmission.DoesNotExist:
+            return Response({
+                "exists": False
+            }, status=status.HTTP_200_OK)  # Return 200 instead of 404
+            
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def post(self, request, *args, **kwargs):
+        # Your existing post method
+        data = request.data
+        required_fields = ['student', 'course', 'assignment', 'track', 'file_url']
+        if not all(field in data for field in required_fields):
+            return Response(
+                {"detail": "Missing required fields"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            submission = AssignmentSubmission.objects.create(
+                student_id=data['student'],
+                assignment_id=data['assignment'],
+                course_id=data['course'],
+                track_id=data['track'],
+                file_url=data['file_url'],
+                submission_date=timezone.now(),
+                submitted=True
+            )
+            return Response(
+                AssignmentSubmissionSerializer(submission).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

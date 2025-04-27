@@ -18,6 +18,7 @@ import TermsOfService from "./Components/TermsOfService/TermsOfService";
 import Team from "./Components/Team/Team";
 import SignIn from "./pages/Signin";
 import NotFound from "./pages/NotFound";
+import VerifiedPage from './pages/verifiedPage';
 import AccessDenied from "./Components/Denied/Denied";
 import RecommendationForm from './Components/Recommendation/Recommendation';
 import UploadStudentPage from './components/AddStudent';
@@ -45,13 +46,14 @@ import MovieSearch from './Components/MovieSearch/MovieSearch';
 import ChatWithAI from './Components/ChatAI/ChatWithAI';
 
 // ** Chat Components **
-import ChatRoomList from './components/ChatRoomList';
-import ChatRoomMessages from './components/ChatRoomMessages';
+import ChatRoomList from './Components/ChatRoomList';
+import ChatRoomMessages from './Components/ChatRoomMessages';
 
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
+import NotVerifiedPage from './pages/NotVerifiedPage';
 
 const App = () => {
   useCustomScripts();
@@ -85,6 +87,8 @@ const App = () => {
           <Route path="/chat/rooms" element={<ChatRoomList />} />
           <Route path="/chat/rooms/:roomId" element={<ChatRoomMessages />} />
 
+          <Route path="/verified" element={<VerifiedPage />} />
+          <Route path="/not-verified" element={<NotVerifiedPage />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route
@@ -104,6 +108,11 @@ const App = () => {
 
           {/* Instructor Dashboard */}
           {userType === 'staff' && role === 'instructor' && (
+            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+
+          )}
+          {/* Instructor-Specific Routes */}
+          {userType === "staff" && role === "instructor" && (
             <Route
               path="/instructor/dashboard"
               element={<InstructorDashboard />}

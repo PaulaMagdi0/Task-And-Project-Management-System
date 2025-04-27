@@ -12,6 +12,7 @@ class AssignmentSubmission(models.Model):
     track = models.ForeignKey(Track, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to='submissions/', null=True, blank=True)
     file_url = models.URLField(null=True, blank=True)  # URL for external file (e.g., Google Drive link)
+    submitted = models.BooleanField(default=False)
     # feedback = models.TextField(blank=True, null=True)
     # score = models.FloatField(blank=True, null=True)
     

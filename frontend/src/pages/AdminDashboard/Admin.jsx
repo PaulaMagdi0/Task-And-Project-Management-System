@@ -8,8 +8,8 @@ import BranchManagement from './BranchManagment';
 import TracksManagement from './TracksManagment';
 import StaffManagement from './StaffManagment';
 // ** Chat imports **
-import ChatRoomList from '../../components/ChatRoomList';
-import ChatRoomView from '../../components/ChatRoomView';
+import ChatRoomList from '../../Components/ChatRoomList';
+import ChatRoomView from '../../Components/ChatRoomView';
 
 const AdminDashboard = () => {
   const { username } = useSelector((state) => state.auth);

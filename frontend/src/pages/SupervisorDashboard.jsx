@@ -25,8 +25,8 @@ import UploadStudentPage from '../components/AddStudent';
 import UploadInstructor from '../Components/AddInstructor/AddInstructor';
 
 // ** Chat imports **
-import ChatRoomList from '../components/ChatRoomList';
-import ChatRoomView from '../components/ChatRoomView';
+import ChatRoomView from '../Components/ChatRoomView';
+import ChatRoomList from '../Components/ChatRoomList';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -36,13 +36,13 @@ const SupervisorDashboard = () => {
   const displayName = username ? username.split('@')[0] : 'Supervisor';
 
   const menuItems = [
-    { text: 'My Courses',       icon: <FiBook />,          path: '/supervisor/dashboard/courses' },
-    { text: 'Add Student',      icon: <FiClipboard />,     path: '/supervisor/dashboard/addstudent' },
-    { text: 'Create Assignment',icon: <ArchiveRestore />,  path: '/supervisor/dashboard/create-assignment' },
-    { text: 'View Assignments', icon: <FiCalendar />,      path: '/supervisor/dashboard/view-assignment' },
-    { text: 'Add Instructor',   icon: <FiAward />,         path: '/supervisor/dashboard/addinstructor' },
-    { text: 'Add Courses',      icon: <NotebookText />,    path: '/supervisor/dashboard/addcourses' },
-    { text: 'Chat',             icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
+    { text: 'My Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
+    { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
+    { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
+    { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
+    { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
+    { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
+    { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
   ];
 
   return (
