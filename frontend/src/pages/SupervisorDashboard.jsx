@@ -1,3 +1,4 @@
+// File: src/pages/SupervisorDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Routes, Route, useLocation, Link } from 'react-router-dom';
@@ -7,49 +8,48 @@ import {
   FiBook,
   FiCalendar,
   FiAward,
-  FiAlertTriangle,
   FiClipboard,
+  FiMessageCircle,
 } from 'react-icons/fi';
 import './SupervisorDashboard.css';
-import { NotebookText,ArchiveRestore } from 'lucide-react';
+import { NotebookText, ArchiveRestore } from 'lucide-react';
 
 // Import your components
 import Courses from './Courses';
-// import Assignments from '../pages/Instructor/Assignments';
 import Assignments from '../Components/Assignments/Assignments';
 import Submissions from '../pages/Instructor/Submissions';
 import AddCourses from '../Components/AddCourses/AddCourss';
-
 import Grades from '../pages/Instructor/Grades';
-// import CreateAssignment from '../pages/Instructor/CreateAssignment';
 import CreateAssignment from '../Components/CreateAssignments/CreateAssignments';
-
 import UploadStudentPage from '../components/AddStudent';
 import UploadInstructor from '../Components/AddInstructor/AddInstructor';
+
+// ** Chat imports **
+import ChatRoomList from '../components/ChatRoomList';
+import ChatRoomView from '../components/ChatRoomView';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
 
-  const menuItems = [
-    { text: 'My Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
-    { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
-    { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
-    { text: 'View My Assignment', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
-    { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
-    { text: 'Add Courses', icon:<NotebookText />, path: '/supervisor/dashboard/addcourses' },
-
-    // { text: 'Grades', icon: <FiAlertTriangle />, path: '/supervisor/dashboard/grades' },
-  ];
-
   const displayName = username ? username.split('@')[0] : 'Supervisor';
+
+  const menuItems = [
+    { text: 'My Courses',       icon: <FiBook />,          path: '/supervisor/dashboard/courses' },
+    { text: 'Add Student',      icon: <FiClipboard />,     path: '/supervisor/dashboard/addstudent' },
+    { text: 'Create Assignment',icon: <ArchiveRestore />,  path: '/supervisor/dashboard/create-assignment' },
+    { text: 'View Assignments', icon: <FiCalendar />,      path: '/supervisor/dashboard/view-assignment' },
+    { text: 'Add Instructor',   icon: <FiAward />,         path: '/supervisor/dashboard/addinstructor' },
+    { text: 'Add Courses',      icon: <NotebookText />,    path: '/supervisor/dashboard/addcourses' },
+    { text: 'Chat',             icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
+  ];
 
   return (
     <div className="dashboard-container">
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          {sidebarOpen && (
+          {sidebarOpen ? (
             <>
               <div className="welcome-message">
                 <h3>Welcome back,</h3>
@@ -59,25 +59,21 @@ const SupervisorDashboard = () => {
                 <FiX size={24} />
               </button>
             </>
-          )}
-          {!sidebarOpen && (
+          ) : (
             <button className="toggle-btn" onClick={() => setSidebarOpen(true)}>
               <FiMenu size={24} />
             </button>
           )}
         </div>
-
         <div className="menu-items">
-          {menuItems.map((item) => {
-            const isActive = location.pathname.endsWith(item.path);
+          {menuItems.map(item => {
+            const isActive = location.pathname === item.path;
             return (
               <Link
+                key={item.text}
                 to={item.path}
                 className={`menu-item ${isActive ? 'active' : ''}`}
-                key={item.text}
-                onClick={() => {
-                  if (!sidebarOpen) setSidebarOpen(true);
-                }}
+                onClick={() => sidebarOpen || setSidebarOpen(true)}
               >
                 {item.icon}
                 {sidebarOpen && <span>{item.text}</span>}
@@ -86,7 +82,6 @@ const SupervisorDashboard = () => {
           })}
         </div>
       </div>
-
       <div className="main-content">
         <div className="content-card">
           <Routes>
@@ -98,6 +93,9 @@ const SupervisorDashboard = () => {
             <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
             <Route path="addcourses" element={<AddCourses />} />
+            {/* Chat routes */}
+            <Route path="chat" element={<ChatRoomList />} />
+            <Route path="chat/rooms/:roomId" element={<ChatRoomView />} />
             {/* <Route path="grades" element={<Grades />} /> */}
           </Routes>
         </div>

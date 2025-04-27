@@ -1,118 +1,152 @@
-from rest_framework import generics, permissions
-from rest_framework.exceptions import PermissionDenied
-from django.shortcuts import redirect
-from django.views import View
-from .models import ChatRoom, Message
-from .serializers import ChatRoomSerializer, MessageSerializer
+# File: apps/chat/views.py
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from rest_framework import generics, permissions, status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+
+from .models import ChatRoom, ChatParticipant, Message
+from .serializers import ChatRoomSerializer, MessageSerializer, UserSerializer
 
 User = get_user_model()
 
-class ChatHomeView(View):
-    """
-    Redirects to the chat rooms list view.
-    """
-    def get(self, request):
-        return redirect("chat_rooms")
-
-
 class ChatRoomListCreateView(generics.ListCreateAPIView):
-    """
-    API view to list all chat rooms and create a new chat room.
-    Both students and instructors can start a chat.
-    """
-    queryset = ChatRoom.objects.all().order_by("-created_at")
     serializer_class = ChatRoomSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def perform_create(self, serializer):
-        """
-        Allows both students and instructors to create a chat room,
-        ensuring one chat per student-instructor pair.
-        """
+    def get_queryset(self):
         user = self.request.user
-        other_user_id = self.request.data.get("other_user_id")  # Expecting the recipient's ID
+        ct = ContentType.objects.get_for_model(user)
+        room_ids = ChatParticipant.objects.filter(
+            content_type=ct, object_id=user.id
+        ).values_list('room_id', flat=True)
+        return ChatRoom.objects.filter(id__in=room_ids).order_by('-created_at')
 
-        if not other_user_id:
-            raise PermissionDenied("You must specify the other participant.")
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        other_id = request.data.get('other_user_id')
+        if not other_id:
+            raise PermissionDenied("You must specify other_user_id.")
+        other = get_object_or_404(User, pk=other_id)
+        if user == other:
+            raise PermissionDenied("Cannot chat with yourself.")
 
-        # Check if the other user exists
-        try:
-            other_user = User.objects.get(id=other_user_id)
-        except User.DoesNotExist:
-            raise PermissionDenied("The specified user does not exist.")
+        user_ct  = ContentType.objects.get_for_model(user)
+        other_ct = ContentType.objects.get_for_model(other)
 
-        if user == other_user:
-            raise PermissionDenied("You cannot create a chat room with yourself.")
+        # existing 1:1?
+        room_ids = ChatParticipant.objects.filter(
+            content_type=user_ct, object_id=user.id
+        ).values_list('room_id', flat=True)
+        shared = ChatParticipant.objects.filter(
+            room_id__in=room_ids,
+            content_type=other_ct, object_id=other.id
+        ).values_list('room_id', flat=True)
 
-        # Ensure the chat is between a student and an instructor
-        if user.is_student == other_user.is_student:
-            raise PermissionDenied("Chats can only be between students and instructors.")
+        if shared:
+            room = ChatRoom.objects.get(pk=shared[0])
+            return Response(self.get_serializer(room).data, status=status.HTTP_200_OK)
 
-        # Assign student and instructor roles correctly
-        student, instructor = (user, other_user) if user.is_student else (other_user, user)
+        return super().create(request, *args, **kwargs)
 
-        # Create or get the chat room
-        chat_room, created = ChatRoom.objects.get_or_create(student=student, instructor=instructor)
+    def perform_create(self, serializer):
+        # build a deterministic, unique name for this 1:1
+        user = self.request.user
+        other = get_object_or_404(User, pk=self.request.data['other_user_id'])
+        names = sorted([user.username, other.username])
+        room_name = f"chat_{names[0]}_{names[1]}"
+        room = serializer.save(name=room_name)
 
-        serializer.save(student=student, instructor=instructor)
+        user_ct  = ContentType.objects.get_for_model(user)
+        other_ct = ContentType.objects.get_for_model(other)
+        ChatParticipant.objects.bulk_create([
+            ChatParticipant(room=room, content_type=user_ct,  object_id=user.id),
+            ChatParticipant(room=room, content_type=other_ct, object_id=other.id),
+        ])
 
 
 class MyChatRoomsView(generics.ListAPIView):
-    """
-    API view to list chat rooms for the authenticated user.
-    """
-    serializer_class = ChatRoomSerializer
+    serializer_class   = ChatRoomSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Returns chat rooms where the authenticated user is a participant.
-        """
         user = self.request.user
-        return ChatRoom.objects.filter(student=user) | ChatRoom.objects.filter(instructor=user)
+        ct   = ContentType.objects.get_for_model(user)
+        room_ids = ChatParticipant.objects.filter(
+            content_type=ct, object_id=user.id
+        ).values_list("room_id", flat=True)
+        return ChatRoom.objects.filter(id__in=room_ids).order_by("-created_at")
+
+    def get_serializer_context(self):
+        # include request so our serializer can fetch `request.user`
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx
 
 
 class MessageListCreateView(generics.ListCreateAPIView):
-    """
-    API view to list all messages in a chat room and send new messages.
-    Requires authentication.
-    """
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_room(self):
+        return get_object_or_404(ChatRoom, pk=self.kwargs['room_id'])
+
+    def check_participation(self, room, user):
+        ct = ContentType.objects.get_for_model(user)
+        return ChatParticipant.objects.filter(
+            room=room, content_type=ct, object_id=user.id
+        ).exists()
+
     def get_queryset(self):
-        """
-        Returns messages for a specific chat room, ordered by timestamp.
-        """
-        room_id = self.kwargs.get("room_id")  # Dynamic URL-based room_id
+        room = self.get_room()
+        user = self.request.user
 
-        if not room_id:
-            raise PermissionDenied("Invalid request. A room_id is required.")
+        if not self.check_participation(room, user):
+            raise PermissionDenied("Not a participant in this room.")
 
-        try:
-            chat_room = ChatRoom.objects.get(id=room_id)
-        except ChatRoom.DoesNotExist:
-            raise PermissionDenied("Chat room does not exist.")
+        # mark messages as “read” up to now
+        user_ct = ContentType.objects.get_for_model(user)
+        ChatParticipant.objects.filter(
+            room=room,
+            content_type=user_ct,
+            object_id=user.id
+        ).update(last_read=timezone.now())
 
-        # Ensure the user is part of the chat room
-        if self.request.user not in [chat_room.student, chat_room.instructor]:
-            raise PermissionDenied("You do not have permission to view this chat room.")
+        return Message.objects.filter(room=room).order_by('timestamp')
 
-        return Message.objects.filter(room=chat_room).select_related("room", "sender").order_by("timestamp")
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['room']   = self.get_room()
+        ctx['sender'] = self.request.user
+        return ctx
 
     def perform_create(self, serializer):
-        """
-        Ensures only participants can send messages in the chat room.
-        """
-        room_id = self.kwargs.get("room_id")
+        room = self.get_room()
+        user = self.request.user
 
-        try:
-            chat_room = ChatRoom.objects.get(id=room_id)
-        except ChatRoom.DoesNotExist:
-            raise PermissionDenied("Chat room does not exist.")
+        if not self.check_participation(room, user):
+            raise PermissionDenied("Not a participant in this room.")
 
-        if self.request.user not in [chat_room.student, chat_room.instructor]:
-            raise PermissionDenied("You are not a participant in this chat room.")
+        ct = ContentType.objects.get_for_model(user)
+        serializer.save(
+            room=room,
+            sender_content_type=ct,
+            sender_object_id=user.id
+        )
 
-        serializer.save(sender=self.request.user, room=chat_room)
+
+class SearchUsersView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        q = self.request.query_params.get('q', '').strip()
+        if not q:
+            return User.objects.none()
+        return User.objects.filter(
+            Q(username__icontains=q) | Q(email__icontains=q)
+        )[:20]

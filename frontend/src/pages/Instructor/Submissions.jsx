@@ -132,7 +132,7 @@ const Submissions = () => {
   
             // 2. Validate submission existence
             const hasValidSubmission = !!submission.file_url; // Use file presence as submission indicator
-            const submissionId = submission.id || submission.submission_id || null;
+            const submissionId = submission.id || submission.submission_id || 1;
   
             // 3. Fetch existing grade
             let existingGrade = null;
@@ -268,12 +268,12 @@ const Submissions = () => {
           }
         }
       }
-  
+      //submissionId=1;
       // 3. API fallback with better error handling
       if (!submissionId && student.submitted) {
         try {
           const submissionRes = await apiClient.get(
-            `submissions/?student=${studentId}&assignment=${selectedAssignment}`
+            `submission/instructor/?student=${studentId}&assignment=${selectedAssignment}`
           );
           
           // Handle different API response structures

@@ -149,7 +149,7 @@ class AssignmentStudentDetailView(APIView):
         # Safer fetching using get_object_or_404
         assignment = get_object_or_404(Assignment, id=assignment_id)
         student = get_object_or_404(Student, id=student_id)
-
+        
         course = assignment.course
         track = student.track
 
@@ -174,6 +174,7 @@ class AssignmentStudentDetailView(APIView):
 
             if submission:
                 submission_data.update({
+                    "id": submission.id,  # 👈 Add submission ID here
                     "submission_time": submission.submission_date,
                     "file_url": submission.file_url,
                 })
@@ -197,6 +198,7 @@ class AssignmentStudentDetailView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
             
     def post(self, request, assignment_id, student_id):
         return self._update_feedback(request, assignment_id, student_id, create_only=True)

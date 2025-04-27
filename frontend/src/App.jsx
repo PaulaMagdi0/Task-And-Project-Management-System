@@ -19,7 +19,6 @@ import Team from "./Components/Team/Team";
 import SignIn from "./pages/Signin";
 import NotFound from "./pages/NotFound";
 import AccessDenied from "./Components/Denied/Denied";
-import Chatting, { dummyUsers } from './pages/Chat/Chatting';
 import RecommendationForm from './Components/Recommendation/Recommendation';
 import UploadStudentPage from './components/AddStudent';
 import ProfilePage from './pages/ProfilePage';
@@ -37,18 +36,23 @@ import Grades from './pages/DashBoard/Grades';
 import CreateAssignment from './pages/DashBoard/CreateAssignment';
 import Hello from './pages/DashBoard/hello';
 
-// **Admin Dashboard:**
+// Admin Dashboard
 import AdminDashboard from './pages/AdminDashboard/Admin';
 import Jokes from './Components/Jokes/Jokes';
 import GitHubStat from './Components/githubStat/githubStat';
 import BookSearch from './Components/BookSearch/BookSearch';
 import MovieSearch from './Components/MovieSearch/MovieSearch';
+import ChatWithAI from './Components/ChatAI/ChatWithAI';
+
+// ** Chat Components **
+import ChatRoomList from './components/ChatRoomList';
+import ChatRoomMessages from './components/ChatRoomMessages';
 
 // Styles
 import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
-import ChatWithAI from './Components/ChatAI/ChatWithAI';
+
 const App = () => {
   useCustomScripts();
   const { userType, role } = useSelector((state) => state.auth);
@@ -67,7 +71,6 @@ const App = () => {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/team" element={<Team />} />
           <Route path="/signin" element={<SignIn />} />
-          <Route path="/chat" element={<Chatting users={dummyUsers} />} />
           <Route path="/upload-student" element={<UploadStudentPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
@@ -77,6 +80,11 @@ const App = () => {
           <Route path="/github-stat" element={<GitHubStat />} />
           <Route path="/book-search" element={<BookSearch />} />
           <Route path="/movie-search" element={<MovieSearch />} />
+
+          {/* Chat Routes */}
+          <Route path="/chat/rooms" element={<ChatRoomList />} />
+          <Route path="/chat/rooms/:roomId" element={<ChatRoomMessages />} />
+
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route
@@ -96,13 +104,8 @@ const App = () => {
 
           {/* Instructor Dashboard */}
           {userType === 'staff' && role === 'instructor' && (
-            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
-
-          )}
-             {/* Instructor-Specific Routes */}
-          {userType === "staff" && role === "instructor" && (
             <Route
-              path="/instructor/dashboard/*"
+              path="/instructor/dashboard"
               element={<InstructorDashboard />}
             />
           )}
@@ -112,7 +115,7 @@ const App = () => {
             <Route path="/admin/dashboard/*" element={<AdminDashboard />} />
           )}
 
-          {/* Fallback Route */}
+          {/* Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -122,4 +125,3 @@ const App = () => {
 };
 
 export default App;
-
