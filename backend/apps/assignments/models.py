@@ -23,22 +23,27 @@ class Assignment(models.Model):
         ("exam", "Exam"),
     )
 
+    DIFFICULTY_LEVELS = (
+        ("Easy", "Easy"),
+        ("Medium", "Medium"),
+        ("Hard", "Hard"),
+    )
+
     title = models.CharField(max_length=255)
     due_date = models.DateTimeField(default=timezone.now)
     end_date = models.DateTimeField(default=None)
     assignment_type = models.CharField(
         max_length=50, choices=ASSIGNMENT_TYPES, default="task"
     )
+    difficulty = models.CharField(
+        max_length=10, choices=DIFFICULTY_LEVELS, default="Easy"
+    )  # ✅ أضفناها هنا
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     file = models.URLField(null=True, blank=True)
     file_url = models.URLField(null=True, blank=True)
-
-    # Add a ForeignKey to Track to link each assignment with a track
     track = models.ForeignKey('tracks.Track', on_delete=models.SET_NULL, null=True, blank=True)
-
-    # Use the `through` model to link students to assignments with a course and track field
     assigned_to = models.ManyToManyField(
         Student, through='AssignmentStudent', related_name='assignments', blank=True
     )
@@ -46,7 +51,7 @@ class Assignment(models.Model):
     class Meta:
         ordering = ["-created_at"]
         db_table = "assignments"
-
+        
     def __str__(self):
         assigned_display = ""
         for assignment_student in self.assignmentstudent_set.all():
