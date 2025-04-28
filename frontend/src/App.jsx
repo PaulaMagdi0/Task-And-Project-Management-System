@@ -39,11 +39,7 @@ import Hello from './pages/DashBoard/hello';
 
 // Admin Dashboard
 import AdminDashboard from './pages/AdminDashboard/Admin';
-import Jokes from './Components/Jokes/Jokes';
 import GitHubStat from './Components/githubStat/githubStat';
-import BookSearch from './Components/BookSearch/BookSearch';
-import MovieSearch from './Components/MovieSearch/MovieSearch';
-import ChatWithAI from './Components/ChatAI/ChatWithAI';
 
 // ** Chat Components **
 import ChatRoomList from './Components/Chat/ChatRoomList';
@@ -77,11 +73,10 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
-          <Route path="/ChatAI" element={<ChatWithAI />} />
-          <Route path="/jokes" element={<Jokes />} />
+      
+
           <Route path="/github-stat" element={<GitHubStat />} />
-          <Route path="/book-search" element={<BookSearch />} />
-          <Route path="/movie-search" element={<MovieSearch />} />
+      
 
           {/* Chat Routes */}
           <Route path="/chat/rooms" element={<ChatRoomList />} />

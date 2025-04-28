@@ -1,0 +1,39 @@
+.movie-search-container {
+    padding: 16px;
+  }
+  
+  .movie-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-radius: 8px;
+    background-color: #fff;
+  }
+  
+  .movie-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .movie-title {
+    color: #7b1fa2;
+    font-weight: 600;
+  }
+  
+  .trailer-link {
+    color: #7b1fa2;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .trailer-link:hover {
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 600px) {
+    .movie-search-container {
+      padding: 8px;
+    }
+  
+    .movie-card {
+      margin-bottom: 16px;
+    }
+  }
