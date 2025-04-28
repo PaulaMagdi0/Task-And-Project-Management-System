@@ -1,18 +1,18 @@
-import React, { useState, useEffect, Component } from 'react';
-import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Box, CircularProgress, Typography } from '@mui/material';
-import Sidebar from './Sidebar';
-import CoursesSection from './CoursesSection';
-import AssignmentsSection from './AssignmentsSection';
-import DeadlinesSection from './DeadlinesSection';
-import GradesSection from './GradesSection';
-import EntertainmentSection from './EntertainmentSection';
-import LibrarySection from './LibrarySection';
-import BookHubSection from './BookHubSection';
-import ChatWithAISection from './ChatWithAISection';
-import { fetchStudentData } from './api';
-import './StudentDashboard.css';
+import React, { useState, useEffect, Component } from "react";
+import { useSelector } from "react-redux";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Box, CircularProgress, Typography } from "@mui/material";
+import Sidebar from "./Sidebar";
+import CoursesSection from "./CoursesSection";
+import AssignmentsSection from "./AssignmentsSection";
+import DeadlinesSection from "./DeadlinesSection";
+import GradesSection from "./GradesSection";
+import EntertainmentSection from "./EntertainmentSection";
+import LibrarySection from "./LibrarySection";
+import BookHubSection from "./BookHubSection";
+import ChatWithAISection from "./ChatWithAISection";
+import { fetchStudentData } from "./api";
+import "./StudentDashboard.css";
 
 // Error Boundary for the entire dashboard
 class DashboardErrorBoundary extends Component {
@@ -30,7 +30,7 @@ class DashboardErrorBoundary extends Component {
             An error occurred in the dashboard.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Error: {this.state.error?.message || 'Unknown error'}
+            Error: {this.state.error?.message || "Unknown error"}
           </Typography>
         </Box>
       );
@@ -40,7 +40,7 @@ class DashboardErrorBoundary extends Component {
 }
 
 const StudentDashboard = () => {
-  const [selectedSection, setSelectedSection] = useState('courses');
+  const [selectedSection, setSelectedSection] = useState("courses");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [data, setData] = useState({
     student: null,
@@ -54,16 +54,32 @@ const StudentDashboard = () => {
   const [submittedAssignments, setSubmittedAssignments] = useState({});
   const navigate = useNavigate();
   const { username } = useSelector((state) => state.auth);
+  const location = useLocation();
 
   useEffect(() => {
-    const savedSubmissions = JSON.parse(localStorage.getItem('submittedAssignments')) || {};
+    // Parse query parameters
+    const queryParams = new URLSearchParams(location.search);
+    const section = queryParams.get("section");
+
+    // Set selectedSection based on query parameter
+    if (section === "assignments") {
+      setSelectedSection("assignments");
+    } else if (section === "courses") {
+      setSelectedSection("courses");
+    } else {
+      // Default to 'courses' if no section is specified
+      setSelectedSection("courses");
+    }
+
+    const savedSubmissions =
+      JSON.parse(localStorage.getItem("submittedAssignments")) || {};
     setSubmittedAssignments(savedSubmissions);
 
     const fetchData = async () => {
       try {
         setData((prev) => ({ ...prev, loading: true, error: null }));
         const response = await fetchStudentData();
-        console.log('Fetched Data:', response);
+        console.log("Fetched Data:", response);
         setData({
           student: response.student,
           courses: response.courses || [],
@@ -75,28 +91,31 @@ const StudentDashboard = () => {
         });
         setSubmittedAssignments((prev) => {
           const updatedSubmissions = { ...prev, ...response.submissions };
-          localStorage.setItem('submittedAssignments', JSON.stringify(updatedSubmissions));
+          localStorage.setItem(
+            "submittedAssignments",
+            JSON.stringify(updatedSubmissions)
+          );
           return updatedSubmissions;
         });
       } catch (error) {
-        console.error('Fetch Error:', error);
+        console.error("Fetch Error:", error);
         setData((prev) => ({ ...prev, loading: false, error: error.message }));
         if (error.response?.status === 401) {
-          localStorage.removeItem('authToken');
-          navigate('/login');
+          localStorage.removeItem("authToken");
+          navigate("/login");
         }
       }
     };
 
     fetchData();
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   const renderSection = () => {
-    console.log('Rendering Section:', selectedSection, 'Grades:', data.grades);
+    console.log("Rendering Section:", selectedSection, "Grades:", data.grades);
     if (data.loading) {
       return (
         <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress sx={{ color: '#e53935' }} />
+          <CircularProgress sx={{ color: "#e53935" }} />
         </Box>
       );
     }
@@ -112,21 +131,44 @@ const StudentDashboard = () => {
     }
 
     switch (selectedSection) {
-      case 'courses':
-        return <CoursesSection courses={data.courses} assignments={data.assignments} submittedAssignments={submittedAssignments} />;
-      case 'assignments':
-        return <AssignmentsSection data={data} submittedAssignments={submittedAssignments} setSubmittedAssignments={setSubmittedAssignments} />;
-      case 'deadlines':
-        return <DeadlinesSection assignments={data.assignments} submittedAssignments={submittedAssignments} />;
-      case 'averageGrade':
-        return <GradesSection grades={data.grades} assignments={data.assignments} courses={data.courses} />;
-      case 'entertainment':
+      case "courses":
+        return (
+          <CoursesSection
+            courses={data.courses}
+            assignments={data.assignments}
+            submittedAssignments={submittedAssignments}
+          />
+        );
+      case "assignments":
+        return (
+          <AssignmentsSection
+            data={data}
+            submittedAssignments={submittedAssignments}
+            setSubmittedAssignments={setSubmittedAssignments}
+          />
+        );
+      case "deadlines":
+        return (
+          <DeadlinesSection
+            assignments={data.assignments}
+            submittedAssignments={submittedAssignments}
+          />
+        );
+      case "averageGrade":
+        return (
+          <GradesSection
+            grades={data.grades}
+            assignments={data.assignments}
+            courses={data.courses}
+          />
+        );
+      case "entertainment":
         return <EntertainmentSection />;
-      case 'library':
+      case "library":
         return <LibrarySection />;
-      case 'bookHub':
+      case "bookHub":
         return <BookHubSection />;
-      case 'chatWithAI':
+      case "chatWithAI":
         return <ChatWithAISection />;
       default:
         return null;
