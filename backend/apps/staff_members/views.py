@@ -272,9 +272,6 @@ def supervisor_instructor_by_id_view(request, staff_id):
         )
 
 #Return All Instructosfrom django.http import JsonResponse
-from django.http import JsonResponse
-from django.views import View
-from .models import StaffMember
 
 class InstructorListView(View):
     def get(self, request, *args, **kwargs):
@@ -307,4 +304,3 @@ class InstructorListView(View):
         ]
 
         return JsonResponse(data, safe=False)
-1

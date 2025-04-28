@@ -5,12 +5,14 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from .models import StaffMember
 from apps.courses.models import Course
-from django.contrib.auth.hashers import make_password
 from django.shortcuts import get_object_or_404
 from apps.branch_location.models import Branch
 import secrets       # Add this import
 import string        # And this import
 import logging
+from django.contrib.auth.hashers import make_password
+from apps.courses.models import Course
+
 logger = logging.getLogger(__name__)
 
 class StaffMemberSerializer(serializers.ModelSerializer):
@@ -372,11 +374,6 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
             raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))
         
 
-from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
-from apps.staff_members.models import StaffMember
-from apps.courses.models import Course
-
 class CreateInstructorSerializer(serializers.ModelSerializer):
     course_id = serializers.IntegerField(required=False, write_only=True)
 
@@ -414,3 +411,5 @@ class CreateInstructorSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Course with ID {course_id} does not exist.")
 
         return staff_member
+
+

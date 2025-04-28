@@ -39,3 +39,11 @@ class MinimalCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ['id', 'name']
+        
+# Update Course Instructor
+class CourseInstructorUpdateSerializer(serializers.ModelSerializer):
+    instructor_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Course
+        fields = ['instructor_id']

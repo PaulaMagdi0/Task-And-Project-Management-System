@@ -27,6 +27,8 @@ import UploadInstructor from '../../Components/AddInstructor/AddInstructor';
 // ** Chat imports **
 import ChatRoomView from '../../Components/Chat/ChatRoomView';
 import ChatRoomList from '../../Components/Chat/ChatRoomList';
+import Tracks from '../../Components/Tracks/Tracks';
+import ReassignInstructor from '../../Components/ReAssignCourse/ReAssignCourse';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -36,15 +38,19 @@ const SupervisorDashboard = () => {
   const displayName = username ? username.split('@')[0] : 'Supervisor';
 
   const menuItems = [
-    { text: 'My Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
+    { text: 'My Tracks', icon: <FiMessageCircle />, path: '/supervisor/dashboard/tracks' },
+    { text: 'Tracks Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
     { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
     { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
     { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
+    { text: 'ReassignCourse', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
+
     { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
     { text: "Grades",icon : <FiAward/>,path:"/supervisor/dashboard/Grades"},
     { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
+
   ];
 
   return (
@@ -88,6 +94,7 @@ const SupervisorDashboard = () => {
         <div className="content-card">
           <Routes>
             <Route index element={<Courses />} />
+            <Route path="tracks" element={<Tracks />} />
             <Route path="courses" element={<Courses />} />
             <Route path="addstudent" element={<UploadStudentPage />} />
             <Route path="addinstructor" element={<UploadInstructor />} />
@@ -96,6 +103,7 @@ const SupervisorDashboard = () => {
             <Route path="submissions" element={<Submissions />} />
             <Route path="addcourses" element={<AddCourses />} />
             <Route path="Grades" element={<Grades />} />
+            <Route path="ReAssignCourse" element={<ReassignInstructor />} />
 
             {/* Chat routes */}
             <Route path="chat" element={<ChatRoomList />} />

@@ -1,0 +1,561 @@
+import React, { useEffect, useState, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchCourses, reassignInstructor } from "../../redux/coursesSlice";
+import { fetchInstructors } from "../../redux/supervisorsSlice";
+import {
+  Button,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Typography,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Modal,
+  Box,
+  Alert,
+  Snackbar,
+  Grid,
+  Skeleton,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+
+// Styled components
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  borderRadius: theme.spacing(2),
+  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+  overflow: "hidden",
+  margin: theme.spacing(3),
+  backgroundColor: "#ffffff",
+}));
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  fontWeight: 600,
+  backgroundColor: theme.palette.grey[100],
+  padding: theme.spacing(2),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const StyledTableRow = styled(TableRow)(() => ({
+  "&:nth-of-type(odd)": {
+    backgroundColor: "#f8fafc",
+  },
+  "&:hover": {
+    backgroundColor: "#f1f5f9",
+    transition: "background-color 0.2s ease-in-out",
+  },
+}));
+
+// Helper function for sorting
+const sortRows = (rows, sortBy, sortOrder) => {
+  return [...rows].sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+    if (sortBy === "instructor") {
+      aValue = a.instructor?.name || "Not assigned";
+      bValue = b.instructor?.name || "Not assigned";
+    }
+    if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+};
+
+const SupervisorCourses = () => {
+  const dispatch = useDispatch();
+  const user_id = useSelector((state) => state.auth.user_id);
+  const {
+    userCourses: { tracks, track_courses: courses },
+    status: { fetchCoursesLoading, fetchCoursesError, reassignInstructorLoading },
+  } = useSelector((state) => state.courses);
+  const {
+    instructors,
+    loading: instructorsLoading,
+    error: instructorsError,
+  } = useSelector((state) => state.supervisors);
+
+  // State management
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [selectedInstructorId, setSelectedInstructorId] = useState("");
+  const [selectedTrackId, setSelectedTrackId] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [selectedTrack, setSelectedTrack] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedInstructor, setSelectedInstructor] = useState("");
+  const [sortBy, setSortBy] = useState("trackName");
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  // Fetch data
+  useEffect(() => {
+    if (user_id) {
+      dispatch(fetchCourses(user_id));
+    }
+    dispatch(fetchInstructors());
+  }, [dispatch, user_id]);
+
+  // Set instructor ID when editing course
+  useEffect(() => {
+    if (editingCourse) {
+      setSelectedInstructorId(editingCourse.instructor?.id || "");
+    }
+  }, [editingCourse]);
+
+  // Handlers
+  const handleEditClick = (course, trackName) => {
+    const track = tracks.find((t) => t.name === trackName);
+    setEditingCourse(course);
+    setSelectedTrackId(track?.id || null);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!selectedInstructorId) {
+      setSnackbar({
+        open: true,
+        message: "Please select an instructor",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!selectedTrackId) {
+      setSnackbar({
+        open: true,
+        message: "Track ID is missing",
+        severity: "error",
+      });
+      return;
+    }
+
+    try {
+      console.log('Dispatching reassignInstructor:', {
+        courseId: editingCourse.id,
+        instructorId: selectedInstructorId,
+        trackId: selectedTrackId,
+      });
+      const response = await dispatch(
+        reassignInstructor({
+          courseId: editingCourse.id,
+          instructorId: selectedInstructorId,
+          trackId: selectedTrackId,
+        })
+      ).unwrap();
+      dispatch(fetchCourses(user_id)); // Refetch courses
+      console.log('Reassign instructor success:', response);
+      setSnackbar({
+        open: true,
+        message: response.detail,
+        severity: "success",
+      });
+      setEditingCourse(null);
+      setSelectedTrackId(null);
+    } catch (error) {
+      console.error('Reassign instructor failed:', error);
+      setSnackbar({
+        open: true,
+        message: error,
+        severity: "error",
+      });
+    }
+  };
+
+  const handleModalClose = () => {
+    setEditingCourse(null);
+    setSelectedTrackId(null);
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const handleSort = (columnId) => {
+    const isAsc = sortBy === columnId && sortOrder === "asc";
+    setSortBy(columnId);
+    setSortOrder(isAsc ? "desc" : "asc");
+  };
+
+  const handleTrackFilterChange = (event) => {
+    setSelectedTrack(event.target.value);
+  };
+
+  const handleCourseFilterChange = (event) => {
+    setSelectedCourse(event.target.value);
+  };
+
+  const handleInstructorFilterChange = (event) => {
+    setSelectedInstructor(event.target.value);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedTrack("");
+    setSelectedCourse("");
+    setSelectedInstructor("");
+  };
+
+  // Filter and prepare rows
+  const trackNames = useMemo(
+    () => [...new Set(tracks?.map((track) => track.name) || [])].sort(),
+    [tracks]
+  );
+  const courseNames = useMemo(
+    () => [...new Set(courses?.map((course) => course.name) || [])].sort(),
+    [courses]
+  );
+  const instructorNames = useMemo(
+    () =>
+      [...new Set(instructors?.map((instructor) => instructor.full_name) || [])].sort(),
+    [instructors]
+  );
+
+  const filteredRows = useMemo(() => {
+    const uniqueRows = new Map(); // Track unique course-track pairs
+    tracks?.forEach((track) => {
+      const filteredCourses = courses
+        ?.filter((course) => course?.tracks?.some((t) => t.id === track.id))
+        ?.filter((course) => {
+          const matchesTrack = selectedTrack ? track.name === selectedTrack : true;
+          const matchesCourse = selectedCourse ? course.name === selectedCourse : true;
+          const matchesInstructor = selectedInstructor
+            ? course.instructor?.name === selectedInstructor
+            : true;
+          return matchesTrack && matchesCourse && matchesInstructor;
+        })
+        ?.map((course) => ({
+          trackName: track.name,
+          courseName: course.name,
+          instructor: course.instructor,
+          courseId: course.id,
+          trackId: track.id,
+        }));
+
+      // Add only unique course-track pairs
+      filteredCourses.forEach((row) => {
+        const key = `${row.courseId}-${track.id}`;
+        if (!uniqueRows.has(key)) {
+          uniqueRows.set(key, row);
+        }
+      });
+    });
+
+    const result = Array.from(uniqueRows.values());
+    console.log("Filtered rows:", result);
+    return result;
+  }, [tracks, courses, selectedTrack, selectedCourse, selectedInstructor]);
+
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows, sortBy, sortOrder),
+    [filteredRows, sortBy, sortOrder]
+  );
+
+  // Loading state
+  if (fetchCoursesLoading || instructorsLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
+        <Box sx={{ width: "100%", maxWidth: "1200px" }}>
+          <Skeleton variant="rectangular" height={60} sx={{ mb: 2, borderRadius: 2 }} />
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={3}>
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
+            </Grid>
+          </Grid>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} variant="rectangular" height={40} sx={{ mb: 1, borderRadius: 2 }} />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (fetchCoursesError || instructorsError) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
+        <Alert severity="error" sx={{ mb: 2, maxWidth: "600px" }}>
+          {fetchCoursesError || instructorsError}
+        </Alert>
+        <Button
+          variant="contained"
+          onClick={() => {
+            if (fetchCoursesError) dispatch(fetchCourses(user_id));
+            if (instructorsError) dispatch(fetchInstructors());
+          }}
+          sx={{ bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, borderRadius: 2 }}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+
+  // Empty data state
+  if (!tracks?.length && !courses?.length) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
+        <Typography variant="h6" sx={{ mb: 2, color: "#64748b" }}>
+          No tracks or courses available
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() => dispatch(fetchCourses(user_id))}
+          sx={{ bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, borderRadius: 2 }}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 3, bgcolor: "#f4f6f8", minHeight: "100vh" }}>
+      <Typography
+        variant="h4"
+        sx={{ fontWeight: 700, color: "#1e3a8a", mb: 2, textAlign: "center" }}
+      >
+        My Tracks and Courses
+      </Typography>
+
+      {/* Filters */}
+      <Grid container spacing={3} sx={{ mb: 3, maxWidth: "1200px", mx: "auto" }}>
+        <Grid item xs={12} md={3}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Track</InputLabel>
+            <Select
+              value={selectedTrack}
+              onChange={handleTrackFilterChange}
+              label="Track"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Tracks</em></MenuItem>
+              {trackNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Course</InputLabel>
+            <Select
+              value={selectedCourse}
+              onChange={handleCourseFilterChange}
+              label="Course"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Courses</em></MenuItem>
+              {courseNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Instructor</InputLabel>
+            <Select
+              value={selectedInstructor}
+              onChange={handleInstructorFilterChange}
+              label="Instructor"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Instructors</em></MenuItem>
+              {instructorNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleResetFilters}
+            sx={{
+              height: "56px",
+              bgcolor: "#3b82f6",
+              "&:hover": { bgcolor: "#2563eb" },
+              borderRadius: 2,
+            }}
+          >
+            Reset Filters
+          </Button>
+        </Grid>
+      </Grid>
+
+      {/* Table */}
+      <StyledPaper sx={{ maxWidth: "1200px", mx: "auto" }}>
+        <TableContainer sx={{ maxHeight: "calc(100vh - 300px)" }}>
+          <Table stickyHeader aria-label="tracks and courses table">
+            <TableHead>
+              <TableRow>
+                {[
+                  { id: "trackName", label: "Track Name", minWidth: 150 },
+                  { id: "courseName", label: "Course Name", minWidth: 150 },
+                  { id: "instructor", label: "Instructor", minWidth: 150 },
+                  { id: "actions", label: "Actions", minWidth: 120, align: "right" },
+                ].map((column) => (
+                  <StyledTableCell
+                    key={column.id}
+                    align={column.align || "left"}
+                    sx={{ minWidth: column.minWidth, cursor: column.id !== "actions" ? "pointer" : "default" }}
+                    onClick={column.id !== "actions" ? () => handleSort(column.id) : undefined}
+                  >
+                    {column.label}
+                    {sortBy === column.id && column.id !== "actions" && (
+                      <Box component="span" sx={{ ml: 1 }}>
+                        {sortOrder === "asc" ? "↑" : "↓"}
+                      </Box>
+                    )}
+                  </StyledTableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sortedRows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body1" sx={{ color: "#64748b" }}>
+                      No tracks or courses found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedRows.map((row, index) => (
+                  <StyledTableRow key={`${row.courseId}-${row.trackName}-${index}`}>
+                    <TableCell sx={{ p: 2 }}>{row.trackName}</TableCell>
+                    <TableCell sx={{ p: 2 }}>{row.courseName}</TableCell>
+                    <TableCell sx={{ p: 2 }}>
+                      {row.instructor?.name || "Not assigned"}
+                    </TableCell>
+                    <TableCell align="right" sx={{ p: 2 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() =>
+                          handleEditClick(
+                            courses.find((c) => c.id === row.courseId),
+                            row.trackName
+                          )
+                        }
+                        disabled={instructorsLoading || reassignInstructorLoading}
+                        sx={{
+                          borderColor: "#3b82f6",
+                          color: "#3b82f6",
+                          "&:hover": { borderColor: "#2563eb", color: "#2563eb" },
+                          borderRadius: 2,
+                        }}
+                      >
+                        Assign Instructor
+                      </Button>
+                    </TableCell>
+                  </StyledTableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </StyledPaper>
+
+      {/* Edit Course Modal */}
+      <Modal
+        open={!!editingCourse}
+        onClose={handleModalClose}
+        aria-labelledby="edit-course-modal"
+        aria-describedby="edit-course-modal-description"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: { xs: "90%", sm: 400 },
+            bgcolor: "background.paper",
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            Assign Instructor for: {editingCourse?.name}
+          </Typography>
+
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel id="instructor-select-label">Instructor</InputLabel>
+            <Select
+              labelId="instructor-select-label"
+              value={selectedInstructorId}
+              onChange={(e) => setSelectedInstructorId(e.target.value)}
+              label="Instructor"
+              sx={{ borderRadius: 2 }}
+              disabled={reassignInstructorLoading}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {instructors?.map((instructor) => (
+                <MenuItem key={instructor.id} value={instructor.id}>
+                  {instructor.full_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button
+              variant="outlined"
+              onClick={handleModalClose}
+              sx={{ mr: 2, borderColor: "#64748b", color: "#64748b", borderRadius: 2 }}
+              disabled={reassignInstructorLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveChanges}
+              disabled={!selectedInstructorId || reassignInstructorLoading}
+              startIcon={reassignInstructorLoading ? <CircularProgress size={20} color="inherit" /> : null}
+              sx={{
+                bgcolor: "#3b82f6",
+                "&:hover": { bgcolor: "#2563eb" },
+                borderRadius: 2,
+              }}
+            >
+              Save Changes
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
+      {/* Snackbar for success/error */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default SupervisorCourses;
