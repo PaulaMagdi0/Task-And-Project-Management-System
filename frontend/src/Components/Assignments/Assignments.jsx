@@ -29,12 +29,17 @@ import {
   AccordionSummary,
   AccordionDetails,
   MenuItem,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Warning as WarningIcon,
   GetApp as DownloadIcon,
+  Clear as ClearIcon,
 } from "@mui/icons-material";
 
 const Assignments = () => {
@@ -56,10 +61,43 @@ const Assignments = () => {
     message: "",
     severity: "success",
   });
+  // Filter states
+  const [filterType, setFilterType] = useState("");
+  const [filterDueDateStart, setFilterDueDateStart] = useState("");
+  const [filterDueDateEnd, setFilterDueDateEnd] = useState("");
+  const [filterTrackCourse, setFilterTrackCourse] = useState("");
 
   useEffect(() => {
     if (user_id) dispatch(fetchAssignments(user_id));
   }, [dispatch, user_id]);
+
+  // Filter assignments based on user input
+  const filteredAssignments = assignments.filter((assignment) => {
+    const dueDate = new Date(assignment.due_date);
+    const startDate = filterDueDateStart ? new Date(filterDueDateStart) : null;
+    const endDate = filterDueDateEnd ? new Date(filterDueDateEnd) : null;
+
+    return (
+      (!filterType || assignment.assignment_type === filterType) &&
+      (!startDate || dueDate >= startDate) &&
+      (!endDate || dueDate <= endDate) &&
+      (!filterTrackCourse ||
+        assignment.track_name
+          .toLowerCase()
+          .includes(filterTrackCourse.toLowerCase()) ||
+        assignment.course_name
+          .toLowerCase()
+          .includes(filterTrackCourse.toLowerCase()))
+    );
+  });
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setFilterType("");
+    setFilterDueDateStart("");
+    setFilterDueDateEnd("");
+    setFilterTrackCourse("");
+  };
 
   // Accordion toggle handler
   const handleAccordionToggle = (assignmentId) => {
@@ -169,6 +207,80 @@ const Assignments = () => {
         Assignments
       </Typography>
 
+      {/* Filter Section */}
+      <Box
+        sx={{
+          mb: 3,
+          p: 2,
+          bgcolor: "background.paper",
+          borderRadius: 2,
+          boxShadow: 1,
+        }}
+      >
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Filters
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={3}>
+            <FormControl fullWidth variant="outlined">
+              <InputLabel>Assignment Type</InputLabel>
+              <Select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                label="Assignment Type"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="task">Task</MenuItem>
+                <MenuItem value="project">Project</MenuItem>
+                <MenuItem value="exam">Exam</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              type="date"
+              label="Due Date (Start)"
+              value={filterDueDateStart}
+              onChange={(e) => setFilterDueDateStart(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              type="date"
+              label="Due Date (End)"
+              value={filterDueDateEnd}
+              onChange={(e) => setFilterDueDateEnd(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              label="Track or Course"
+              value={filterTrackCourse}
+              onChange={(e) => setFilterTrackCourse(e.target.value)}
+              placeholder="Enter track or course name"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Button
+              variant="outlined"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+              sx={{ mt: 1 }}
+            >
+              Clear Filters
+            </Button>
+          </Grid>
+        </Grid>
+      </Box>
+
       <Snackbar
         open={alert.open}
         autoHideDuration={6000}
@@ -251,10 +363,9 @@ const Assignments = () => {
           </TableHead>
 
           <TableBody>
-            {assignments.map((assignment) => (
+            {filteredAssignments.map((assignment) => (
               <React.Fragment key={assignment.id}>
                 <TableRow hover>
-                  {/* Existing table cells */}
                   <TableCell sx={{ textAlign: "center" }}>
                     {assignment.title}
                   </TableCell>
@@ -300,11 +411,8 @@ const Assignments = () => {
                   </TableCell>
                 </TableRow>
 
-                {/* Updated Accordion Section */}
                 <TableRow>
                   <TableCell colSpan={7} sx={{ p: 0 }}>
-                    {" "}
-                    {/* Updated colSpan to 7 */}
                     <Accordion
                       expanded={expandedAssignment === assignment.id}
                       sx={{
@@ -327,7 +435,6 @@ const Assignments = () => {
                             bgcolor: "background.paper",
                           }}
                         >
-                          {/* Form Fields */}
                           <Box
                             sx={{
                               display: "grid",
@@ -486,6 +593,12 @@ const Assignments = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {filteredAssignments.length === 0 && (
+        <Typography variant="body1" sx={{ mt: 2, textAlign: "center" }}>
+          No assignments match the applied filters.
+        </Typography>
+      )}
     </Box>
   );
 };
