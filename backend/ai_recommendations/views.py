@@ -75,7 +75,7 @@ def recommend_based_on_brief(brief_description, top_n=3):
 
 def get_recommendations(request):
     method_choice = request.GET.get("method_choice", "1")  # "1" for Course+Difficulty, "2" for Brief Description
-    top_n = int(request.GET.get("top_n", 3))  # Allow passing top_n optionally
+    top_n = int(request.GET.get("top_n", 4))  # Allow passing top_n optionally
 
     if method_choice == "1":
         course_name = request.GET.get("course_name", "Java")

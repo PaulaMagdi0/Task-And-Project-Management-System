@@ -1299,7 +1299,7 @@ const CreateAssignment = () => {
                     sx={{ fontSize: "0.875rem" }}
                   >
                     <MenuItem value="1" sx={{ fontSize: "0.875rem" }}>
-                      Your Course 
+                      Latest Assignments Created
                     </MenuItem>
                     <MenuItem value="2" sx={{ fontSize: "0.875rem" }}>
                       Brief Description
