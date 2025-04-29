@@ -43,6 +43,34 @@ export const createCourse = createAsyncThunk(
   }
 );
 
+// Update a course
+export const updateCourse = createAsyncThunk(
+  'courses/updateCourse',
+  async ({ courseId, ...courseData }, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.patch(`/courses/${courseId}/`, courseData);
+      return response.data;
+    } catch (error) {
+      console.error('updateCourse error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Failed to update course');
+    }
+  }
+);
+
+// Delete a course
+export const deleteCourse = createAsyncThunk(
+  'courses/deleteCourse',
+  async (courseId, { rejectWithValue }) => {
+    try {
+      await apiClient.delete(`/courses/${courseId}/`);
+      return courseId; // Return courseId for state update
+    } catch (error) {
+      console.error('deleteCourse error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Failed to delete course');
+    }
+  }
+);
+
 // Reassign instructor for a course
 export const reassignInstructor = createAsyncThunk(
   'courses/reassignInstructor',
@@ -104,12 +132,16 @@ const coursesSlice = createSlice({
       fetchCoursesLoading: false,
       fetchAllCoursesLoading: false,
       createCourseLoading: false,
+      updateCourseLoading: false,
+      deleteCourseLoading: false,
       reassignInstructorLoading: false,
       assignCourseToTrackLoading: false,
       removeCourseFromTrackLoading: false,
       fetchCoursesError: null,
       fetchAllCoursesError: null,
       createCourseError: null,
+      updateCourseError: null,
+      deleteCourseError: null,
       reassignInstructorError: null,
       assignCourseToTrackError: null,
       removeCourseFromTrackError: null,
@@ -122,6 +154,8 @@ const coursesSlice = createSlice({
       state.status.fetchCoursesError = null;
       state.status.fetchAllCoursesError = null;
       state.status.createCourseError = null;
+      state.status.updateCourseError = null;
+      state.status.deleteCourseError = null;
       state.status.reassignInstructorError = null;
       state.status.assignCourseToTrackError = null;
       state.status.removeCourseFromTrackError = null;
@@ -177,6 +211,40 @@ const coursesSlice = createSlice({
       .addCase(createCourse.rejected, (state, action) => {
         state.status.createCourseLoading = false;
         state.status.createCourseError = action.payload;
+      })
+      // Update course
+      .addCase(updateCourse.pending, (state) => {
+        state.status.updateCourseLoading = true;
+        state.status.updateCourseError = null;
+        state.status.success = null;
+      })
+      .addCase(updateCourse.fulfilled, (state, action) => {
+        state.status.updateCourseLoading = false;
+        state.allCourses = state.allCourses.map((course) =>
+          course.id === action.payload.id ? action.payload : course
+        );
+        state.status.success = 'Course updated successfully!';
+        console.log('updateCourse fulfilled:', action.payload);
+      })
+      .addCase(updateCourse.rejected, (state, action) => {
+        state.status.updateCourseLoading = false;
+        state.status.updateCourseError = action.payload;
+      })
+      // Delete course
+      .addCase(deleteCourse.pending, (state) => {
+        state.status.deleteCourseLoading = true;
+        state.status.deleteCourseError = null;
+        state.status.success = null;
+      })
+      .addCase(deleteCourse.fulfilled, (state, action) => {
+        state.status.deleteCourseLoading = false;
+        state.allCourses = state.allCourses.filter((course) => course.id !== action.payload);
+        state.status.success = 'Course deleted successfully!';
+        console.log('deleteCourse fulfilled:', action.payload);
+      })
+      .addCase(deleteCourse.rejected, (state, action) => {
+        state.status.deleteCourseLoading = false;
+        state.status.deleteCourseError = action.payload;
       })
       // Reassign instructor
       .addCase(reassignInstructor.pending, (state) => {
@@ -240,7 +308,6 @@ const coursesSlice = createSlice({
       .addCase(removeCourseFromTrack.fulfilled, (state, action) => {
         state.status.removeCourseFromTrackLoading = false;
         state.status.success = action.payload.detail || 'Course removed from track successfully!';
-        // Update userCourses to reflect removal
         const courseIndex = state.userCourses.track_courses.findIndex(
           (course) => course.id === action.meta.arg.courseId
         );

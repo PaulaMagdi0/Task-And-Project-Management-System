@@ -23,41 +23,36 @@ import {
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  updateStudent,
-  deleteStudent,
-  clearStudentsState,
-} from '../../redux/studentsSlice';
-import { fetchStudentsByStaff } from '../../redux/staffSlice';
+  fetchAllCourses,
+  updateCourse,
+  deleteCourse,
+  clearCourseStatus,
+} from '../../redux/coursesSlice';
+import { fetchInstructors } from '../../redux/supervisorsSlice';
 
 const AllCourseManagement = () => {
   const dispatch = useDispatch();
-  const { studentsByStaff: students, studentsLoading: loading, studentsError: error, message } = useSelector((state) => state.staff);
+  const { allCourses, status: { fetchAllCoursesLoading: loading, fetchAllCoursesError: error, success: message } } = useSelector((state) => state.courses);
+  const { instructors } = useSelector((state) => state.supervisors);
   const { user_id } = useSelector((state) => state.auth);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
-    studentId: null,
-    username: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    track: '',
-    branch: ''
+    courseId: null,
+    name: '',
+    description: '',
+    instructor: '',
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [studentToDelete, setStudentToDelete] = useState(null);
+  const [courseToDelete, setCourseToDelete] = useState(null);
   const [localError, setLocalError] = useState('');
-  const [selectedTrack, setSelectedTrack] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('');
   const [searchName, setSearchName] = useState('');
 
-  // Fetch students by staff on mount
+  // Fetch courses and instructors on mount
   useEffect(() => {
-    if (user_id) {
-      dispatch(fetchStudentsByStaff(user_id));
-    }
-  }, [dispatch, user_id]);
+    dispatch(fetchAllCourses());
+    dispatch(fetchInstructors());
+  }, [dispatch]);
 
   // Handle error state
   useEffect(() => {
@@ -68,80 +63,55 @@ const AllCourseManagement = () => {
   // Clear success message after 3 seconds
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(() => dispatch(clearStudentsState()), 3000);
+      const timer = setTimeout(() => dispatch(clearCourseStatus()), 3000);
       return () => clearTimeout(timer);
     }
   }, [message, dispatch]);
 
-  const openEditDialog = (student) => {
+  const openEditDialog = (course) => {
     setEditData({
-      studentId: student.id,
-      username: student.username,
-      firstName: student.first_name,
-      lastName: student.last_name,
-      email: student.email,
-      password: '',
-      track: student.track?.name || '',
-      branch: student.branch?.name || '',
+      courseId: course.id,
+      name: course.name,
+      description: course.description,
+      instructor: course.instructor || '',
     });
     setEditDialogOpen(true);
   };
+
   const handleEditChange = async () => {
-    const { studentId, username, firstName, lastName, email, password, track, branch } = editData;
-  
-    // Validate only the fields that have been changed
-    if (!username && !firstName && !lastName && !email && !track && !branch && !password) {
-      setLocalError('At least one field must be changed.');
+    const { courseId, name, description, instructor } = editData;
+
+    // Validate required fields
+    if (!name) {
+      setLocalError('Course name is required.');
       return;
     }
-  
-    if (password && password.length < 6) {
-      setLocalError('Password must be at least 6 characters long.');
-      return;
-    }
-  
+
     try {
-      const updatedData = {};
-  
-      // Only include fields that were changed
-      if (username) updatedData.username = username;
-      if (firstName) updatedData.firstName = firstName;
-      if (lastName) updatedData.lastName = lastName;
-      if (email) updatedData.email = email;
-      if (password) updatedData.password = password;
-      if (track) updatedData.track = track;
-      if (branch) updatedData.branch = branch;
-  
-      await dispatch(updateStudent({ studentId, ...updatedData })).unwrap();
-  
+      const updatedData = { name, description };
+      if (instructor) updatedData.instructor = instructor;
+
+      await dispatch(updateCourse({ courseId, ...updatedData })).unwrap();
       setEditDialogOpen(false);
-      dispatch(fetchStudentsByStaff(user_id));
+      dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err || 'Failed to update student.');
+      setLocalError(err || 'Failed to update course.');
     }
   };
-  
+
   const openDeleteDialog = (id) => {
-    setStudentToDelete(id);
+    setCourseToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
     try {
-      await dispatch(deleteStudent(studentToDelete)).unwrap();
+      await dispatch(deleteCourse(courseToDelete)).unwrap();
       setDeleteDialogOpen(false);
-      dispatch(fetchStudentsByStaff(user_id));
+      dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err || 'Failed to delete student.');
+      setLocalError(err || 'Failed to delete course.');
     }
-  };
-
-  const handleTrackFilterChange = (event) => {
-    setSelectedTrack(event.target.value);
-  };
-
-  const handleBranchFilterChange = (event) => {
-    setSelectedBranch(event.target.value);
   };
 
   const handleNameSearchChange = (event) => {
@@ -149,63 +119,30 @@ const AllCourseManagement = () => {
   };
 
   const handleResetFilters = () => {
-    setSelectedTrack('');
-    setSelectedBranch('');
     setSearchName('');
   };
 
-  // Compute unique tracks and branches
-  const trackNames = useMemo(
-    () => [...new Set(students?.map((student) => student.track?.name).filter(Boolean))].sort(),
-    [students]
-  );
-  const branchNames = useMemo(
-    () => [...new Set(students?.map((student) => student.branch?.name).filter(Boolean))].sort(),
-    [students]
-  );
-
-  // Filter students
-  const filteredStudents = useMemo(() => {
-    if (!students) return [];
-    return students.filter((student) => {
-      const matchesTrack = selectedTrack ? student.track?.name === selectedTrack : true;
-      const matchesBranch = selectedBranch ? student.branch?.name === selectedBranch : true;
-      const matchesName = searchName
-        ? `${student.first_name} ${student.last_name}`
-            .toLowerCase()
-            .includes(searchName.toLowerCase())
-        : true;
-      return matchesTrack && matchesBranch && matchesName;
-    });
-  }, [students, selectedTrack, selectedBranch, searchName]);
+  // Filter courses
+  const filteredCourses = useMemo(() => {
+    if (!allCourses) return [];
+    return allCourses.filter((course) =>
+      searchName
+        ? course.name.toLowerCase().includes(searchName.toLowerCase())
+        : true
+    );
+  }, [allCourses, searchName]);
 
   return (
     <Box sx={{ p: 4, bgcolor: '#f4f6f8' }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#1e3a8a', textAlign: 'center' }}>
-        Manage Students
+        Manage Courses
       </Typography>
 
       {/* Filters and Search */}
       <Grid container spacing={3} sx={{ mb: 3, maxWidth: '1200px', mx: 'auto' }}>
         <Grid item xs={12} sm={4}>
-          <FormControl variant="outlined" fullWidth>
-            <InputLabel>Track</InputLabel>
-            <Select
-              value={selectedTrack}
-              onChange={handleTrackFilterChange}
-              label="Track"
-              sx={{ borderRadius: 2 }}
-            >
-              <MenuItem value=""><em>All Tracks</em></MenuItem>
-              {trackNames.map((name) => (
-                <MenuItem key={name} value={name}>{name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12} sm={4}>
           <TextField
-            label="Search by Name"
+            label="Search by Course Name"
             fullWidth
             value={searchName}
             onChange={handleNameSearchChange}
@@ -225,7 +162,7 @@ const AllCourseManagement = () => {
               borderRadius: 2,
             }}
           >
-            Reset Filters
+            Reset Filter
           </Button>
         </Grid>
       </Grid>
@@ -245,42 +182,38 @@ const AllCourseManagement = () => {
 
       <Paper sx={{ p: 2, maxWidth: '1200px', mx: 'auto', borderRadius: 2, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
         <Typography variant="h6" gutterBottom>
-          Student List
+          Course List
         </Typography>
 
         {loading ? (
           <Typography>Loading...</Typography>
-        ) : filteredStudents.length > 0 ? (
+        ) : filteredCourses.length > 0 ? (
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>First Name</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Last Name</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Track</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Instructor</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Description</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredStudents.map((student) => (
-                <TableRow key={student.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                  <TableCell>{student.id}</TableCell>
-                  <TableCell>{student.username}</TableCell>
-                  <TableCell>{student.first_name}</TableCell>
-                  <TableCell>{student.last_name}</TableCell>
-                  <TableCell>{student.email}</TableCell>
-                  <TableCell>{student.track?.name}</TableCell>
+              {filteredCourses.map((course) => (
+                <TableRow key={course.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                  <TableCell>{course.id}</TableCell>
+                  <TableCell>{course.name}</TableCell>
+                  <TableCell>{course.instructor_name || 'Not assigned'}</TableCell>
+                  <TableCell>{course.description || '-'}</TableCell>
                   <TableCell>
-                    <Button size="small" onClick={() => openEditDialog(student)}>
+                    <Button size="small" onClick={() => openEditDialog(course)}>
                       Edit
                     </Button>
                     <Button
                       size="small"
                       color="error"
                       sx={{ ml: 1 }}
-                      onClick={() => openDeleteDialog(student.id)}
+                      onClick={() => openDeleteDialog(course.id)}
                     >
                       Delete
                     </Button>
@@ -290,56 +223,44 @@ const AllCourseManagement = () => {
             </TableBody>
           </Table>
         ) : (
-          <Typography>No students found</Typography>
+          <Typography>No courses found</Typography>
         )}
       </Paper>
-      
+
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-        <DialogTitle>Edit Student</DialogTitle>
+        <DialogTitle>Edit Course</DialogTitle>
         <DialogContent>
           <TextField
-            label="First Name"
+            label="Course Name"
             variant="outlined"
             fullWidth
-            value={editData.firstName}
-            onChange={(e) => setEditData({ ...editData, firstName: e.target.value })}
-            sx={{ mb: 2 }}
+            value={editData.name}
+            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+            sx={{ mb: 2, mt: 1 }}
           />
           <TextField
-            label="Last Name"
+            label="Description"
             variant="outlined"
             fullWidth
-            value={editData.lastName}
-            onChange={(e) => setEditData({ ...editData, lastName: e.target.value })}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            label="Email"
-            variant="outlined"
-            fullWidth
-            value={editData.email}
-            onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            label="Password"
-            variant="outlined"
-            fullWidth
-            type="password"
-            value={editData.password}
-            onChange={(e) => setEditData({ ...editData, password: e.target.value })}
+            multiline
+            rows={4}
+            value={editData.description}
+            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
             sx={{ mb: 2 }}
           />
           <FormControl variant="outlined" fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Track</InputLabel>
+            <InputLabel>Instructor</InputLabel>
             <Select
-              value={editData.track}
-              onChange={(e) => setEditData({ ...editData, track: e.target.value })}
-              label="Track"
+              value={editData.instructor}
+              onChange={(e) => setEditData({ ...editData, instructor: e.target.value })}
+              label="Instructor"
             >
-              {trackNames.map((name) => (
-                <MenuItem key={name} value={name}>{name}</MenuItem>
+              <MenuItem value=""><em>Not assigned</em></MenuItem>
+              {instructors.map((instructor) => (
+                <MenuItem key={instructor.id} value={instructor.id}>
+                  {instructor.full_name || instructor.username}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -353,12 +274,12 @@ const AllCourseManagement = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Delete Student</DialogTitle>
+        <DialogTitle>Delete Course</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete this student?</Typography>
+          <Typography>Are you sure you want to delete this course?</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} color="primary">

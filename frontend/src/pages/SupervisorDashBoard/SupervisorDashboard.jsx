@@ -30,6 +30,7 @@ import ChatRoomView from '../../Components/Chat/ChatRoomView';
 import ChatRoomList from '../../Components/Chat/ChatRoomList';
 import Tracks from '../../Components/Tracks/Tracks';
 import ReassignInstructor from '../../Components/ReAssignCourse/ReAssignCourse';
+import AllCourseManagement from '../../Components/AllCourseManagement/AllCourseManagement';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -48,10 +49,11 @@ const SupervisorDashboard = () => {
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
     { text: 'Course Management', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
+    { text: 'AllCourseManagement', icon: <FiBook />, path: '/supervisor/dashboard/all-course-management' },
     { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
     { text: "Grades",icon : <FiAward/>,path:"/supervisor/dashboard/Grades"},
     { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
-
+    
   ];
 
   return (
@@ -103,10 +105,10 @@ const SupervisorDashboard = () => {
             <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
-            <Route path="addcourses" element={<AddCourses />} />
+            <Route path="all-course-management" element={<AllCourseManagement />} />
+            <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="Grades" element={<Grades />} />
             <Route path="ReAssignCourse" element={<ReassignInstructor />} />
-
             {/* Chat routes */}
             <Route path="chat" element={<ChatRoomList />} />
             <Route path="chat/rooms/:roomId" element={<ChatRoomView />} />
