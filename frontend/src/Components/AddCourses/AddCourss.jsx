@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Button, Card, Typography, TextField, Divider, Grid, CircularProgress,
-  Snackbar, Alert, FormControl, Autocomplete, Tabs, Tab, Skeleton
+  Snackbar, Alert, FormControl, Autocomplete, Tabs, Tab, Skeleton,
+  Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { styled } from '@mui/material/styles';
@@ -41,6 +42,30 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
   },
 }));
 
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  borderRadius: '12px',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+  backgroundColor: '#ffffff',
+  marginTop: theme.spacing(3),
+}));
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  fontWeight: 600,
+  backgroundColor: theme.palette.grey[100],
+  padding: theme.spacing(1.5),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
+
+const StyledTableRow = styled(TableRow)(() => ({
+  '&:nth-of-type(odd)': {
+    backgroundColor: '#f8fafc',
+  },
+  '&:hover': {
+    backgroundColor: '#f1f5f9',
+    transition: 'background-color 0.2s ease-in-out',
+  },
+}));
+
 const AddCourses = () => {
   const dispatch = useDispatch();
   const { user_id } = useSelector((state) => state.auth);
@@ -72,11 +97,11 @@ const AddCourses = () => {
     tracks: [],
   });
   const [assignCourseForm, setAssignCourseForm] = useState({
-      selectedCourse: null,
-      selectedTrack: null,
-      selectedOption:null
-});
-console.log(assignCourseForm.selectedOption);
+    selectedCourse: null,
+    selectedTrack: null,
+    selectedOption: null
+  });
+  console.log('Assign Course Form:', assignCourseForm);
   const [formErrors, setFormErrors] = useState({
     name: '',
     description: '',
@@ -121,7 +146,7 @@ console.log(assignCourseForm.selectedOption);
       }
     };
     fetchData();
-}, [dispatch, user_id, retryCount]);
+  }, [dispatch, user_id, retryCount]);
 
   // Form validation
   const validateForm = useCallback(() => {
@@ -160,7 +185,7 @@ console.log(assignCourseForm.selectedOption);
       setNewCourseForm({ name: '', description: '', instructor: null, tracks: [] });
       setFormErrors({ name: '', description: '' });
     } else {
-      setAssignCourseForm({ selectedCourse: null, selectedTrack: null,selectedOption:null });
+      setAssignCourseForm({ selectedCourse: null, selectedTrack: null, selectedOption: null });
     }
   }, [tabIndex]);
 
@@ -201,7 +226,7 @@ console.log(assignCourseForm.selectedOption);
 
   const handleAssignCourseToTrack = useCallback(async () => {
     if (!assignCourseForm.selectedCourse || !assignCourseForm.selectedTrack || !assignCourseForm.selectedOption) {
-      setSnackbar({ open: true, message: 'Please select a course and track', severity: 'error' });
+      setSnackbar({ open: true, message: 'Please select a course, track, and option', severity: 'error' });
       return;
     }
 
@@ -211,7 +236,6 @@ console.log(assignCourseForm.selectedOption);
         courseId: assignCourseForm.selectedCourse.id,
         trackId: assignCourseForm.selectedTrack.id,
         optionId: assignCourseForm.selectedOption.id,
-
       })).unwrap();
       console.log('Course assigned:', response);
       setSnackbar({ open: true, message: 'Course assigned to track successfully!', severity: 'success' });
@@ -230,26 +254,30 @@ console.log(assignCourseForm.selectedOption);
   const instructorOptions = useMemo(() => instructors || [], [instructors]);
   const trackOptions = useMemo(() => userCourses?.tracks || [], [userCourses]);
   const courseOptions = useMemo(() => allCourses || [], [allCourses]);
-  const CreateOptions =[{name:"As Existing",value:"notNull",id:0},{name:"As Form",value:"Null",id:1}]
+  const CreateOptions = [
+    { name: "As Existing", value: "notNull", id: 0 },
+    { name: "As Form", value: "Null", id: 1 }
+  ];
+
   // Log state for debugging
   console.log('State:', {
     instructors: instructorOptions,
     tracks: trackOptions,
     courses: courseOptions,
-    options:CreateOptions,
+    options: CreateOptions,
     loading: { fetchCoursesLoading, fetchAllCoursesLoading, instructorsLoading },
     errors: { fetchCoursesError, fetchAllCoursesError, instructorsError },
   });
-  
+
   // Combined loading state
   const isLoading = fetchCoursesLoading || fetchAllCoursesLoading || instructorsLoading;
-  
+
   // Combined error state
   const hasError = fetchCoursesError || fetchAllCoursesError || instructorsError;
-  
+
   // Combined action loading state
   const isActionLoading = createCourseLoading || assignCourseToTrackLoading || loading;
-  
+
   // Error state
   if (hasError) {
     return (
@@ -459,19 +487,31 @@ console.log(assignCourseForm.selectedOption);
             </Typography>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <Autocomplete
-                    options={courseOptions}
-                    getOptionLabel={(option) => option.name || ''}
-                    value={assignCourseForm.selectedCourse}
-                    onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedCourse: value }))}
-                    renderInput={(params) => <TextField {...params} label="Select Course" />}
-                    disabled={fetchAllCoursesLoading}
-                    noOptionsText="No courses available"
-                  />
-                </FormControl>
+              <FormControl fullWidth>
+                    <Autocomplete
+                      options={courseOptions}
+                      getOptionLabel={(option) => {
+                        // Display course name and instructor name if available
+                        return `${option.name}${option.instructor_name ? ` - ${option.instructor_name}` : ''}`;
+                      }}
+                      value={assignCourseForm.selectedCourse}
+                      onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedCourse: value }))}
+                      renderInput={(params) => <TextField {...params} label="Select Course" />}
+                      disabled={fetchAllCoursesLoading}
+                      noOptionsText="No courses available"
+                      renderOption={(props, option) => (
+                        <li {...props} key={option.id}>
+                          <Box>
+                            <Typography>{option.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.instructor_name || 'No instructor assigned'}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                    />
+                  </FormControl>
               </Grid>
-              
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <Autocomplete
@@ -493,12 +533,11 @@ console.log(assignCourseForm.selectedOption);
                     value={assignCourseForm.selectedOption}
                     onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedOption: value }))}
                     renderInput={(params) => <TextField {...params} label="Select Option" />}
-                    // disabled={fetchAllCoursesLoading}
-                    noOptionsText="No courses available"
+                    disabled={fetchAllCoursesLoading}
+                    noOptionsText="No options available"
                   />
                 </FormControl>
               </Grid>
-              
             </Grid>
             <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
               <StyledButton
@@ -520,6 +559,48 @@ console.log(assignCourseForm.selectedOption);
               >
                 Reset Form
               </StyledButton>
+            </Box>
+
+            {/* Courses Table */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#64748b', mb: 2 }}>
+                Available Courses
+              </Typography>
+              <StyledTableContainer component={Paper}>
+                <Table aria-label="courses table">
+                  <TableHead>
+                    <TableRow>
+                      <StyledTableCell>Course Name</StyledTableCell>
+                      <StyledTableCell>Instructor</StyledTableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {fetchAllCoursesLoading ? (
+                      [...Array(3)].map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell><Skeleton variant="text" /></TableCell>
+                          <TableCell><Skeleton variant="text" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : allCourses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} align="center">
+                          <Typography variant="body2" sx={{ color: '#64748b', py: 2 }}>
+                            No courses available
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      allCourses.map((course) => (
+                        <StyledTableRow key={course.id}>
+                          <TableCell>{course.name}</TableCell>
+                          <TableCell>{course.instructor_name || 'Not assigned'}</TableCell>
+                        </StyledTableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </StyledTableContainer>
             </Box>
           </Box>
         )}

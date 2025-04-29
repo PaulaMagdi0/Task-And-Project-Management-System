@@ -24,6 +24,7 @@ import Grades from '../../Components/Grades/Grades';
 import CreateAssignment from '../../Components/CreateAssignments/CreateAssignments';
 import UploadStudentPage from '../../components/AddStudent';
 import UploadInstructor from '../../Components/AddInstructor/AddInstructor';
+import ManageStudents from "../../Components/ManageStudent/ManageStudent"
 // ** Chat imports **
 import ChatRoomView from '../../Components/Chat/ChatRoomView';
 import ChatRoomList from '../../Components/Chat/ChatRoomList';
@@ -41,12 +42,12 @@ const SupervisorDashboard = () => {
     { text: 'My Tracks', icon: <FiMessageCircle />, path: '/supervisor/dashboard/tracks' },
     { text: 'Tracks Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
     { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
+    { text: 'Student Management', icon: <FiBook />, path: '/supervisor/dashboard/student-management' },
     { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
     { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
-    { text: 'ReassignCourse', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
-
+    { text: 'Course Management', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
     { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
     { text: "Grades",icon : <FiAward/>,path:"/supervisor/dashboard/Grades"},
     { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
@@ -97,6 +98,7 @@ const SupervisorDashboard = () => {
             <Route path="tracks" element={<Tracks />} />
             <Route path="courses" element={<Courses />} />
             <Route path="addstudent" element={<UploadStudentPage />} />
+            <Route path="student-management" element={<ManageStudents />} />
             <Route path="addinstructor" element={<UploadInstructor />} />
             <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="view-assignment" element={<Assignments />} />

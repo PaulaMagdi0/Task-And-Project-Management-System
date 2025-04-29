@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCourses, reassignInstructor } from "../../redux/coursesSlice";
+import { fetchCourses, reassignInstructor, removeCourseFromTrack } from "../../redux/coursesSlice";
 import { fetchInstructors } from "../../redux/supervisorsSlice";
 import {
   Button,
@@ -23,6 +23,12 @@ import {
   Snackbar,
   Grid,
   Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
@@ -72,7 +78,14 @@ const SupervisorCourses = () => {
   const user_id = useSelector((state) => state.auth.user_id);
   const {
     userCourses: { tracks, track_courses: courses },
-    status: { fetchCoursesLoading, fetchCoursesError, reassignInstructorLoading },
+    status: { 
+      fetchCoursesLoading, 
+      fetchCoursesError, 
+      reassignInstructorLoading,
+      removeCourseFromTrackLoading,
+      removeCourseFromTrackError,
+      success
+    },
   } = useSelector((state) => state.courses);
   const {
     instructors,
@@ -90,6 +103,10 @@ const SupervisorCourses = () => {
   const [selectedInstructor, setSelectedInstructor] = useState("");
   const [sortBy, setSortBy] = useState("trackName");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [deletingRows, setDeletingRows] = useState(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteCourseTrack, setDeleteCourseTrack] = useState(null);
+  const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -106,11 +123,63 @@ const SupervisorCourses = () => {
     }
   }, [editingCourse]);
 
+  // Handle success/error messages
+  useEffect(() => {
+    if (success) {
+      setSnackbar({
+        open: true,
+        message: success,
+        severity: "success",
+      });
+      dispatch(fetchCourses(user_id)); // Refetch to update table
+    }
+    if (removeCourseFromTrackError) {
+      setSnackbar({
+        open: true,
+        message: removeCourseFromTrackError,
+        severity: "error",
+      });
+    }
+  }, [success, removeCourseFromTrackError, dispatch, user_id]);
+
   // Handlers
   const handleEditClick = (course, trackName) => {
     const track = tracks.find((t) => t.name === trackName);
     setEditingCourse(course);
     setSelectedTrackId(track?.id || null);
+  };
+
+  const handleDeleteClick = (courseId, trackId, courseName, trackName) => {
+    setDeleteCourseTrack({ courseId, trackId, courseName, trackName });
+    setIsDeleteConfirmed(false); // Reset checkbox
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!isDeleteConfirmed) return;
+
+    const { courseId, trackId } = deleteCourseTrack;
+    const key = `${courseId}-${trackId}`;
+    setDeletingRows((prev) => new Set([...prev, key]));
+    try {
+      console.log('Dispatching removeCourseFromTrack:', { courseId, trackId });
+      await dispatch(removeCourseFromTrack({ courseId, trackId })).unwrap();
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Remove course from track failed:', error);
+    } finally {
+      setDeletingRows((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(key);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false);
+    setDeleteCourseTrack(null);
+    setIsDeleteConfirmed(false);
   };
 
   const handleSaveChanges = async () => {
@@ -138,20 +207,13 @@ const SupervisorCourses = () => {
         instructorId: selectedInstructorId,
         trackId: selectedTrackId,
       });
-      const response = await dispatch(
+      await dispatch(
         reassignInstructor({
           courseId: editingCourse.id,
           instructorId: selectedInstructorId,
           trackId: selectedTrackId,
         })
       ).unwrap();
-      dispatch(fetchCourses(user_id)); // Refetch courses
-      console.log('Reassign instructor success:', response);
-      setSnackbar({
-        open: true,
-        message: response.detail,
-        severity: "success",
-      });
       setEditingCourse(null);
       setSelectedTrackId(null);
     } catch (error) {
@@ -171,6 +233,7 @@ const SupervisorCourses = () => {
 
   const handleSnackbarClose = () => {
     setSnackbar({ ...snackbar, open: false });
+    dispatch(clearCourseStatus()); // Clear status after snackbar closes
   };
 
   const handleSort = (columnId) => {
@@ -233,9 +296,8 @@ const SupervisorCourses = () => {
           trackId: track.id,
         }));
 
-      // Add only unique course-track pairs
       filteredCourses.forEach((row) => {
-        const key = `${row.courseId}-${track.id}`;
+        const key = `${row.courseId}-${row.trackId}`;
         if (!uniqueRows.has(key)) {
           uniqueRows.set(key, row);
         }
@@ -405,7 +467,7 @@ const SupervisorCourses = () => {
                   { id: "trackName", label: "Track Name", minWidth: 150 },
                   { id: "courseName", label: "Course Name", minWidth: 150 },
                   { id: "instructor", label: "Instructor", minWidth: 150 },
-                  { id: "actions", label: "Actions", minWidth: 120, align: "right" },
+                  { id: "actions", label: "Actions", minWidth: 180, align: "right" },
                 ].map((column) => (
                   <StyledTableCell
                     key={column.id}
@@ -434,7 +496,7 @@ const SupervisorCourses = () => {
                 </TableRow>
               ) : (
                 sortedRows.map((row, index) => (
-                  <StyledTableRow key={`${row.courseId}-${row.trackName}-${index}`}>
+                  <StyledTableRow key={`${row.courseId}-${row.trackId}-${index}`}>
                     <TableCell sx={{ p: 2 }}>{row.trackName}</TableCell>
                     <TableCell sx={{ p: 2 }}>{row.courseName}</TableCell>
                     <TableCell sx={{ p: 2 }}>
@@ -455,9 +517,32 @@ const SupervisorCourses = () => {
                           color: "#3b82f6",
                           "&:hover": { borderColor: "#2563eb", color: "#2563eb" },
                           borderRadius: 2,
+                          mr: 1,
                         }}
                       >
                         Assign Instructor
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteClick(row.courseId, row.trackId, row.courseName, row.trackName)}
+                        disabled={
+                          instructorsLoading ||
+                          reassignInstructorLoading ||
+                          deletingRows.has(`${row.courseId}-${row.trackId}`)
+                        }
+                        sx={{
+                          borderColor: "#ef4444",
+                          color: "#ef4444",
+                          "&:hover": { borderColor: "#dc2626", color: "#dc2626" },
+                          borderRadius: 2,
+                        }}
+                      >
+                        {deletingRows.has(`${row.courseId}-${row.trackId}`) ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          "Delete"
+                        )}
                       </Button>
                     </TableCell>
                   </StyledTableRow>
@@ -538,6 +623,52 @@ const SupervisorCourses = () => {
           </Box>
         </Box>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteDialogClose}
+        aria-labelledby="delete-confirmation-dialog"
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Are you sure you want to remove <strong>{deleteCourseTrack?.courseName}</strong> from the <strong>{deleteCourseTrack?.trackName}</strong> track?
+          </Typography>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={isDeleteConfirmed}
+                onChange={(e) => setIsDeleteConfirmed(e.target.checked)}
+                color="error"
+              />
+            }
+            label="I confirm the deletion"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleDeleteDialogClose}
+            sx={{ color: "#64748b", borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            disabled={!isDeleteConfirmed || removeCourseFromTrackLoading}
+            startIcon={removeCourseFromTrackLoading ? <CircularProgress size={20} color="inherit" /> : null}
+            sx={{
+              bgcolor: "#ef4444",
+              "&:hover": { bgcolor: "#dc2626" },
+              borderRadius: 2,
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for success/error */}
       <Snackbar

@@ -10,9 +10,21 @@ from .models import Course
 import logging
 from rest_framework.permissions import IsAuthenticated
 from .serializers import CourseInstructorUpdateSerializer
+from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Course
+from .serializers import CourseSerializer
+import logging
 
 logger = logging.getLogger(__name__)
+from rest_framework import generics, status
+from rest_framework.response import Response
+from .models import Course
+from .serializers import CourseSerializer
+import logging
 
+logger = logging.getLogger(__name__)
 
 class CourseListView(generics.ListCreateAPIView):
     """
@@ -24,7 +36,7 @@ class CourseListView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Handles the creation of a new course and associating it with tracks.
+        Handles the creation of a new course and associating it with tracks and instructor.
         """
         print("✅ Validated Data:", serializer.validated_data)
         logger.debug(f"✅ Validated Data: {serializer.validated_data}")
@@ -39,19 +51,39 @@ class CourseListView(generics.ListCreateAPIView):
         print("👨‍🏫 Instructor:", instructor)
         logger.debug(f"👨‍🏫 Instructor: {instructor}")
 
+        # If instructor is provided, associate it with the course
         if instructor:
             course.instructor = instructor
             course.save()
 
-        # Add tracks to the course using the set() method to handle many-to-many relation
         print("📦 Tracks to associate:", tracks)
         logger.debug(f"📦 Tracks to associate: {tracks}")
 
-        # Associate the tracks using the set method to handle M2M relationship
-        course.tracks.set(tracks)
+        # Associate the tracks with the course using the set() method for many-to-many relationships
+        if tracks:
+            course.tracks.set(tracks)
 
         print(f"✅ Associated course '{course}' with tracks")
         logger.debug(f"✅ Associated course '{course}' with tracks")
+
+    def create(self, request, *args, **kwargs):
+        """
+        Custom create method to handle course creation and association.
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            # Perform course creation and association of tracks and instructor
+            self.perform_create(serializer)
+            return Response({
+                'status': 'success',
+                'message': 'Course created and associated with tracks and instructor.',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            'status': 'error',
+            'message': 'Failed to create course.',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class StaffMemberCoursesView(APIView):

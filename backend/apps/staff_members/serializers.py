@@ -110,56 +110,6 @@ class StaffMemberListSerializer(serializers.ModelSerializer):
         return obj.branch.name
 
 
-# class CreateSupervisorSerializer(serializers.ModelSerializer):
-#     branch_id = serializers.PrimaryKeyRelatedField(
-#         queryset=Branch.objects.all(),
-#         source='branch',
-#         write_only=True,
-#         required=True
-#     )
-    
-#     class Meta:
-#         model = StaffMember
-#         fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id']
-#         extra_kwargs = {
-#             'password': {'write_only': True, 'required': False},
-#             'email': {'required': True}
-#         }
-
-#     def validate(self, data):
-#         if StaffMember.objects.filter(email=data['email']).exists():
-#             raise serializers.ValidationError({
-#                 'email': _('A user with this email already exists.')
-#             })
-#         return data
-
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         # Remove any role that might have been passed in (to avoid duplicates)
-#         validated_data.pop('role', None)
-        
-#         password = validated_data.pop('password', None)
-#         branch = validated_data.pop('branch')
-        
-#         if not password:
-#             password = ''.join(
-#                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
-#                 for _ in range(12)
-#             )
-            
-#         supervisor = StaffMember(
-#             **validated_data,
-#             role=StaffMember.Role.SUPERVISOR  # Explicitly assign the supervisor role
-#         )
-        
-#         try:
-#             validate_password(password, supervisor)
-#             supervisor.set_password(password)
-#             supervisor.branch = branch
-#             supervisor.save()
-#             return supervisor
-#         except DjangoValidationError as e:
-#             raise serializers.ValidationError({'password': e.messages})
 
 class CreateSupervisorSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(

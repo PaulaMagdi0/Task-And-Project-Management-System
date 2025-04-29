@@ -6,7 +6,10 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from apps.staff_members.serializers import StaffMember
 from apps.courses.serializers import Course
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from apps.courses.models import Course, CourseTrack
 
 class TrackListView(generics.ListCreateAPIView):
     """
@@ -126,3 +129,27 @@ class AvailableTracksView(APIView):
         # Serialize the tracks and return them
         track_data = TrackSerializer(tracks, many=True).data
         return Response(track_data, status=status.HTTP_200_OK)
+
+# remove Course From Track
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_course_from_track(request, track_id, course_id):
+    try:
+        # Fetch the track and course from the database
+        track = get_object_or_404(Track, id=track_id)
+        course = get_object_or_404(Course, id=course_id)
+
+        # Check if the course is related to the track
+        course_track_relation = CourseTrack.objects.filter(course=course, track=track).first()
+
+        if not course_track_relation:
+            return Response({"error": "Course is not assigned to this track."}, status=400)
+
+        # Delete the relationship
+        course_track_relation.delete()
+
+        # Return a success message
+        return Response({"message": "Course removed from track successfully."})
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
