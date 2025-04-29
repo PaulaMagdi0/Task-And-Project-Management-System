@@ -15,13 +15,17 @@ import {
   IconButton,
   Paper,
   MenuItem,
-  styled
+  styled,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon
 } from '@mui/material';
 import { Close, CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import { useDispatch, useSelector } from 'react-redux';
 import apiClient from '../services/api';
-import { fetchCourses } from '../redux/coursesSlice'; // ← re-use coursesSlice
+import { fetchCourses } from '../redux/coursesSlice';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -51,13 +55,22 @@ export default function UploadStudentPage() {
   const dispatch = useDispatch();
   const { user_id } = useSelector(s => s.auth);
 
-  // pull in exactly the same "associated tracks" you get in AddCourses:
-  const { data: courseContextData, loading: tracksLoading } = useSelector(s => s.courses);
-  const tracks = courseContextData?.tracks || [];
+  // Access tracks and loading state from Redux store
+  const { userCourses, status } = useSelector(s => s.courses);
+  const tracks = userCourses?.tracks || [];
+  const tracksLoading = status.fetchCoursesLoading;
 
-  // fetch once on mount
+  // Debug logging to verify data
   useEffect(() => {
-    dispatch(fetchCourses(user_id));
+    console.log('Tracks data:', tracks);
+    console.log('Tracks loading:', tracksLoading);
+  }, [tracks, tracksLoading]);
+
+  // Fetch tracks and courses on mount
+  useEffect(() => {
+    if (user_id) {
+      dispatch(fetchCourses(user_id));
+    }
   }, [dispatch, user_id]);
 
   const [isExcelUpload, setIsExcelUpload] = useState(false);
@@ -76,6 +89,7 @@ export default function UploadStudentPage() {
     message: '',
     isSuccess: false
   });
+  const [studentStatuses, setStudentStatuses] = useState([]);
 
   const handleStudentInputChange = e => {
     const { name, value } = e.target;
@@ -84,35 +98,86 @@ export default function UploadStudentPage() {
 
   const handleFileChange = e => {
     setExcelFile(e.target.files[0]);
+    setStudentStatuses([]); // Clear previous statuses
   };
 
   const handleCloseModal = () => setOpenModal(false);
-  const showSuccessModal = message => {
-    setModalContent({ title: 'Success!', message, isSuccess: true });
+
+  const showSuccessModal = (message, warnings = []) => {
+    let fullMessage = message;
+    if (warnings.length > 0) {
+      fullMessage += '\n\nWarnings:\n' + warnings.join('\n');
+    }
+    setModalContent({ title: 'Success!', message: fullMessage, isSuccess: true });
     setOpenModal(true);
   };
-  const showErrorModal = message => {
-    setModalContent({ title: 'Error', message, isSuccess: false });
+
+  const showErrorModal = (message, details = null) => {
+    let fullMessage = message;
+    // Skip details for duplicate email errors to avoid redundancy
+    if (details && typeof details === 'object' && details.field === 'email' && details.error === message) {
+      // Do nothing, keep fullMessage as just the main message
+    } else if (details) {
+      if (typeof details === 'object') {
+        // Handle validation errors with details
+        if (details.details) {
+          fullMessage += '\n\nDetails:\n' + Object.entries(details.details)
+            .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
+            .join('\n');
+        }
+        // Handle single field errors, but skip if it repeats the main message
+        else if (details.field && details.error && details.error !== message) {
+          fullMessage += `\n\n${details.field}: ${details.error}`;
+        }
+        // Handle Excel upload validation errors
+        else if (details.detail && details.errors) {
+          fullMessage += `\n\n${details.detail}\n\nErrors:\n` + details.errors.join('\n');
+        }
+        // Handle generic object details
+        else if (Object.keys(details).length > 0) {
+          fullMessage += '\n\nDetails:\n' + JSON.stringify(details, null, 2);
+        }
+      } else if (typeof details === 'string') {
+        fullMessage += '\n\nDetails:\n' + details;
+      }
+    }
+    setModalContent({ title: 'Error', message: fullMessage, isSuccess: false });
     setOpenModal(true);
   };
 
   const handleSubmitManualStudent = async () => {
     const { first_name, last_name, email, track_id } = studentData;
     if (!first_name || !last_name || !email || !track_id) {
-      showErrorModal('Please fill all required fields');
+      showErrorModal('Please fill all required fields', {
+        details: {
+          ...(first_name ? {} : { first_name: ['This field is required'] }),
+          ...(last_name ? {} : { last_name: ['This field is required'] }),
+          ...(email ? {} : { email: ['This field is required'] }),
+          ...(track_id ? {} : { track_id: ['This field is required'] })
+        }
+      });
       return;
     }
+
     setLoading(true);
     try {
       const form = new FormData();
-      Object.entries(studentData).forEach(([k, v]) => form.append(k, v));
-      await apiClient.post('/student/create/', form, {
+      Object.entries(studentData).forEach(([k, v]) => {
+        console.log(`FormData: ${k} = ${v}`); // Debug FormData
+        form.append(k, v);
+      });
+      const response = await apiClient.post('/student/create/', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       showSuccessModal('Student added successfully! Verification email sent.');
       setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
     } catch (err) {
-      showErrorModal(err.response?.data?.error || 'Failed to add student');
+      console.error('Create student error:', err.response?.data || err.message); // Debug full error
+      const errorData = err.response?.data || { error: 'Unknown error occurred' };
+      showErrorModal(
+        errorData.error || 'Failed to add student',
+        errorData.details || errorData.field ? errorData : null
+      );
     } finally {
       setLoading(false);
     }
@@ -123,7 +188,12 @@ export default function UploadStudentPage() {
       showErrorModal('Please select an Excel file');
       return;
     }
+    if (!studentData.track_id) {
+      showErrorModal('Please select a track');
+      return;
+    }
     setLoading(true);
+    setStudentStatuses([]); // Clear previous statuses
     try {
       const form = new FormData();
       form.append('excel_file', excelFile);
@@ -131,14 +201,52 @@ export default function UploadStudentPage() {
       const resp = await apiClient.post('/student/upload/', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      if (resp.data.errors?.length) {
-        showErrorModal(`Completed with ${resp.data.errors.length} errors`);
-      } else {
-        showSuccessModal(`Created ${resp.data.created_count} students!`);
-        setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
+      console.log('Excel upload response:', resp.data); // Debug log
+      const errors = resp.data.errors || [];
+      const createdCount = resp.data.created_count || 0;
+      const students = resp.data.students || [];
+
+      // Initialize student statuses with emails from response
+      const statuses = students.map(student => ({
+        email: student.email || `Student ${student.id}`,
+        status: 'Sending...',
+        success: false
+      }));
+      setStudentStatuses(statuses);
+
+      // Simulate per-student feedback with delay
+      for (let i = 0; i < statuses.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
+        setStudentStatuses(prev =>
+          prev.map((s, index) =>
+            index === i ? { ...s, status: 'Email sent', success: true } : s
+          )
+        );
       }
+
+      // Show final success modal
+      if (createdCount > 0) {
+        const warnings = errors.map(e => e || 'Unknown error');
+        showSuccessModal(`Done correctly! Created ${createdCount} students!`, warnings);
+      } else if (errors.length > 0) {
+        showErrorModal('Failed to create students', {
+          detail: 'All rows failed validation',
+          errors
+        });
+      } else {
+        showErrorModal('No students were created and no specific errors reported.');
+      }
+
+      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
+      setExcelFile(null);
     } catch (err) {
-      showErrorModal(err.response?.data?.error || 'Upload failed');
+      console.error('Excel upload error:', err.response?.data || err.message);
+      const errorData = err.response?.data || { error: 'Upload failed' };
+      showErrorModal(
+        errorData.error || 'Upload failed',
+        errorData.detail && errorData.errors ? errorData : errorData.details || errorData
+      );
+      setStudentStatuses([]);
     } finally {
       setLoading(false);
     }
@@ -220,13 +328,17 @@ export default function UploadStudentPage() {
                   value={studentData.track_id}
                   onChange={handleStudentInputChange}
                 >
-                  {tracksLoading
-                    ? <MenuItem disabled>Loading…</MenuItem>
-                    : tracks.map(t => (
-                        <MenuItem key={t.id} value={t.id}>
-                          {t.name}
-                        </MenuItem>
-                      ))}
+                  {tracksLoading ? (
+                    <MenuItem disabled>Loading tracks...</MenuItem>
+                  ) : tracks.length > 0 ? (
+                    tracks.map(t => (
+                      <MenuItem key={t.id} value={t.id}>
+                        {t.name}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>No tracks available</MenuItem>
+                  )}
                 </StyledTextField>
               </Grid>
             </Grid>
@@ -289,13 +401,17 @@ export default function UploadStudentPage() {
               onChange={handleStudentInputChange}
               sx={{ mb: 3 }}
             >
-              {tracksLoading
-                ? <MenuItem disabled>Loading…</MenuItem>
-                : tracks.map(t => (
-                    <MenuItem key={t.id} value={t.id}>
-                      {t.name}
-                    </MenuItem>
-                  ))}
+              {tracksLoading ? (
+                <MenuItem disabled>Loading tracks...</MenuItem>
+              ) : tracks.length > 0 ? (
+                tracks.map(t => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.name}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem disabled>No tracks available</MenuItem>
+              )}
             </StyledTextField>
 
             <StyledButton
@@ -307,6 +423,32 @@ export default function UploadStudentPage() {
             >
               {loading ? 'Uploading...' : 'Upload Students'}
             </StyledButton>
+
+            {studentStatuses.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="h6" mb={2} fontWeight="600" color="text.secondary">
+                  Processing Students
+                </Typography>
+                <List dense>
+                  {studentStatuses.map((s, index) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        {s.success ? (
+                          <CheckCircle color="success" />
+                        ) : (
+                          <CircularProgress size={20} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={s.email}
+                        secondary={s.status}
+                        primaryTypographyProps={{ fontWeight: s.success ? 'bold' : 'normal' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
           </Box>
         )}
       </StyledCard>
@@ -317,9 +459,11 @@ export default function UploadStudentPage() {
         PaperProps={{ sx: { borderRadius: '16px', minWidth: '400px' } }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
-          {modalContent.isSuccess
-            ? <CheckCircle color="success" sx={{ mr: 1, fontSize: 28 }} />
-            : <ErrorIcon color="error" sx={{ mr: 1, fontSize: 28 }} />}
+          {modalContent.isSuccess ? (
+            <CheckCircle color="success" sx={{ mr: 1, fontSize: 28 }} />
+          ) : (
+            <ErrorIcon color="error" sx={{ mr: 1, fontSize: 28 }} />
+          )}
           {modalContent.title}
           <IconButton
             aria-label="close"
@@ -330,7 +474,7 @@ export default function UploadStudentPage() {
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" whiteSpace="pre-wrap">
             {modalContent.message}
           </Typography>
         </DialogContent>

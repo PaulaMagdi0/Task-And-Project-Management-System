@@ -1,7 +1,7 @@
 import logging
 from rest_framework import status
 from django.shortcuts import redirect
-from rest_framework.decorators import api_view, permission_classes,parser_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
@@ -13,27 +13,20 @@ from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
 from .models import Student
-from apps.tracks.models import Track  # Adjust based on your app structure
+from apps.tracks.models import Track
 from apps.courses.models import Course
-from apps.assignments.models import Assignment  # Import Assignment model
+from apps.assignments.models import Assignment
 from apps.staff_members.models import StaffMember
 from apps.assignments.serializers import AssignmentSerializer
-from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
+from apps.courses.serializers import CourseSerializer
 from rest_framework.views import APIView
 from django.contrib.auth.hashers import check_password
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from .models import Student
-import logging
 
 # Set up logger
 logger = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
-#UPload Excel File View
 
 @permission_classes([AllowAny])
 @api_view(['POST'])
@@ -47,16 +40,7 @@ def upload_excel(request):
     if not has_student_management_permission(request.user):
         return Response({"detail": "You don't have permission to add students"}, status=403)
     
-    # ✅ Prevent AttributeError for Anonymous Users
-    user_role = getattr(request.user, 'role', 'Unknown')
-    is_superuser = getattr(request.user, 'is_superuser', False)
-    print(f"User Role: {user_role}, Superuser: {is_superuser}")
-
-    # ✅ Permission Check
-    if not has_student_management_permission(request.user):
-        raise PermissionDenied("You don't have permission to add students")
-
-    # ✅ Ensure file is provided
+    # Ensure file is provided
     if 'excel_file' not in request.FILES:
         logger.warning("Excel file missing in upload request")
         return Response(
@@ -64,7 +48,7 @@ def upload_excel(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # ✅ Validate the uploaded Excel file
+    # Validate the uploaded Excel file
     serializer = ExcelUploadSerializer(
         data=request.data,
         context={'request': request}
@@ -74,7 +58,7 @@ def upload_excel(request):
         logger.error(f"Excel validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Process file inside a transaction
+    # Process file inside a transaction
     try:
         with transaction.atomic():
             result = serializer.save()
@@ -94,6 +78,22 @@ def upload_excel(request):
                 "students": result.get('students', [])
             }, status=status.HTTP_201_CREATED)
 
+    except ValidationError as e:
+        logger.error(f"Excel processing validation error: {str(e)}")
+        error_detail = e.detail if hasattr(e, 'detail') else str(e)
+        if isinstance(error_detail, dict) and 'detail' in error_detail and 'errors' in error_detail:
+            return Response(
+                {
+                    "error": "Validation failed",
+                    "detail": error_detail['detail'],
+                    "errors": error_detail['errors']
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(
+            {"error": "Validation failed", "details": str(error_detail)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         logger.exception(f"Excel processing failed: {str(e)}")
         return Response(
@@ -101,8 +101,6 @@ def upload_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-        
-#Create Single Student View
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def create_student_from_form(request):
@@ -115,15 +113,17 @@ def create_student_from_form(request):
     - role
     - track_id
     """
+    logger.debug(f"Incoming FormData: {dict(request.data)}")
+
     email = request.data.get("email", "").strip().lower()
     
     if not email:
         return Response(
-            {"error": "Email is required.", "field": "email"},
+            {"error": "Email is required", "field": "email"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Check if student exists first to provide immediate feedback
+    # Check if student exists
     if Student.objects.filter(email=email).exists():
         return Response(
             {
@@ -134,17 +134,13 @@ def create_student_from_form(request):
             status=status.HTTP_409_CONFLICT
         )
 
-    # Extract username from email
-    username = email.split("@")[0]
-
-    # Collecting form data
+    # Collect form data
     data = {
         "first_name": request.data.get("first_name", "").strip(),
         "last_name": request.data.get("last_name", "").strip(),
         "email": email,
-        "role": request.data.get("role", "student"),
-        "track_id": request.data.get("track_id"),
-        "username": username,
+        "role": request.data.get("role", "student").strip().lower(),
+        "track_id": request.data.get("track_id", "").strip(),
     }
 
     # Validate required fields
@@ -159,43 +155,53 @@ def create_student_from_form(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Check if the track_id is valid
+    # Validate track_id
     try:
-        track = Track.objects.get(id=data['track_id'])
-        data["track"] = track
+        track_id = int(data['track_id'])
+        track = Track.objects.get(id=track_id)
+        data["track_id"] = track_id  # Pass track_id to serializer
+    except (ValueError, TypeError):
+        return Response(
+            {
+                "error": f"Invalid track_id: '{data['track_id']}' must be a valid integer",
+                "field": "track_id"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
     except Track.DoesNotExist:
         return Response(
             {
-                "error": f"Invalid track_id provided: {data['track_id']}",
+                "error": f"Track with ID '{data['track_id']}' does not exist",
                 "field": "track_id"
             },
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Validate the serializer with the data
+    # Validate with serializer
     serializer = StudentSerializer(data=data)
     
     if serializer.is_valid():
         try:
-            serializer.save()
+            student = serializer.save()
             return Response(
                 {
                     "message": "Student created successfully",
-                    "student": serializer.data
+                    "student": StudentSerializer(student).data
                 },
                 status=status.HTTP_201_CREATED
             )
         except Exception as e:
             logger.error(f"Error saving student: {str(e)}")
             return Response(
-                {"error": "Failed to create student due to server error"},
+                {"error": f"Failed to create student: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    # Return serializer errors with field-specific information
+    # Return detailed validation errors
     errors = serializer.errors
     for field in errors:
         errors[field] = [str(msg) for msg in errors[field]]
+    logger.debug(f"Serializer errors: {errors}")
     return Response(
         {
             "error": "Validation failed",
@@ -205,10 +211,7 @@ def create_student_from_form(request):
         status=status.HTTP_400_BAD_REQUEST
     )
 
-# List All Student View 
-# List All Student View 
 @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
 @permission_classes([AllowAny])
 def list_students(request):
     """List students with optimized querying and pagination"""
@@ -246,7 +249,6 @@ def list_students(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# Verfiy View 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def verify_email(request, verification_code):
@@ -320,9 +322,6 @@ def student_courses(request, student_id):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
-    
-#UPdate student Info View
-
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
@@ -337,8 +336,8 @@ def update_student(request, student_id):
         # Get fields from the request
         new_password = request.data.get('newPassword')
         new_email = request.data.get('email')
-        first_name = request.data.get('firstName')  # Get first name from request
-        last_name = request.data.get('lastName')    # Get last name from request
+        first_name = request.data.get('firstName')
+        last_name = request.data.get('lastName')
 
         # Initialize a dictionary to track updates
         updates = {}
@@ -350,7 +349,7 @@ def update_student(request, student_id):
 
             # Set the new password
             student.set_password(new_password)
-            updates['password'] = '******'  # Don't return the password for security reasons
+            updates['password'] = '******'
 
         # Update email if provided
         if new_email:
@@ -415,7 +414,6 @@ class StudentDashboardAPI(generics.RetrieveAPIView):
         # Returns the logged-in student's profile
         return self.request.user.student_profile
 
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def show_options(request):
@@ -446,9 +444,8 @@ def show_options(request):
             }
         }
     }
-    return Response(options)        
-#Return The students For Track And Course
-# http://127.0.0.1:8000/api/student/tracks/track_id/courses/course_id/students/
+    return Response(options)
+
 class StudentsByTrackAndCourseView(APIView):
     def get(self, request, track_id, course_id):
         # Get the track and course based on the provided IDs
@@ -464,8 +461,8 @@ class StudentsByTrackAndCourseView(APIView):
 
         # Filter students based on the track and course using the many-to-many relationship through CourseTrack
         students_in_track_and_course = Student.objects.filter(
-            track=track,  # Students must be assigned to the track
-            track__courses=course  # Students must be linked to the course via the track
+            track=track,
+            track__courses=course
         )
 
         # Prepare the data for response
@@ -480,8 +477,7 @@ class StudentsByTrackAndCourseView(APIView):
             })
 
         return Response(student_data, status=status.HTTP_200_OK)
-    
-#Return Student For SUpervisor Tracks
+
 class StudentsByStaffView(APIView):
     def get(self, request, staff_id):
         try:
@@ -496,7 +492,7 @@ class StudentsByStaffView(APIView):
 
         elif staff.role == StaffMember.Role.INSTRUCTOR:
             # Get courses taught by this instructor
-            courses = Course.objects.filter(instructor=staff)  # If M2M, use .filter(instructors=staff)
+            courses = Course.objects.filter(instructor=staff)
 
             # Get track IDs linked to these courses through CourseTrack
             track_ids = CourseTrack.objects.filter(course__in=courses).values_list('track_id', flat=True)
