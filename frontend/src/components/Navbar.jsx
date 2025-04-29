@@ -108,21 +108,21 @@ const Navbar = () => {
       case "student":
         return (
           <>
-            <NavButton
-              component={Link}
-              to="/student/dashboard"
-              startIcon={<BookOpen size={18} />}
-            >
-              My Courses
-            </NavButton>
-            <NavButton
-              component={Link}
-              to="/student/assignments"
-              startIcon={<FileText size={18} />}
-            >
-              Assignments
-            </NavButton>
-          </>
+          <NavButton
+            component={Link}
+            to="/student/dashboard?section=courses" // Add query parameter
+            startIcon={<BookOpen size={18} />}
+          >
+            My Courses
+          </NavButton>
+          <NavButton
+            component={Link}
+            to="/student/dashboard?section=assignments"
+            startIcon={<FileText size={18} />}
+          >
+            Assignments
+          </NavButton>
+        </>
         );
       case "branchmanager":
         return (

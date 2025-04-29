@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchTracks,
@@ -39,6 +39,7 @@ import {
   Link,
   Chip,
   Fade,
+  IconButton,
 } from "@mui/material";
 import {
   Info as InfoIcon,
@@ -50,6 +51,7 @@ import {
   Send as SendIcon,
   Link as LinkIcon,
   Error as ErrorIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
@@ -57,24 +59,108 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { isValidUrl } from "../../../utils/validation";
 
-const steps = ["Basic Info", "Course Details", "Assignment Target", "Review"];
+const steps = ["Basic Info", "Assignment Target", "Review"];
 
-const ColorButton = styled(Button)(({ theme }) => ({
-  background: `linear-gradient(45deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+const SimpleButton = styled(Button)(({ theme }) => ({
+  backgroundColor: theme.palette.primary.main,
   color: theme.palette.common.white,
-  fontWeight: "bold",
+  fontWeight: 500,
+  padding: theme.spacing(1, 3),
+  borderRadius: "8px",
+  textTransform: "none",
+  boxShadow: "none",
   "&:hover": {
-    background: `linear-gradient(45deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
+    backgroundColor: theme.palette.primary.dark,
+    boxShadow: theme.shadows[2],
+  },
+  "&:disabled": {
+    backgroundColor: theme.palette.grey[400],
+    color: theme.palette.grey[600],
   },
 }));
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialog-paper": {
-    borderRadius: "16px",
-    padding: theme.spacing(2),
-    background: `linear-gradient(135deg, ${theme.palette.background.paper} 30%, ${theme.palette.grey[100]} 100%)`,
-    boxShadow: theme.shadows[10],
-    border: `1px solid ${theme.palette.grey[300]}`,
+    borderRadius: "12px",
+    padding: theme.spacing(3),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[8],
+    border: `1px solid ${theme.palette.grey[200]}`,
+    maxWidth: "800px",
+  },
+}));
+
+const RecommendationCard = styled(Card)(({ theme }) => ({
+  margin: theme.spacing(1),
+  borderRadius: "10px",
+  border: `1px solid ${theme.palette.grey[200]}`,
+  transition: "box-shadow 0.3s ease-in-out",
+  "&:hover": {
+    boxShadow: theme.shadows[4],
+  },
+  backgroundColor: theme.palette.background.default,
+}));
+
+const ChatContainer = styled(Box)(({ theme }) => ({
+  border: `1px solid ${theme.palette.grey[200]}`,
+  borderRadius: "10px",
+  padding: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+  maxHeight: "450px",
+  overflowY: "auto",
+  boxShadow: theme.shadows[1],
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "8px",
+    backgroundColor: theme.palette.grey[50],
+    "&:hover": {
+      backgroundColor: theme.palette.grey[100],
+    },
+    "&.Mui-focused": {
+      backgroundColor: theme.palette.grey[100],
+      "& .MuiOutlinedInput-notchedOutline": {
+        borderColor: theme.palette.primary.main,
+      },
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: theme.palette.text.secondary,
+    fontWeight: 500,
+    "&.Mui-focused": {
+      color: theme.palette.primary.main,
+    },
+  },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: theme.palette.grey[300],
+  },
+}));
+
+const StyledSelect = styled(Select)(({ theme }) => ({
+  borderRadius: "8px",
+  backgroundColor: theme.palette.grey[50],
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: theme.palette.grey[300],
+  },
+  "&:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: theme.palette.grey[500],
+  },
+  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: theme.palette.primary.main,
+  },
+}));
+
+const ChatMessage = styled(Box)(({ theme }) => ({
+  backgroundColor: theme.palette.grey[50],
+  borderRadius: "10px",
+  padding: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+  border: `1px solid ${theme.palette.grey[200]}`,
+  "& p": {
+    margin: 0,
+    lineHeight: 1.7,
+    color: theme.palette.text.primary,
   },
 }));
 
@@ -99,11 +185,21 @@ const CreateAssignment = () => {
     assignToAll: true,
     selectedStudents: [],
     assignment_type: "task",
+    difficulty: "Medium",
   });
   const [submitDialog, setSubmitDialog] = useState({
     open: false,
     success: false,
     message: "",
+  });
+  const [recommendationDialog, setRecommendationDialog] = useState({
+    open: false,
+    recommendations: [],
+    loading: false,
+    methodChoice: "1",
+    briefDescription: "",
+    chatInput: "",
+    chatResponse: "",
   });
   const [showResetIndicator, setShowResetIndicator] = useState(false);
   const [validationErrors, setValidationErrors] = useState({
@@ -114,25 +210,172 @@ const CreateAssignment = () => {
     file_url: false,
     track: false,
     course: false,
+    difficulty: false,
   });
 
-  useEffect(() => {
-    dispatch(fetchTracks(user_id));
-  }, [dispatch, user_id]);
-
-  useEffect(() => {
+  // Memoized fetch functions to prevent unnecessary re-renders
+  const fetchCoursesMemoized = useCallback(() => {
     if (formData.track) {
       dispatch(fetchCourses({ userId: user_id, trackId: formData.track }));
     }
   }, [dispatch, user_id, formData.track]);
 
-  useEffect(() => {
+  const fetchStudentsMemoized = useCallback(() => {
     if (formData.course && formData.track) {
       dispatch(
         fetchStudents({ trackId: formData.track, courseId: formData.course })
       );
     }
   }, [dispatch, formData.track, formData.course]);
+
+  useEffect(() => {
+    dispatch(fetchTracks(user_id));
+  }, [dispatch, user_id]);
+
+  useEffect(() => {
+    fetchCoursesMemoized();
+  }, [fetchCoursesMemoized]);
+
+  useEffect(() => {
+    fetchStudentsMemoized();
+  }, [fetchStudentsMemoized]);
+
+  const fetchRecommendations = async () => {
+    setRecommendationDialog((prev) => ({ ...prev, loading: true }));
+
+    if (recommendationDialog.methodChoice === "3") {
+      if (!recommendationDialog.chatInput.trim()) {
+        setRecommendationDialog((prev) => ({ ...prev, loading: false }));
+        setSubmitDialog({
+          open: true,
+          success: false,
+          message: "Please enter a message for the AI chat",
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:8000/api/chatAI/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: recommendationDialog.chatInput }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          // Clean response: remove markdown and format
+          const cleanedResponse = data.response
+            .replace(/(\*\*|###|```|`|[-*+]\s)/g, "") // Remove markdown symbols and list markers
+            .replace(/\n+/g, "\n") // Normalize newlines
+            .trim();
+          setRecommendationDialog((prev) => ({
+            ...prev,
+            chatResponse: cleanedResponse,
+            recommendations: [
+              {
+                title: formData.title || "AI-Generated Assignment",
+                description: cleanedResponse,
+              },
+            ],
+            loading: false,
+            chatInput: "",
+          }));
+        } else {
+          throw new Error(data.error || "Failed to fetch AI response");
+        }
+      } catch (error) {
+        setRecommendationDialog((prev) => ({
+          ...prev,
+          loading: false,
+          recommendations: [],
+          chatResponse: "",
+        }));
+        setSubmitDialog({
+          open: true,
+          success: false,
+          message: "Error fetching AI chat response",
+        });
+      }
+      return;
+    }
+
+    let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
+    if (recommendationDialog.methodChoice === "1") {
+      const courseName = courses.find((c) => c.id === formData.course)?.name || "";
+      url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
+    } else {
+      url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
+    }
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      if (response.ok) {
+        setRecommendationDialog((prev) => ({
+          ...prev,
+          recommendations: data.recommendations,
+          loading: false,
+        }));
+      } else {
+        setRecommendationDialog((prev) => ({
+          ...prev,
+          loading: false,
+          recommendations: [],
+        }));
+        setSubmitDialog({
+          open: true,
+          success: false,
+          message: data.error || "Failed to fetch recommendations",
+        });
+      }
+    } catch (error) {
+      setRecommendationDialog((prev) => ({
+        ...prev,
+        loading: false,
+        recommendations: [],
+      }));
+      setSubmitDialog({
+        open: true,
+        success: false,
+        message: "Error fetching recommendations",
+      });
+    }
+  };
+
+  const handleRecommendationSelect = (recommendation) => {
+    setFormData((prev) => ({
+      ...prev,
+      description: recommendation.description,
+      title: recommendation.title || prev.title,
+    }));
+    setRecommendationDialog((prev) => ({ ...prev, open: false }));
+    setValidationErrors((prev) => ({ ...prev, description: false }));
+  };
+
+  const handleRecommendationMethodChange = (e) => {
+    setRecommendationDialog((prev) => ({
+      ...prev,
+      methodChoice: e.target.value,
+      recommendations: [],
+      briefDescription: "",
+      chatInput: "",
+      chatResponse: "",
+    }));
+  };
+
+  const handleBriefDescriptionChange = (e) => {
+    setRecommendationDialog((prev) => ({
+      ...prev,
+      briefDescription: e.target.value,
+    }));
+  };
+
+  const handleChatInputChange = (e) => {
+    setRecommendationDialog((prev) => ({
+      ...prev,
+      chatInput: e.target.value,
+    }));
+  };
 
   const validateCurrentStep = () => {
     const errors = { ...validationErrors };
@@ -159,15 +402,16 @@ const CreateAssignment = () => {
         errors.file_url = true;
         isValid = false;
       }
-    }
-
-    if (activeStep === 1) {
       if (!formData.track) {
         errors.track = true;
         isValid = false;
       }
       if (!formData.course) {
         errors.course = true;
+        isValid = false;
+      }
+      if (!formData.difficulty) {
+        errors.difficulty = true;
         isValid = false;
       }
     }
@@ -189,7 +433,6 @@ const CreateAssignment = () => {
     const { name, value, checked, type } = e.target;
     let updatedValue = value;
 
-    // Automatically prepend "https://" to file_url if it doesn't start with a protocol
     if (name === "file_url") {
       if (value.trim() && !value.match(/^https?:\/\//)) {
         updatedValue = `https://${value.trim()}`;
@@ -229,6 +472,7 @@ const CreateAssignment = () => {
       assignToAll: true,
       selectedStudents: [],
       assignment_type: "task",
+      difficulty: "Medium",
     });
     setActiveStep(0);
     setShowResetIndicator(true);
@@ -239,10 +483,20 @@ const CreateAssignment = () => {
     if (submitDialog.success) resetForm();
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateCurrentStep()) return;
+  const handleRecommendationDialogClose = () => {
+    setRecommendationDialog((prev) => ({
+      ...prev,
+      open: false,
+      recommendations: [],
+      briefDescription: "",
+      chatInput: "",
+      chatResponse: "",
+    }));
+  };
 
+  const handleSubmit= async () => {
+    if (!validateCurrentStep()) return;
+  
     if (formData.assignToAll && (!students || students.length === 0)) {
       setSubmitDialog({
         open: true,
@@ -251,7 +505,7 @@ const CreateAssignment = () => {
       });
       return;
     }
-
+  
     const assignmentData = {
       title: formData.title,
       description: formData.description,
@@ -261,11 +515,12 @@ const CreateAssignment = () => {
       course: formData.course,
       track: formData.track,
       assignment_type: formData.assignment_type,
+      difficulty: formData.difficulty,
       assigned_to: formData.assignToAll
         ? students.map((s) => s.id)
         : formData.selectedStudents,
     };
-
+  
     try {
       const action = await dispatch(createAssignment(assignmentData));
       if (createAssignment.fulfilled.match(action)) {
@@ -294,161 +549,95 @@ const CreateAssignment = () => {
     switch (step) {
       case 0:
         return (
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField
-                label="Assignment Title *"
+              <StyledTextField
+                label="Assignment Title"
                 value={formData.title}
                 onChange={handleChange}
                 name="title"
                 fullWidth
                 required
                 error={validationErrors.title}
-                helperText={validationErrors.title && "Title is required"}
+                helperText={validationErrors.title ? "Title is required" : ""}
                 InputProps={{
                   startAdornment: (
                     <DescriptionIcon
                       color={validationErrors.title ? "error" : "action"}
-                      sx={{ mr: 1 }}
+                      sx={{ mr: 1, opacity: 0.6 }}
                     />
                   ),
                 }}
+                variant="outlined"
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DateTimePicker
-                  label="Due Date *"
+                  label="Due Date"
                   value={formData.due_date}
                   onChange={handleDateChange("due_date")}
                   renderInput={(params) => (
-                    <TextField
+                    <StyledTextField
                       {...params}
                       error={validationErrors.due_date}
                       helperText={
-                        validationErrors.due_date && "Due date required"
+                        validationErrors.due_date ? "Due date is required" : ""
                       }
                       InputProps={{
+                        ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={
-                              validationErrors.due_date ? "error" : "action"
-                            }
-                            sx={{ mr: 1 }}
+                            color={validationErrors.due_date ? "error" : "action"}
+                            sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
                       }}
+                      fullWidth
+                      required
                     />
                   )}
                 />
               </LocalizationProvider>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DateTimePicker
-                  label="End Date *"
+                  label="End Date"
                   value={formData.end_date}
                   onChange={handleDateChange("end_date")}
                   minDateTime={formData.due_date}
                   renderInput={(params) => (
-                    <TextField
+                    <StyledTextField
                       {...params}
                       error={validationErrors.end_date}
                       helperText={
-                        validationErrors.end_date && "End date required"
+                        validationErrors.end_date ? "End date is required" : ""
                       }
                       InputProps={{
+                        ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={
-                              validationErrors.end_date ? "error" : "action"
-                            }
-                            sx={{ mr: 1 }}
+                            color={validationErrors.end_date ? "error" : "action"}
+                            sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
                       }}
+                      fullWidth
+                      required
                     />
                   )}
                 />
               </LocalizationProvider>
             </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Assignment Type *</InputLabel>
-                <Select
-                  value={formData.assignment_type}
-                  onChange={handleChange}
-                  name="assignment_type"
-                  label="Assignment Type *"
-                >
-                  <MenuItem value="task">Task</MenuItem>
-                  <MenuItem value="project">Project</MenuItem>
-                  <MenuItem value="exam">Exam</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Description *"
-                value={formData.description}
-                onChange={handleChange}
-                name="description"
-                fullWidth
-                required
-                multiline
-                rows={4}
-                error={validationErrors.description}
-                helperText={
-                  validationErrors.description && "Description required"
-                }
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Assignment URL *"
-                value={formData.file_url}
-                onChange={handleChange}
-                name="file_url"
-                fullWidth
-                required
-                error={validationErrors.file_url}
-                helperText={
-                  validationErrors.file_url ? "Valid URL required" : "Enter a URL (https:// will be added if omitted)"
-                }
-                InputProps={{
-                  startAdornment: (
-                    <LinkIcon
-                      color={validationErrors.file_url ? "error" : "action"}
-                      sx={{ mr: 1 }}
-                    />
-                  ),
-                }}
-              />
-              {formData.file_url && !validationErrors.file_url && (
-                <Link
-                  href={formData.file_url}
-                  target="_blank"
-                  rel="noopener"
-                  sx={{ mt: 1, display: "block" }}
-                >
-                  Test Link
-                </Link>
-              )}
-            </Grid>
-          </Grid>
-        );
-
-      case 1:
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth required error={validationErrors.track}>
-                <InputLabel>Track *</InputLabel>
-                <Select
+                <InputLabel sx={{ fontWeight: 500 }}>Track</InputLabel>
+                <StyledSelect
                   value={formData.track}
                   onChange={handleChange}
                   name="track"
-                  label="Track *"
+                  label="Track"
                 >
                   {tracks.map((track) => (
                     <MenuItem key={track.id} value={track.id}>
@@ -463,7 +652,7 @@ const CreateAssignment = () => {
                           <SchoolIcon sx={{ fontSize: 14 }} />
                         </Avatar>
                         <Box>
-                          <Typography>{track.name}</Typography>
+                          <Typography variant="body2">{track.name}</Typography>
                           <Typography variant="caption" color="text.secondary">
                             {track.description}
                           </Typography>
@@ -471,58 +660,169 @@ const CreateAssignment = () => {
                       </Stack>
                     </MenuItem>
                   ))}
-                </Select>
+                </StyledSelect>
                 {validationErrors.track && (
                   <Typography variant="caption" color="error">
-                    Track required
+                    Track is required
                   </Typography>
                 )}
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <FormControl
                 fullWidth
                 required
                 disabled={!formData.track}
                 error={validationErrors.course}
               >
-                <InputLabel>Course *</InputLabel>
-                <Select
+                <InputLabel sx={{ fontWeight: 500 }}>Course</InputLabel>
+                <StyledSelect
                   value={formData.course}
                   onChange={handleChange}
                   name="course"
-                  label="Course *"
+                  label="Course"
                 >
                   {courses.map((course) => (
                     <MenuItem key={course.id} value={course.id}>
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <Avatar
                           sx={{
-                            bgcolor: theme.palette.secondary.main,
+                            bgcolor: theme.palette.primary.main,
                             width: 24,
                             height: 24,
                           }}
                         >
                           <DescriptionIcon sx={{ fontSize: 14 }} />
                         </Avatar>
-                        <Typography>{course.name}</Typography>
+                        <Typography variant="body2">{course.name}</Typography>
                       </Stack>
                     </MenuItem>
                   ))}
-                </Select>
+                </StyledSelect>
                 {validationErrors.course && (
                   <Typography variant="caption" color="error">
-                    Course required
+                    Course is required
                   </Typography>
                 )}
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required error={validationErrors.difficulty}>
+                <InputLabel sx={{ fontWeight: 500 }}>Difficulty</InputLabel>
+                <StyledSelect
+                  value={formData.difficulty}
+                  onChange={handleChange}
+                  name="difficulty"
+                  label="Difficulty"
+                >
+                  <MenuItem value="Easy">Easy</MenuItem>
+                  <MenuItem value="Medium">Medium</MenuItem>
+                  <MenuItem value="Hard">Hard</MenuItem>
+                </StyledSelect>
+                {validationErrors.difficulty && (
+                  <Typography variant="caption" color="error">
+                    Difficulty is required
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel sx={{ fontWeight: 500 }}>Assignment Type</InputLabel>
+                <StyledSelect
+                  value={formData.assignment_type}
+                  onChange={handleChange}
+                  name="assignment_type"
+                  label="Assignment Type"
+                >
+                  <MenuItem value="task">Task</MenuItem>
+                  <MenuItem value="project">Project</MenuItem>
+                  <MenuItem value="exam">Exam</MenuItem>
+                </StyledSelect>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <StyledTextField
+                label="Description"
+                value={formData.description}
+                onChange={handleChange}
+                name="description"
+                fullWidth
+                required
+                multiline
+                rows={4}
+                error={validationErrors.description}
+                helperText={
+                  validationErrors.description ? "Description is required" : ""
+                }
+                InputProps={{
+                  endAdornment: (
+                    <Tooltip title="Get AI Recommendations">
+                      <IconButton
+                        onClick={() =>
+                          setRecommendationDialog((prev) => ({
+                            ...prev,
+                            open: true,
+                          }))
+                        }
+                        disabled={!formData.course || !formData.difficulty}
+                        color="primary"
+                        sx={{ p: 1 }}
+                      >
+                        <AutoAwesomeIcon />
+                      </IconButton>
+                    </Tooltip>
+                  ),
+                }}
+                variant="outlined"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <StyledTextField
+                label="Assignment URL"
+                value={formData.file_url}
+                onChange={handleChange}
+                name="file_url"
+                fullWidth
+                required
+                error={validationErrors.file_url}
+                helperText={
+                  validationErrors.file_url
+                    ? "Valid URL is required"
+                    : "Enter a URL (https:// will be added if omitted)"
+                }
+                InputProps={{
+                  startAdornment: (
+                    <LinkIcon
+                      color={validationErrors.file_url ? "error" : "action"}
+                      sx={{ mr: 1, opacity: 0.6 }}
+                    />
+                  ),
+                }}
+                variant="outlined"
+              />
+              {formData.file_url && !validationErrors.file_url && (
+                <Link
+                  href={formData.file_url}
+                  target="_blank"
+                  rel="noopener"
+                  sx={{
+                    mt: 1,
+                    display: "block",
+                    color: theme.palette.primary.main,
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  Test Link
+                </Link>
+              )}
+            </Grid>
           </Grid>
         );
 
-      case 2:
+      case 1:
         return (
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -531,25 +831,38 @@ const CreateAssignment = () => {
                     onChange={handleChange}
                     name="assignToAll"
                     color="primary"
+                    sx={{ "& .MuiSvgIcon-root": { fontSize: 24 } }}
                   />
                 }
                 label={
-                  <>
-                    Assign to all course students
+                  <Box display="flex" alignItems="center">
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 500, color: theme.palette.text.primary }}
+                    >
+                      Assign to all course students
+                    </Typography>
                     <Tooltip title="Toggle to select individual students">
-                      <InfoIcon color="action" sx={{ ml: 1 }} />
+                      <InfoIcon
+                        color="action"
+                        sx={{ ml: 1, fontSize: 18, opacity: 0.6 }}
+                      />
                     </Tooltip>
-                  </>
+                  </Box>
                 }
               />
             </Grid>
             {!formData.assignToAll && (
               <Grid item xs={12}>
-                <Typography variant="subtitle1" gutterBottom>
+                <Typography
+                  variant="subtitle1"
+                  gutterBottom
+                  sx={{ fontWeight: 500, color: theme.palette.text.primary }}
+                >
                   Select Students ({students?.length || 0} available)
                 </Typography>
                 {students && students.length > 0 ? (
-                  <Grid container spacing={2}>
+                  <Grid container spacing={1}>
                     {students.map((student) => (
                       <Grid item key={student.id}>
                         <Chip
@@ -561,16 +874,28 @@ const CreateAssignment = () => {
                               : "default"
                           }
                           avatar={
-                            <Avatar>
-                              <PersonIcon />
+                            <Avatar sx={{ bgcolor: theme.palette.primary.light }}>
+                              <PersonIcon sx={{ fontSize: 16 }} />
                             </Avatar>
                           }
+                          sx={{
+                            borderRadius: "16px",
+                            fontSize: "0.875rem",
+                            fontWeight: 500,
+                          }}
                         />
                       </Grid>
                     ))}
                   </Grid>
                 ) : (
-                  <Alert severity="info">
+                  <Alert
+                    severity="info"
+                    sx={{
+                      borderRadius: "8px",
+                      fontSize: "0.875rem",
+                      bgcolor: theme.palette.info.light,
+                    }}
+                  >
                     No students found in this course/track combination
                   </Alert>
                 )}
@@ -579,71 +904,135 @@ const CreateAssignment = () => {
           </Grid>
         );
 
-      case 3:
+      case 2:
         return (
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Card variant="outlined">
+              <Card
+                variant="outlined"
+                sx={{
+                  borderRadius: "10px",
+                  border: `1px solid ${theme.palette.grey[200]}`,
+                  backgroundColor: theme.palette.background.paper,
+                }}
+              >
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>
+                  <Typography
+                    variant="h6"
+                    gutterBottom
+                    sx={{ fontWeight: 500, color: theme.palette.text.primary }}
+                  >
                     Assignment Summary
                   </Typography>
                   <Stack spacing={2}>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Title
                       </Typography>
-                      <Typography>{formData.title}</Typography>
+                      <Typography variant="body2">{formData.title}</Typography>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Type
                       </Typography>
-                      <Typography sx={{ textTransform: "capitalize" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ textTransform: "capitalize" }}
+                      >
                         {formData.assignment_type}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
+                        Difficulty
+                      </Typography>
+                      <Typography variant="body2">
+                        {formData.difficulty}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Description
                       </Typography>
-                      <Typography sx={{ whiteSpace: "pre-line" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ whiteSpace: "pre-line" }}
+                      >
                         {formData.description}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Dates
                       </Typography>
-                      <Typography>
+                      <Typography variant="body2">
                         Due: {formData.due_date?.toLocaleString() || "Not set"}
                         <br />
                         End: {formData.end_date?.toLocaleString() || "Not set"}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         URL
                       </Typography>
-                      <Link href={formData.file_url} target="_blank">
+                      <Link
+                        href={formData.file_url}
+                        target="_blank"
+                        sx={{
+                          color: theme.palette.primary.main,
+                          fontSize: "0.875rem",
+                        }}
+                      >
                         {formData.file_url}
                       </Link>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Course & Track
                       </Typography>
-                      <Typography>
+                      <Typography variant="body2">
                         {courses.find((c) => c.id === formData.course)?.name}
                         <br />
                         {tracks.find((t) => t.id === formData.track)?.name}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500 }}
+                      >
                         Assigned To
                       </Typography>
-                      <Typography>
+                      <Typography variant="body2">
                         {formData.assignToAll
                           ? `All students (${students?.length || 0}) in course`
                           : formData.selectedStudents.length > 0
@@ -674,12 +1063,19 @@ const CreateAssignment = () => {
           maxWidth: 800,
           mx: "auto",
           p: isMobile ? 2 : 3,
+          bgcolor: theme.palette.background.default,
+          borderRadius: "12px",
         }}
       >
         <Typography
-          variant="h4"
+          variant="h5"
           gutterBottom
-          sx={{ fontWeight: "bold", marginBottom: "2rem" }}
+          sx={{
+            fontWeight: 500,
+            color: theme.palette.text.primary,
+            mb: 3,
+            textAlign: "center",
+          }}
         >
           Create New Assignment
         </Typography>
@@ -690,19 +1086,41 @@ const CreateAssignment = () => {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              my: 4,
+              my: 3,
             }}
           >
-            <CircularProgress />
+            <CircularProgress size={32} />
           </Box>
         )}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert
+            severity="error"
+            sx={{
+              mb: 2,
+              borderRadius: "8px",
+              fontSize: "0.875rem",
+              bgcolor: theme.palette.error.light,
+            }}
+          >
             {error}
           </Alert>
         )}
 
-        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+        <Stepper
+          activeStep={activeStep}
+          alternativeLabel
+          sx={{
+            mb: 4,
+            "& .MuiStepLabel-label": {
+              fontWeight: 500,
+              fontSize: "0.9rem",
+              color: theme.palette.text.primary,
+            },
+            "& .MuiStepIcon-root": {
+              fontSize: "1.5rem",
+            },
+          }}
+        >
           {steps.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
@@ -710,42 +1128,70 @@ const CreateAssignment = () => {
           ))}
         </Stepper>
 
-        <Paper elevation={3} sx={{ p: isMobile ? 2 : 4 }}>
-          <form onSubmit={handleSubmit}>
+        <Paper
+          elevation={2}
+          sx={{
+            p: isMobile ? 2 : 3,
+            borderRadius: "10px",
+            background: theme.palette.background.paper,
+            border: `1px solid ${theme.palette.grey[200]}`,
+          }}
+        >
+          <form onSubmit={(e) => {
+  e.preventDefault();
+  if (activeStep === steps.length - 1) {
+    handleSubmit();
+  } else {
+    handleNext();
+  }
+}}>
             {getStepContent(activeStep)}
+            
 
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}
-            >
-              <Button
-                disabled={activeStep === 0}
-                onClick={handleBack}
-                variant="outlined"
-                size="large"
-              >
-                Back
-              </Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, gap: 2 }}>
+  <Button
+    disabled={activeStep === 0}
+    onClick={handleBack}
+    variant="outlined"
+    sx={{
+      borderRadius: "8px",
+      fontWeight: 500,
+      px: 3,
+      py: 1,
+      borderColor: theme.palette.grey[300],
+      color: theme.palette.text.primary,
+      textTransform: "none",
+      "&:hover": {
+        borderColor: theme.palette.primary.main,
+        bgcolor: theme.palette.grey[50],
+      },
+    }}
+  >
+    Back
+  </Button>
 
-              {activeStep === steps.length - 1 ? (
-                <ColorButton
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  disabled={loading}
-                  endIcon={<SendIcon />}
-                >
-                  {loading ? (
-                    <CircularProgress size={24} />
-                  ) : (
-                    "Submit Assignment"
-                  )}
-                </ColorButton>
-              ) : (
-                <Button variant="contained" onClick={handleNext} size="large">
-                  Next
-                </Button>
-              )}
-            </Box>
+  {activeStep === steps.length - 1 ? (
+    <SimpleButton
+      type="submit"
+      variant="contained"
+      disabled={loading}
+      endIcon={<SendIcon />}
+    >
+      {loading ? (
+        <CircularProgress size={20} color="inherit" />
+      ) : (
+        "Submit Assignment"
+      )}
+    </SimpleButton>
+  ) : (
+    <SimpleButton
+      type="submit"  // Changed from onClick={handleNext}
+      variant="contained"
+    >
+      Next
+    </SimpleButton>
+  )}
+</Box>
           </form>
         </Paper>
 
@@ -753,49 +1199,332 @@ const CreateAssignment = () => {
           open={submitDialog.open}
           onClose={handleDialogClose}
           TransitionComponent={Fade}
-          transitionDuration={500}
+          transitionDuration={400}
         >
-          <DialogTitle sx={{ textAlign: "center", pb: 0 }}>
-            {submitDialog.success ? (
-              <CheckCircleIcon
-                color="success"
-                sx={{ fontSize: 60, mb: 2, animation: "bounce 0.5s" }}
-              />
-            ) : (
-              <ErrorIcon
-                color="error"
-                sx={{ fontSize: 60, mb: 2, animation: "shake 0.5s" }}
-              />
-            )}
-            <Typography variant="h5" sx={{ fontWeight: "bold" }}>
-              {submitDialog.success
-                ? "Assignment Created!"
-                : "Submission Failed"}
-            </Typography>
-          </DialogTitle>
+          <DialogTitle sx={{ textAlign: "center", pb: 2 }}>
+  {submitDialog.success ? (
+    <CheckCircleIcon
+      color="success"
+      sx={{ fontSize: 50, mb: 1, animation: "bounce 0.5s" }}
+    />
+  ) : (
+    <ErrorIcon
+      color="error"
+      sx={{ fontSize: 50, mb: 1, animation: "shake 0.5s" }}
+    />
+  )}
+  <Typography
+    component="div"  // Changed from variant="h6"
+    sx={{ 
+      fontWeight: 500, 
+      color: theme.palette.text.primary,
+      fontSize: '1.25rem' // Adjust size as needed
+    }}
+  >
+    {submitDialog.success
+      ? "Assignment Created"
+      : "Submission Failed"}
+  </Typography>
+</DialogTitle>
           <DialogContent sx={{ textAlign: "center" }}>
-            <Typography sx={{ mb: 2 }}>{submitDialog.message}</Typography>
+            <Typography
+              sx={{ mb: 2, fontSize: "0.875rem", color: theme.palette.text.secondary }}
+            >
+              {submitDialog.message}
+            </Typography>
             {submitDialog.success && formData.file_url && (
               <Box sx={{ mt: 2 }}>
                 <Link href={formData.file_url} target="_blank" rel="noopener">
-                  <Button
+                  <SimpleButton
                     variant="contained"
-                    color="primary"
                     startIcon={<LinkIcon />}
-                    sx={{ borderRadius: "20px", fontWeight: "bold" }}
+                    sx={{ fontSize: "0.875rem" }}
                   >
                     View Assignment
-                  </Button>
+                  </SimpleButton>
                 </Link>
               </Box>
             )}
           </DialogContent>
-          <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
+          <DialogActions sx={{ justifyContent: "center", pb: 2 }}>
             <Button
               onClick={handleDialogClose}
               variant="outlined"
               color={submitDialog.success ? "primary" : "error"}
-              sx={{ borderRadius: "20px", fontWeight: "bold" }}
+              sx={{
+                borderRadius: "8px",
+                fontWeight: 500,
+                px: 3,
+                py: 1,
+                textTransform: "none",
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </StyledDialog>
+
+        <StyledDialog
+          open={recommendationDialog.open}
+          onClose={handleRecommendationDialogClose}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: "flex", alignItems: "center", pb: 2 }}>
+  <AutoAwesomeIcon
+    sx={{ mr: 1, color: theme.palette.primary.main, fontSize: 22 }}
+  />
+  <Typography
+    component="div"
+    sx={{ 
+      fontWeight: 500, 
+      color: theme.palette.text.primary,
+      fontSize: '1.25rem'
+    }}
+  >
+    AI Task Recommendations
+  </Typography>
+</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12}>
+                <FormControl fullWidth  sx={{ mt: 2 }}>
+                  <InputLabel sx={{ fontWeight: 500, fontSize: "0.875rem" }}>
+                    Recommendation Method
+                  </InputLabel>
+                  <StyledSelect
+                    value={recommendationDialog.methodChoice}
+                    onChange={handleRecommendationMethodChange}
+                    label="Recommendation Method"
+                    sx={{ fontSize: "0.875rem" }}
+                  >
+                    <MenuItem value="1" sx={{ fontSize: "0.875rem" }}>
+                      Latest Assignments Created
+                    </MenuItem>
+                    <MenuItem value="2" sx={{ fontSize: "0.875rem" }}>
+                      Brief Description
+                    </MenuItem>
+                    <MenuItem value="3" sx={{ fontSize: "0.875rem" }}>
+                      Chat with AI
+                    </MenuItem>
+                  </StyledSelect>
+                </FormControl>
+              </Grid>
+              {recommendationDialog.methodChoice === "2" && (
+                <Grid item xs={12}>
+                  <StyledTextField
+                    label="Brief Description"
+                    value={recommendationDialog.briefDescription}
+                    onChange={handleBriefDescriptionChange}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    helperText="Provide a brief description to generate recommendations"
+                    sx={{ "& .MuiInputBase-input": { fontSize: "0.875rem" } }}
+                  />
+                </Grid>
+              )}
+              {recommendationDialog.methodChoice === "3" && (
+                <Grid item xs={12}>
+                  <ChatContainer>
+                    {recommendationDialog.chatResponse && (
+                      <ChatMessage>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 500,
+                            mb: 1,
+                            color: theme.palette.text.primary,
+                          }}
+                        >
+                          AI Response
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: "pre-line",
+                            lineHeight: 1.8,
+                            color: theme.palette.text.primary,
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          {recommendationDialog.chatResponse}
+                        </Typography>
+                      </ChatMessage>
+                    )}
+                    {recommendationDialog.loading && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 2,
+                          fontStyle: "italic",
+                          textAlign: "center",
+                          fontSize: "0.875rem",
+                        }}
+                      >
+                        Generating response...
+                      </Typography>
+                    )}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        alignItems: "center",
+                        bgcolor: theme.palette.grey[50],
+                        p: 1,
+                        borderRadius: "8px",
+                        border: `1px solid ${theme.palette.grey[200]}`,
+                      }}
+                    >
+                      <StyledTextField
+                        label="Ask AI for assignment ideas"
+                        value={recommendationDialog.chatInput}
+                        onChange={handleChatInputChange}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && fetchRecommendations()
+                        }
+                        fullWidth
+                        multiline
+                        rows={2}
+                        placeholder="E.g., Suggest a project for a Python course"
+                        sx={{
+                          "& .MuiInputBase-input": { fontSize: "0.875rem" },
+                          "& .MuiInputLabel-root": { fontSize: "0.875rem" },
+                        }}
+                      />
+                      <SimpleButton
+                        variant="contained"
+                        onClick={fetchRecommendations}
+                        disabled={
+                          !recommendationDialog.chatInput.trim() ||
+                          recommendationDialog.loading
+                        }
+                        sx={{ py: 1, px: 2, minWidth: "80px" }}
+                      >
+                        Send
+                      </SimpleButton>
+                    </Box>
+                  </ChatContainer>
+                </Grid>
+              )}
+              {(recommendationDialog.methodChoice === "1" ||
+                recommendationDialog.methodChoice === "2") && (
+                <Grid item xs={12}>
+                  <SimpleButton
+                    variant="contained"
+                    onClick={fetchRecommendations}
+                    disabled={
+                      recommendationDialog.methodChoice === "2" &&
+                      !recommendationDialog.briefDescription.trim()
+                    }
+                    fullWidth
+                    sx={{ py: 1 }}
+                  >
+                    Get Recommendations
+                  </SimpleButton>
+                </Grid>
+              )}
+            </Grid>
+            {recommendationDialog.loading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  my: 3,
+                }}
+              >
+                <CircularProgress size={32} />
+              </Box>
+            ) : recommendationDialog.recommendations.length > 0 ? (
+              <Grid container spacing={2}>
+                {recommendationDialog.recommendations.map((rec, index) => (
+                  <Grid item xs={12} sm={6} key={index}>
+                    <RecommendationCard variant="outlined">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle2"
+                          gutterBottom
+                          sx={{
+                            fontWeight: 500,
+                            color: theme.palette.text.primary,
+                          }}
+                        >
+                          {rec.title}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          paragraph
+                          sx={{ lineHeight: 1.7, fontSize: "0.875rem" }}
+                        >
+                          {rec.description}
+                        </Typography>
+                        {recommendationDialog.methodChoice === "1" && (
+                          <>
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              sx={{
+                                color: theme.palette.text.secondary,
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              Course: {rec.course_name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              sx={{
+                                color: theme.palette.text.secondary,
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              Difficulty: {rec.difficulty}
+                            </Typography>
+                          </>
+                        )}
+                        <SimpleButton
+                          variant="contained"
+                          size="small"
+                          sx={{
+                            mt: 2,
+                            fontSize: "0.75rem",
+                            px: 2,
+                            py: 0.5,
+                          }}
+                          onClick={() => handleRecommendationSelect(rec)}
+                        >
+                          Use this
+                        </SimpleButton>
+                      </CardContent>
+                    </RecommendationCard>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: "center", mt: 2, fontSize: "0.875rem" }}
+              >
+                No recommendations available. Try adjusting your input.
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: "flex-end", pt: 2 }}>
+            <Button
+              onClick={handleRecommendationDialogClose}
+              variant="outlined"
+              color="primary"
+              sx={{
+                borderRadius: "8px",
+                fontWeight: 500,
+                px: 3,
+                py: 1,
+                textTransform: "none",
+                fontSize: "0.875rem",
+              }}
             >
               Close
             </Button>
@@ -808,6 +1537,14 @@ const CreateAssignment = () => {
           onClose={() => setShowResetIndicator(false)}
           message="Form reset successfully"
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          sx={{
+            "& .MuiSnackbarContent-root": {
+              borderRadius: "8px",
+              bgcolor: theme.palette.success.light,
+              color: theme.palette.success.contrastText,
+              fontSize: "0.875rem",
+            },
+          }}
         />
       </Box>
     </LocalizationProvider>
@@ -819,13 +1556,13 @@ const styleSheet = document.createElement("style");
 styleSheet.innerHTML = `
   @keyframes bounce {
     0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-20px); }
-    60% { transform: translateY(-10px); }
+    40% { transform: translateY(-15px); }
+    60% { transform: translateY(-7px); }
   }
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
   }
 `;
 document.head.appendChild(styleSheet);

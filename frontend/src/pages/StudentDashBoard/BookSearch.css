@@ -1,0 +1,39 @@
+.book-search-container {
+    padding: 16px;
+  }
+  
+  .book-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-radius: 8px;
+    background-color: #fff;
+  }
+  
+  .book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .book-title {
+    color: #00897b;
+    font-weight: 600;
+  }
+  
+  .book-link {
+    color: #00897b;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .book-link:hover {
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 600px) {
+    .book-search-container {
+      padding: 8px;
+    }
+  
+    .book-card {
+      margin-bottom: 16px;
+    }
+  }

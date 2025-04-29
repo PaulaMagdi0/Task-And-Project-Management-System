@@ -21,6 +21,7 @@ from .models import Assignment, Track, Student, AssignmentStudent
 
 from rest_framework import serializers
 from .models import Assignment, Track, Student, AssignmentStudent
+from ai_recommendations.views import refresh_embeddings
 
 class AssignmentSerializer(serializers.ModelSerializer):
     track = serializers.PrimaryKeyRelatedField(queryset=Track.objects.all(), write_only=True, required=True)
@@ -41,7 +42,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
         fields = [
-            'id', 'title', 'due_date', 'end_date', 'assignment_type', 'course', 'description', 
+            'id', 'title', 'due_date', 'end_date', 'assignment_type','difficulty', 'course', 'description', 
             'file', 'file_url', 'created_at', 'assigned_to', 'course_name', 'track_name', 
             'track', 'assigned_to_all'
         ]
@@ -106,6 +107,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
                 assigned_students.add(student)
             else:
                 print(f"❌ Student {student.id} is already assigned to assignment {assignment.id}, skipping...")
+
+    # ➔ IMPORTANT: Refresh the embeddings after new assignment is created
+        refresh_embeddings()
 
         return assignment
 
