@@ -12,4 +12,5 @@ urlpatterns = [
     path('reassign-instructor/<int:pk>/', ReassignCourseInstructorView.as_view(), name='reassign-course-instructor'),
     path("assign-course-to-track/",AssignCourseToTrackView.as_view(),name="assign-course-to-track")
 
+
 ]

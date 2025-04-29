@@ -11,6 +11,7 @@ import logging
 from django.db import transaction
 from django.core.validators import validate_email
 from io import BytesIO
+from apps.tracks.serializers import TrackSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -505,3 +506,12 @@ class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
         except AssignmentStudent.DoesNotExist:
             return None
         return None
+
+# students/serializers.py
+
+class StudentSerializer(serializers.ModelSerializer):
+    track = TrackSerializer()  # Nested track info
+
+    class Meta:
+        model = Student
+        fields = ['id', 'email', 'username','first_name', 'last_name', 'track']

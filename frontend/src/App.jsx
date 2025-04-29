@@ -50,6 +50,7 @@ import "./assets/css/main.css";
 import "aos/dist/aos.css";
 import "./App.css";
 import NotVerifiedPage from './pages/NotVerifiedPage';
+import AddCourses from './Components/AddCourses/AddCourss';
 
 const App = () => {
   useCustomScripts();
@@ -73,7 +74,8 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
-      
+          <Route path="/hello" element={<AddCourses />} />
+
 
           <Route path="/github-stat" element={<GitHubStat />} />
       

@@ -1,6 +1,5 @@
 import logging
 from rest_framework import status
-from rest_framework.response import Response
 from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes,parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -21,6 +20,17 @@ from apps.staff_members.models import StaffMember
 from apps.assignments.serializers import AssignmentSerializer
 from apps.courses.serializers import CourseSerializer  # Ensure you have this serializer
 from rest_framework.views import APIView
+from django.contrib.auth.hashers import check_password
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from .models import Student
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 #UPload Excel File View
@@ -313,38 +323,64 @@ def student_courses(request, student_id):
     
 #UPdate student Info View
 
-from django.contrib.auth.hashers import check_password
-
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
-    
-    if request.user.id != student.id:
-        return Response({"error": "Permission denied"}, status=403)
-
-    current_password = request.data.get('currentPassword')
-    new_password = request.data.get('newPassword')
-
-    # Validate inputs
-    if not current_password or not new_password:
-        return Response({"error": "Both passwords required"}, status=400)
-
-    # Verify current password
-    if not check_password(current_password, student.password):  # Changed this line
-        return Response({"error": "Current password incorrect"}, status=400)
-
-    if len(new_password) < 8:
-        return Response({"error": "Password too short"}, status=400)
-
-    if current_password == new_password:
-        return Response({"error": "New password must differ"}, status=400)
-
     try:
-        student.set_password(new_password)
+        # Fetch the student object or return a 404 if not found
+        student = get_object_or_404(Student, id=student_id)
+
+        # Check permissions: only allow the student to update their own details or a supervisor
+        if request.user.id != student.id and request.user.role != 'supervisor':
+            return Response({"error": "Permission denied"}, status=403)
+
+        # Get fields from the request
+        new_password = request.data.get('newPassword')
+        new_email = request.data.get('email')
+        first_name = request.data.get('firstName')  # Get first name from request
+        last_name = request.data.get('lastName')    # Get last name from request
+
+        # Initialize a dictionary to track updates
+        updates = {}
+
+        # Password update logic
+        if new_password:
+            if len(new_password) < 8:
+                return Response({"error": "Password too short"}, status=400)
+
+            # Set the new password
+            student.set_password(new_password)
+            updates['password'] = '******'  # Don't return the password for security reasons
+
+        # Update email if provided
+        if new_email:
+            try:
+                # Validate email format
+                validate_email(new_email)
+                student.email = new_email
+                updates['email'] = new_email
+            except ValidationError:
+                return Response({"error": "Invalid email format"}, status=400)
+
+        # Update first and last names if provided
+        if first_name:
+            student.first_name = first_name
+            updates['firstName'] = first_name
+
+        if last_name:
+            student.last_name = last_name
+            updates['lastName'] = last_name
+
+        # Save the student object and commit changes to the database
         student.save()
-        return Response({"message": "Password updated"})
+
+        # Log the updates and return success response
+        logger.info(f"Student with ID {student_id} updated: {updates}")
+        return Response({"message": "Student updated successfully", "updates": updates})
+
     except Exception as e:
+        # Log and handle unexpected errors
+        logger.error(f"Error updating student with ID {student_id}: {str(e)}")
         return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
@@ -444,3 +480,32 @@ class StudentsByTrackAndCourseView(APIView):
             })
 
         return Response(student_data, status=status.HTTP_200_OK)
+    
+#Return Student For SUpervisor Tracks
+class StudentsByStaffView(APIView):
+    def get(self, request, staff_id):
+        try:
+            staff = StaffMember.objects.get(id=staff_id)
+        except StaffMember.DoesNotExist:
+            return Response({'error': 'Staff member not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if staff.role == StaffMember.Role.SUPERVISOR:
+            # Get tracks supervised by the staff
+            tracks = Track.objects.filter(supervisor=staff)
+            students = Student.objects.filter(track__in=tracks)
+
+        elif staff.role == StaffMember.Role.INSTRUCTOR:
+            # Get courses taught by this instructor
+            courses = Course.objects.filter(instructor=staff)  # If M2M, use .filter(instructors=staff)
+
+            # Get track IDs linked to these courses through CourseTrack
+            track_ids = CourseTrack.objects.filter(course__in=courses).values_list('track_id', flat=True)
+
+            # Get students in those tracks
+            students = Student.objects.filter(track_id__in=track_ids).distinct()
+
+        else:
+            return Response({'error': 'Staff member must be a supervisor or instructor.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = StudentSerializer(students, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
