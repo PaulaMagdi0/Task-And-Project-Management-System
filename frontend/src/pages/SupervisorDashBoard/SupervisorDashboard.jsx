@@ -16,6 +16,7 @@ import './SupervisorDashboard.css';
 import { NotebookText, ArchiveRestore } from 'lucide-react';
 
 // Import your components
+import AllCourseManagement from "../../Components/AllCourseManagement/AllCourseManagement"
 import Courses from './Courses';
 import Assignments from '../../Components/Assignments/Assignments';
 import Submissions from '../../Components/Submissions/Submissions';
@@ -30,7 +31,6 @@ import ChatRoomView from '../../Components/Chat/ChatRoomView';
 import ChatRoomList from '../../Components/Chat/ChatRoomList';
 import Tracks from '../../Components/Tracks/Tracks';
 import ReassignInstructor from '../../Components/ReAssignCourse/ReAssignCourse';
-import AllCourseManagement from '../../Components/AllCourseManagement/AllCourseManagement';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -105,10 +105,10 @@ const SupervisorDashboard = () => {
             <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="view-assignment" element={<Assignments />} />
             <Route path="submissions" element={<Submissions />} />
-            <Route path="all-course-management" element={<AllCourseManagement />} />
-            <Route path="create-assignment" element={<CreateAssignment />} />
+            <Route path="addcourses" element={<AddCourses />} />
             <Route path="Grades" element={<Grades />} />
             <Route path="ReAssignCourse" element={<ReassignInstructor />} />
+            <Route path="all-course-management" element={<AllCourseManagement />} />
             {/* Chat routes */}
             <Route path="chat" element={<ChatRoomList />} />
             <Route path="chat/rooms/:roomId" element={<ChatRoomView />} />
