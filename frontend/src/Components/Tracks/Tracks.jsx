@@ -9,6 +9,9 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import { useDispatch, useSelector } from "react-redux";
+import { fetchCourses } from "../../redux/coursesSlice";
+import{ useEffect } from "react";
 
 // Styled components for enhanced UI
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -51,29 +54,17 @@ const formatDate = (dateString) => {
   }
 };
 
-// Sample tracks data from API response
-const tracksData = [
-  {
-    id: 2,
-    name: 'PHP',
-    description: 'sda',
-    track_type: 'ICC',
-    supervisor: 'Mina Nagy',
-    supervisor_role: 'Supervisor',
-    created_at: '2025-04-27T12:34:25.292665Z',
-  },
-  {
-    id: 1,
-    name: 'Python',
-    description: 'dsad',
-    track_type: 'ICC',
-    supervisor: 'Mina Nagy',
-    supervisor_role: 'Supervisor',
-    created_at: '2025-04-27T11:48:04.543658Z',
-  },
-];
 
 const Tracks = () => {
+    const dispatch = useDispatch();
+    const user_id = useSelector((state) => state.auth.user_id);
+    const {tracks:tracksData} = useSelector((state) => state.courses.userCourses);
+  useEffect(() => {
+    if (user_id) {
+      dispatch(fetchCourses(user_id));
+    }
+  }, [dispatch, user_id]);
+
   const columns = [
     { id: 'name', label: 'Track Name', minWidth: 150 },
     { id: 'description', label: 'Description', minWidth: 200 },
@@ -113,8 +104,8 @@ const Tracks = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {tracksData.length > 0 ? (
-                tracksData.map((track) => (
+              {tracksData?.length > 0 ? (
+                tracksData?.map((track) => (
                   <StyledTableRow key={track.id}>
                     <TableCell sx={{ padding: 2 }}>{track.name}</TableCell>
                     <TableCell sx={{ padding: 2 }}>

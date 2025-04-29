@@ -1,20 +1,23 @@
 # ai_recommendations/views.py
 
 from django.http import JsonResponse
+from django.core.cache import cache
 from apps.assignments.models import Assignment
 from apps.courses.models import Course
 from transformers import BertTokenizer, BertModel
 import torch
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Load pre-trained BERT model and tokenizer (CPU only)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 device = torch.device("cpu")
 model = BertModel.from_pretrained('bert-base-uncased').to(device)
 
-# Initialize global variables
-assignments_queryset = []
-assignments_embeddings = None
+# ========== Utilities ==========
 
 def get_embeddings(texts):
     inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(device)
@@ -33,17 +36,31 @@ def fetch_assignments_and_embeddings():
     return assignments, embeddings
 
 def refresh_embeddings():
-    """Refresh the assignments queryset and their corresponding embeddings."""
-    global assignments_queryset, assignments_embeddings
+    """Refresh the assignments queryset and their corresponding embeddings in cache."""
     assignments_queryset, assignments_embeddings = fetch_assignments_and_embeddings()
+    cache.set('assignments_queryset', list(assignments_queryset))
+    cache.set('assignments_embeddings', assignments_embeddings)
+
+def get_cached_embeddings():
+    assignments_queryset = cache.get('assignments_queryset', [])
+    assignments_embeddings = cache.get('assignments_embeddings', None)
+    return assignments_queryset, assignments_embeddings
 
 # Fetch assignments and embeddings ONCE initially
-refresh_embeddings()
+try:
+    from apps.assignments.models import Assignment
+    if Assignment.objects.exists():
+        refresh_embeddings()
+except Exception as e:
+    print(f"[WARNING] Couldn't refresh embeddings at startup: {e}")
+
+# ========== Recommendation Logic ==========
 
 def recommend_using_course_and_difficulty(course_name, difficulty, top_n=3):
     try:
         course = Course.objects.get(name__iexact=course_name.strip())
     except Course.DoesNotExist:
+        logger.error(f"No course found with the name: {course_name}")
         return f"❌ No course found with the name: {course_name}"
 
     filtered_assignments = Assignment.objects.filter(
@@ -52,12 +69,19 @@ def recommend_using_course_and_difficulty(course_name, difficulty, top_n=3):
     ).order_by('-created_at')[:top_n]
 
     if not filtered_assignments.exists():
+        logger.warning(f"No assignments found for course '{course_name}' with difficulty '{difficulty}'")
         return f"⚠️ No assignments found for course '{course_name}' with difficulty '{difficulty}'"
 
     return filtered_assignments
 
 def recommend_based_on_brief(brief_description, top_n=3):
+    if not brief_description.strip():
+        return f"⚠️ Brief description is empty."
+
+    assignments_queryset, assignments_embeddings = get_cached_embeddings()
+
     if assignments_embeddings is None or len(assignments_queryset) == 0:
+        logger.warning("No assignments available for recommendation.")
         return f"⚠️ No assignments available for recommendation."
 
     brief_embedding = get_embeddings([brief_description])
@@ -67,15 +91,21 @@ def recommend_based_on_brief(brief_description, top_n=3):
     )[0]
 
     top_indices = sim_scores.argsort()[-top_n:][::-1]
-
     assignments_list = list(assignments_queryset)
     recommended_assignments = [assignments_list[i] for i in top_indices]
 
     return recommended_assignments
 
+# ========== API View ==========
+
 def get_recommendations(request):
     method_choice = request.GET.get("method_choice", "1")  # "1" for Course+Difficulty, "2" for Brief Description
-    top_n = int(request.GET.get("top_n", 4))  # Allow passing top_n optionally
+    top_n = int(request.GET.get("top_n", 4))
+
+    # Auto-refresh if assignments count changed
+    cached_assignments, _ = get_cached_embeddings()
+    if Assignment.objects.count() != len(cached_assignments):
+        refresh_embeddings()
 
     if method_choice == "1":
         course_name = request.GET.get("course_name", "Java")
@@ -85,6 +115,7 @@ def get_recommendations(request):
         brief_description = request.GET.get("brief_description", "web app using django")
         recommendations = recommend_based_on_brief(brief_description, top_n=top_n)
     else:
+        logger.error("Invalid method choice.")
         return JsonResponse({"error": "Invalid method choice."}, status=400)
 
     if isinstance(recommendations, str):
