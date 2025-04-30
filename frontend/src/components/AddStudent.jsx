@@ -19,7 +19,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  Autocomplete
 } from '@mui/material';
 import { Close, CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
 import CloudUpload from '@mui/icons-material/CloudUpload';
@@ -60,17 +61,27 @@ export default function UploadStudentPage() {
   const tracks = userCourses?.tracks || [];
   const tracksLoading = status.fetchCoursesLoading;
 
-  // Debug logging to verify data
-  useEffect(() => {
-    console.log('Tracks data:', tracks);
-    console.log('Tracks loading:', tracksLoading);
-  }, [tracks, tracksLoading]);
+  // State for intakes
+  const [intakes, setIntakes] = useState([]);
+  const [intakesLoading, setIntakesLoading] = useState(false);
 
-  // Fetch tracks and courses on mount
+  // Fetch tracks and intakes on mount
   useEffect(() => {
     if (user_id) {
       dispatch(fetchCourses(user_id));
     }
+    // Fetch intakes
+    setIntakesLoading(true);
+    apiClient.get('/student/intakes/')
+      .then(response => {
+        setIntakes(response.data.intakes || []);
+      })
+      .catch(error => {
+        console.error('Failed to fetch intakes:', error);
+      })
+      .finally(() => {
+        setIntakesLoading(false);
+      });
   }, [dispatch, user_id]);
 
   const [isExcelUpload, setIsExcelUpload] = useState(false);
@@ -79,6 +90,7 @@ export default function UploadStudentPage() {
     last_name: '',
     email: '',
     track_id: '',
+    intake: '',
     role: 'student'
   });
   const [excelFile, setExcelFile] = useState(null);
@@ -146,14 +158,15 @@ export default function UploadStudentPage() {
   };
 
   const handleSubmitManualStudent = async () => {
-    const { first_name, last_name, email, track_id } = studentData;
-    if (!first_name || !last_name || !email || !track_id) {
+    const { first_name, last_name, email, track_id, intake } = studentData;
+    if (!first_name || !last_name || !email || !track_id || !intake) {
       showErrorModal('Please fill all required fields', {
         details: {
           ...(first_name ? {} : { first_name: ['This field is required'] }),
           ...(last_name ? {} : { last_name: ['This field is required'] }),
           ...(email ? {} : { email: ['This field is required'] }),
-          ...(track_id ? {} : { track_id: ['This field is required'] })
+          ...(track_id ? {} : { track_id: ['This field is required'] }),
+          ...(intake ? {} : { intake: ['This field is required'] })
         }
       });
       return;
@@ -170,7 +183,10 @@ export default function UploadStudentPage() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       showSuccessModal('Student added successfully! Verification email sent.');
-      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
+      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', intake: '', role: 'student' });
+      // Refresh intakes
+      const intakeResponse = await apiClient.get('/student/intakes/');
+      setIntakes(intakeResponse.data.intakes || []);
     } catch (err) {
       console.error('Create student error:', err.response?.data || err.message); // Debug full error
       const errorData = err.response?.data || { error: 'Unknown error occurred' };
@@ -192,12 +208,17 @@ export default function UploadStudentPage() {
       showErrorModal('Please select a track');
       return;
     }
+    if (!studentData.intake) {
+      showErrorModal('Please select or enter an intake');
+      return;
+    }
     setLoading(true);
     setStudentStatuses([]); // Clear previous statuses
     try {
       const form = new FormData();
       form.append('excel_file', excelFile);
       form.append('track_id', studentData.track_id);
+      form.append('intake', studentData.intake);
       const resp = await apiClient.post('/student/upload/', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -237,8 +258,11 @@ export default function UploadStudentPage() {
         showErrorModal('No students were created and no specific errors reported.');
       }
 
-      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', role: 'student' });
+      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', intake: '', role: 'student' });
       setExcelFile(null);
+      // Refresh intakes
+      const intakeResponse = await apiClient.get('/student/intakes/');
+      setIntakes(intakeResponse.data.intakes || []);
     } catch (err) {
       console.error('Excel upload error:', err.response?.data || err.message);
       const errorData = err.response?.data || { error: 'Upload failed' };
@@ -341,6 +365,29 @@ export default function UploadStudentPage() {
                   )}
                 </StyledTextField>
               </Grid>
+              <Grid item xs={12}>
+                <Autocomplete
+                  freeSolo
+                  options={intakes}
+                  value={studentData.intake}
+                  onChange={(event, newValue) => {
+                    setStudentData(prev => ({ ...prev, intake: newValue || '' }));
+                  }}
+                  onInputChange={(event, newInputValue) => {
+                    setStudentData(prev => ({ ...prev, intake: newInputValue }));
+                  }}
+                  renderInput={params => (
+                    <StyledTextField
+                      {...params}
+                      label="Intake *"
+                      fullWidth
+                      name="intake"
+                      placeholder="Select or enter new intake (e.g., Intake 45)"
+                    />
+                  )}
+                  disabled={intakesLoading}
+                />
+              </Grid>
             </Grid>
 
             <StyledButton
@@ -413,6 +460,29 @@ export default function UploadStudentPage() {
                 <MenuItem disabled>No tracks available</MenuItem>
               )}
             </StyledTextField>
+
+            <Autocomplete
+              freeSolo
+              options={intakes}
+              value={studentData.intake}
+              onChange={(event, newValue) => {
+                setStudentData(prev => ({ ...prev, intake: newValue || '' }));
+              }}
+              onInputChange={(event, newInputValue) => {
+                setStudentData(prev => ({ ...prev, intake: newInputValue }));
+              }}
+              renderInput={params => (
+                <StyledTextField
+                  {...params}
+                  label="Intake *"
+                  fullWidth
+                  name="intake"
+                  placeholder="Select or enter new intake (e.g., Intake 45)"
+                  sx={{ mb: 3 }}
+                />
+              )}
+              disabled={intakesLoading}
+            />
 
             <StyledButton
               variant="contained"

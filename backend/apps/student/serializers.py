@@ -23,9 +23,10 @@ class ExcelUploadSerializer(serializers.Serializer):
         allow_null=True,
         source='track'
     )
+    intake = serializers.CharField(required=True, max_length=100)
 
     def validate_excel_file(self, value):
-        try:
+       
             if not value.name.lower().endswith(('.xlsx', '.xls')):
                 raise ValidationError("Only .xlsx or .xls files allowed")
             try:
@@ -50,15 +51,14 @@ class ExcelUploadSerializer(serializers.Serializer):
             if sheet.max_row < 2:
                 raise ValidationError("Excel file contains no data rows")
             return value
-        except ValidationError:
-            raise
-        except Exception as e:
-            logger.exception("Excel validation failed")
-            raise ValidationError("Invalid Excel file format")
+
+    def validate_intake(self, value):
+        return value.strip()
 
     def _process_excel_file(self):
         excel_file = self.validated_data['excel_file']
         track = self.validated_data.get('track')
+        intake = self.validated_data['intake']
         try:
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
@@ -74,7 +74,9 @@ class ExcelUploadSerializer(serializers.Serializer):
             raise ValidationError("Invalid Excel file format or structure")
 
         students_to_create = []
-        existing_emails = set(Student.objects.values_list('email', flat=True))
+        existing_emails_in_intake = set(
+            Student.objects.filter(intake=intake).values_list('email', flat=True)
+        )
         created_students = []
         email_password_map = {}
         errors = []
@@ -100,8 +102,8 @@ class ExcelUploadSerializer(serializers.Serializer):
                 if not self._validate_email(email):
                     errors.append(f"Row {row_num}: Invalid email format '{email}'")
                     continue
-                if email in existing_emails:
-                    errors.append(f"Row {row_num}: Email '{email}' already exists")
+                if email in existing_emails_in_intake:
+                    errors.append(f"Row {row_num}: Email '{email}' already exists in intake '{intake}'")
                     continue
                 password = self._generate_password()
                 verification_code = self._generate_verification_code()
@@ -110,6 +112,7 @@ class ExcelUploadSerializer(serializers.Serializer):
                     first_name=str(first_name).strip(),
                     last_name=str(last_name).strip(),
                     email=email,
+                    intake=intake,
                     role=(str(role) if role else 'student').strip().lower(),
                     track=track,
                     verification_code=verification_code,
@@ -117,7 +120,7 @@ class ExcelUploadSerializer(serializers.Serializer):
                 )
                 student.set_password(password)
                 students_to_create.append(student)
-                existing_emails.add(email)
+                existing_emails_in_intake.add(email)
                 email_password_map[email] = password
             except Exception as e:
                 errors.append(f"Row {row_num}: Error processing - {str(e)}")
@@ -175,6 +178,7 @@ class ExcelUploadSerializer(serializers.Serializer):
                     Your student account has been created:
                     Email: {student.email}
                     Temporary Password: {password}
+                    Intake: {student.intake}
                     Please verify your email by visiting:
                     {verification_url}
                     After verification, you can login and change your password.
@@ -214,13 +218,14 @@ class StudentSerializer(serializers.ModelSerializer):
         allow_blank=True,
         style={'input_type': 'password'}
     )
+    intake = serializers.CharField(required=True, max_length=100)
 
     class Meta:
         model = Student
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'track', 'track_id', 'password', 'is_active',
-            'verified', 'date_joined'
+            'verified', 'date_joined', 'intake'
         ]
         read_only_fields = [
             'id', 'is_active', 'verified', 'date_joined'
@@ -234,15 +239,19 @@ class StudentSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         logger.debug(f"Validating email: {value}")
-        if self.instance and self.instance.email == value:
+        intake = self.context['request'].data.get('intake') if self.context.get('request') else self.initial_data.get('intake')
+        if self.instance and self.instance.email == value and self.instance.intake == intake:
             return value
-        if Student.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already exists")
+        if Student.objects.filter(email=value, intake=intake).exists():
+            raise serializers.ValidationError(f"Email already exists in intake '{intake}'")
         try:
             validate_email(value)
         except ValidationError:
             raise serializers.ValidationError("Enter a valid email address")
         return value.lower().strip()
+
+    def validate_intake(self, value):
+        return value.strip()
 
     def validate(self, data):
         logger.debug(f"Serializer data: {data}")
@@ -255,8 +264,10 @@ class StudentSerializer(serializers.ModelSerializer):
         logger.debug(f"Creating student with validated data: {validated_data}")
         password = validated_data.pop('password', None)
         track = validated_data.pop('track', None)
+        intake = validated_data.get('intake')
         student = Student(**validated_data)
         student.track = track
+        student.intake = intake
         if password:
             student.set_password(password)
         else:
@@ -296,6 +307,7 @@ class StudentSerializer(serializers.ModelSerializer):
             Please verify your email by visiting:
             {verification_url}
             Email: {student.email}
+            Intake: {student.intake}
             Your temporary password: {password}
             """
             send_mail(
@@ -316,7 +328,7 @@ class DashboardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 
-                'upcoming_assignments', 'courses']
+                'upcoming_assignments', 'courses', 'intake']
     
     def get_upcoming_assignments(self, obj):
         return []
@@ -327,7 +339,7 @@ class DashboardSerializer(serializers.ModelSerializer):
 class MinimalStudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ['id', 'full_name', 'email']
+        fields = ['id', 'full_name', 'email', 'intake']
         
 class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
     has_submitted = serializers.SerializerMethodField()
@@ -335,7 +347,7 @@ class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Student
-        fields = ['id', 'full_name', 'email', 'has_submitted', 'submission_details']
+        fields = ['id', 'full_name', 'email', 'intake', 'has_submitted', 'submission_details']
     
     def get_has_submitted(self, student):
         assignment_id = self.context.get('assignment_id')

@@ -40,11 +40,17 @@ def upload_excel(request):
     if not has_student_management_permission(request.user):
         return Response({"detail": "You don't have permission to add students"}, status=403)
     
-    # Ensure file is provided
+    # Ensure file and intake are provided
     if 'excel_file' not in request.FILES:
         logger.warning("Excel file missing in upload request")
         return Response(
             {"error": "Excel file is required"}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if 'intake' not in request.data:
+        logger.warning("Intake missing in upload request")
+        return Response(
+            {"error": "Intake is required"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -112,22 +118,29 @@ def create_student_from_form(request):
     - email
     - role
     - track_id
+    - intake
     """
     logger.debug(f"Incoming FormData: {dict(request.data)}")
 
     email = request.data.get("email", "").strip().lower()
+    intake = request.data.get("intake", "").strip()
     
     if not email:
         return Response(
             {"error": "Email is required", "field": "email"},
             status=status.HTTP_400_BAD_REQUEST
         )
+    if not intake:
+        return Response(
+            {"error": "Intake is required", "field": "intake"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Check if student exists
-    if Student.objects.filter(email=email).exists():
+    if Student.objects.filter(email=email, intake=intake).exists():
         return Response(
             {
-                "error": f"A student with email '{email}' already exists",
+                "error": f"A student with email '{email}' already exists in intake '{intake}'",
                 "field": "email",
                 "email": email
             },
@@ -141,10 +154,11 @@ def create_student_from_form(request):
         "email": email,
         "role": request.data.get("role", "student").strip().lower(),
         "track_id": request.data.get("track_id", "").strip(),
+        "intake": intake,
     }
 
     # Validate required fields
-    required_fields = ['first_name', 'last_name', 'track_id']
+    required_fields = ['first_name', 'last_name', 'track_id', 'intake']
     missing_fields = [field for field in required_fields if not data.get(field)]
     if missing_fields:
         return Response(
@@ -226,6 +240,9 @@ def list_students(request):
         if track_id := request.query_params.get('track_id'):
             students = students.filter(track_id=track_id)
         
+        if intake := request.query_params.get('intake'):
+            students = students.filter(intake=intake)
+        
         if is_active := request.query_params.get('is_active'):
             students = students.filter(is_active=is_active.lower() == 'true')
 
@@ -246,6 +263,21 @@ def list_students(request):
         logger.error(f"Student listing error: {str(e)}")
         return Response(
             {"error": "Failed to retrieve student list"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_intakes(request):
+    """List all unique intakes"""
+    try:
+        intakes = Student.objects.values('intake').distinct()
+        intake_list = [item['intake'] for item in intakes if item['intake']]
+        return Response({"intakes": intake_list}, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Intake listing error: {str(e)}")
+        return Response(
+            {"error": "Failed to retrieve intake list"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -311,7 +343,8 @@ def student_courses(request, student_id):
                 'email': student.email,
                 'role': student.role,
                 'date_joined': student.date_joined,
-                'track_id': student.track_id
+                'track_id': student.track_id,
+                'intake': student.intake
             },
             'courses': course_data,
             'assignments': assignments_serializer.data
@@ -338,6 +371,7 @@ def update_student(request, student_id):
         new_email = request.data.get('email')
         first_name = request.data.get('firstName')
         last_name = request.data.get('lastName')
+        intake = request.data.get('intake')
 
         # Initialize a dictionary to track updates
         updates = {}
@@ -356,6 +390,8 @@ def update_student(request, student_id):
             try:
                 # Validate email format
                 validate_email(new_email)
+                if Student.objects.filter(email=new_email, intake=student.intake).exclude(id=student.id).exists():
+                    return Response({"error": f"Email '{new_email}' already exists in intake '{student.intake}'"}, status=400)
                 student.email = new_email
                 updates['email'] = new_email
             except ValidationError:
@@ -369,6 +405,13 @@ def update_student(request, student_id):
         if last_name:
             student.last_name = last_name
             updates['lastName'] = last_name
+
+        # Update intake if provided
+        if intake:
+            if Student.objects.filter(email=student.email, intake=intake).exclude(id=student.id).exists():
+                return Response({"error": f"Email '{student.email}' already exists in intake '{intake}'"}, status=400)
+            student.intake = intake
+            updates['intake'] = intake
 
         # Save the student object and commit changes to the database
         student.save()
@@ -432,6 +475,11 @@ def show_options(request):
                 'url': '/api/student/list/',
                 'description': 'List students with pagination and filtering'
             },
+            'intakes': {
+                'method': 'GET',
+                'url': '/api/student/intakes/',
+                'description': 'List all unique intakes'
+            },
             'verify': {
                 'method': 'GET',
                 'url': '/api/student/verify/<str:verification_code>/',
@@ -472,6 +520,7 @@ class StudentsByTrackAndCourseView(APIView):
                 "id": student.id,
                 "name": student.full_name,
                 "email": student.email,
+                "intake": student.intake,
                 "track": student.track.name,
                 "course": course.name,
             })
