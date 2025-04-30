@@ -54,7 +54,7 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 
 export default function UploadStudentPage() {
   const dispatch = useDispatch();
-  const { user_id } = useSelector(s => s.auth);
+  const { user_id, track_id } = useSelector(s => s.auth);
 
   // Access tracks and loading state from Redux store
   const { userCourses, status } = useSelector(s => s.courses);
@@ -70,27 +70,40 @@ export default function UploadStudentPage() {
     if (user_id) {
       dispatch(fetchCourses(user_id));
     }
-    // Fetch intakes
+    if (track_id) {
+      fetchIntakes(track_id);
+    }
+  }, [dispatch, user_id, track_id]);
+
+  const fetchIntakes = (trackId) => {
+    if (!trackId) {
+      setIntakes([]);
+      setIntakesLoading(false);
+      return;
+    }
     setIntakesLoading(true);
-    apiClient.get('/student/intakes/')
+    apiClient
+      .get('/student/intakes/', { params: { track_id: trackId } })
       .then(response => {
         setIntakes(response.data.intakes || []);
       })
       .catch(error => {
         console.error('Failed to fetch intakes:', error);
+        setIntakes([]);
       })
       .finally(() => {
         setIntakesLoading(false);
       });
-  }, [dispatch, user_id]);
+  };
 
   const [isExcelUpload, setIsExcelUpload] = useState(false);
   const [studentData, setStudentData] = useState({
     first_name: '',
     last_name: '',
     email: '',
-    track_id: '',
-    intake: '',
+    track_id: track_id || '',
+    intake_id: '',
+    intake_name: '',
     role: 'student'
   });
   const [excelFile, setExcelFile] = useState(null);
@@ -110,7 +123,7 @@ export default function UploadStudentPage() {
 
   const handleFileChange = e => {
     setExcelFile(e.target.files[0]);
-    setStudentStatuses([]); // Clear previous statuses
+    setStudentStatuses([]);
   };
 
   const handleCloseModal = () => setOpenModal(false);
@@ -126,27 +139,19 @@ export default function UploadStudentPage() {
 
   const showErrorModal = (message, details = null) => {
     let fullMessage = message;
-    // Skip details for duplicate email errors to avoid redundancy
     if (details && typeof details === 'object' && details.field === 'email' && details.error === message) {
-      // Do nothing, keep fullMessage as just the main message
+      // Skip redundant details
     } else if (details) {
       if (typeof details === 'object') {
-        // Handle validation errors with details
         if (details.details) {
           fullMessage += '\n\nDetails:\n' + Object.entries(details.details)
             .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
             .join('\n');
-        }
-        // Handle single field errors, but skip if it repeats the main message
-        else if (details.field && details.error && details.error !== message) {
+        } else if (details.field && details.error && details.error !== message) {
           fullMessage += `\n\n${details.field}: ${details.error}`;
-        }
-        // Handle Excel upload validation errors
-        else if (details.detail && details.errors) {
+        } else if (details.detail && details.errors) {
           fullMessage += `\n\n${details.detail}\n\nErrors:\n` + details.errors.join('\n');
-        }
-        // Handle generic object details
-        else if (Object.keys(details).length > 0) {
+        } else if (Object.keys(details).length > 0) {
           fullMessage += '\n\nDetails:\n' + JSON.stringify(details, null, 2);
         }
       } else if (typeof details === 'string') {
@@ -157,16 +162,34 @@ export default function UploadStudentPage() {
     setOpenModal(true);
   };
 
+  const createNewIntake = async (name) => {
+    if (!studentData.track_id) {
+      showErrorModal('Please select a track before creating an intake');
+      return null;
+    }
+    try {
+      const payload = { name, track: studentData.track_id };
+      console.log('Creating intake with payload:', payload); // Debug log
+      const response = await apiClient.post('/student/intakes/create/', payload);
+      setIntakes(prev => [...prev, response.data]);
+      return response.data.id;
+    } catch (err) {
+      console.error('Create intake error:', err.response?.data || err.message);
+      showErrorModal('Failed to create intake', err.response?.data);
+      return null;
+    }
+  };
+
   const handleSubmitManualStudent = async () => {
-    const { first_name, last_name, email, track_id, intake } = studentData;
-    if (!first_name || !last_name || !email || !track_id || !intake) {
+    const { first_name, last_name, email, track_id, intake_id, intake_name } = studentData;
+    if (!first_name || !last_name || !email || !track_id || (!intake_id && !intake_name)) {
       showErrorModal('Please fill all required fields', {
         details: {
           ...(first_name ? {} : { first_name: ['This field is required'] }),
           ...(last_name ? {} : { last_name: ['This field is required'] }),
           ...(email ? {} : { email: ['This field is required'] }),
           ...(track_id ? {} : { track_id: ['This field is required'] }),
-          ...(intake ? {} : { intake: ['This field is required'] })
+          ...(intake_id || intake_name ? {} : { intake: ['This field is required'] })
         }
       });
       return;
@@ -174,21 +197,32 @@ export default function UploadStudentPage() {
 
     setLoading(true);
     try {
+      let finalIntakeId = intake_id;
+      if (intake_name && !intake_id) {
+        finalIntakeId = await createNewIntake(intake_name);
+        if (!finalIntakeId) {
+          setLoading(false);
+          return;
+        }
+      }
+
       const form = new FormData();
-      Object.entries(studentData).forEach(([k, v]) => {
-        console.log(`FormData: ${k} = ${v}`); // Debug FormData
-        form.append(k, v);
-      });
+      form.append('first_name', first_name);
+      form.append('last_name', last_name);
+      form.append('email', email);
+      form.append('track_id', track_id);
+      form.append('intake_id', finalIntakeId);
+      form.append('role', studentData.role);
+
       const response = await apiClient.post('/student/create/', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       showSuccessModal('Student added successfully! Verification email sent.');
-      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', intake: '', role: 'student' });
+      setStudentData({ first_name: '', last_name: '', email: '', track_id: track_id || '', intake_id: '', intake_name: '', role: 'student' });
       // Refresh intakes
-      const intakeResponse = await apiClient.get('/student/intakes/');
-      setIntakes(intakeResponse.data.intakes || []);
+      fetchIntakes(studentData.track_id);
     } catch (err) {
-      console.error('Create student error:', err.response?.data || err.message); // Debug full error
+      console.error('Create student error:', err.response?.data || err.message);
       const errorData = err.response?.data || { error: 'Unknown error occurred' };
       showErrorModal(
         errorData.error || 'Failed to add student',
@@ -208,26 +242,34 @@ export default function UploadStudentPage() {
       showErrorModal('Please select a track');
       return;
     }
-    if (!studentData.intake) {
+    if (!studentData.intake_id && !studentData.intake_name) {
       showErrorModal('Please select or enter an intake');
       return;
     }
     setLoading(true);
-    setStudentStatuses([]); // Clear previous statuses
+    setStudentStatuses([]);
     try {
+      let finalIntakeId = studentData.intake_id;
+      if (studentData.intake_name && !studentData.intake_id) {
+        finalIntakeId = await createNewIntake(studentData.intake_name);
+        if (!finalIntakeId) {
+          setLoading(false);
+          return;
+        }
+      }
+
       const form = new FormData();
       form.append('excel_file', excelFile);
       form.append('track_id', studentData.track_id);
-      form.append('intake', studentData.intake);
+      form.append('intake_name', studentData.intake_name || intakes.find(i => i.id === finalIntakeId)?.name || '');
       const resp = await apiClient.post('/student/upload/', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      console.log('Excel upload response:', resp.data); // Debug log
+      console.log('Excel upload response:', resp.data);
       const errors = resp.data.errors || [];
       const createdCount = resp.data.created_count || 0;
       const students = resp.data.students || [];
 
-      // Initialize student statuses with emails from response
       const statuses = students.map(student => ({
         email: student.email || `Student ${student.id}`,
         status: 'Sending...',
@@ -235,9 +277,8 @@ export default function UploadStudentPage() {
       }));
       setStudentStatuses(statuses);
 
-      // Simulate per-student feedback with delay
       for (let i = 0; i < statuses.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
+        await new Promise(resolve => setTimeout(resolve, 300));
         setStudentStatuses(prev =>
           prev.map((s, index) =>
             index === i ? { ...s, status: 'Email sent', success: true } : s
@@ -245,7 +286,6 @@ export default function UploadStudentPage() {
         );
       }
 
-      // Show final success modal
       if (createdCount > 0) {
         const warnings = errors.map(e => e || 'Unknown error');
         showSuccessModal(`Done correctly! Created ${createdCount} students!`, warnings);
@@ -258,11 +298,9 @@ export default function UploadStudentPage() {
         showErrorModal('No students were created and no specific errors reported.');
       }
 
-      setStudentData({ first_name: '', last_name: '', email: '', track_id: '', intake: '', role: 'student' });
+      setStudentData({ first_name: '', last_name: '', email: '', track_id: track_id || '', intake_id: '', intake_name: '', role: 'student' });
       setExcelFile(null);
-      // Refresh intakes
-      const intakeResponse = await apiClient.get('/student/intakes/');
-      setIntakes(intakeResponse.data.intakes || []);
+      fetchIntakes(studentData.track_id);
     } catch (err) {
       console.error('Excel upload error:', err.response?.data || err.message);
       const errorData = err.response?.data || { error: 'Upload failed' };
@@ -350,7 +388,17 @@ export default function UploadStudentPage() {
                   fullWidth
                   name="track_id"
                   value={studentData.track_id}
-                  onChange={handleStudentInputChange}
+                  onChange={e => {
+                    const newTrackId = e.target.value;
+                    setStudentData(prev => ({
+                      ...prev,
+                      track_id: newTrackId,
+                      intake_id: '',
+                      intake_name: ''
+                    }));
+                    fetchIntakes(newTrackId);
+                  }}
+                  disabled={!!track_id || tracksLoading}
                 >
                   {tracksLoading ? (
                     <MenuItem disabled>Loading tracks...</MenuItem>
@@ -369,23 +417,27 @@ export default function UploadStudentPage() {
                 <Autocomplete
                   freeSolo
                   options={intakes}
-                  value={studentData.intake}
+                  getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
+                  value={intakes.find(i => i.id === studentData.intake_id) || studentData.intake_name}
                   onChange={(event, newValue) => {
-                    setStudentData(prev => ({ ...prev, intake: newValue || '' }));
+                    if (typeof newValue === 'object' && newValue) {
+                      setStudentData(prev => ({ ...prev, intake_id: newValue.id, intake_name: '' }));
+                    } else {
+                      setStudentData(prev => ({ ...prev, intake_id: '', intake_name: newValue || '' }));
+                    }
                   }}
                   onInputChange={(event, newInputValue) => {
-                    setStudentData(prev => ({ ...prev, intake: newInputValue }));
+                    setStudentData(prev => ({ ...prev, intake_name: newInputValue, intake_id: '' }));
                   }}
                   renderInput={params => (
                     <StyledTextField
                       {...params}
                       label="Intake *"
                       fullWidth
-                      name="intake"
                       placeholder="Select or enter new intake (e.g., Intake 45)"
                     />
                   )}
-                  disabled={intakesLoading}
+                  disabled={intakesLoading || !studentData.track_id}
                 />
               </Grid>
             </Grid>
@@ -394,7 +446,7 @@ export default function UploadStudentPage() {
               variant="contained"
               fullWidth
               onClick={handleSubmitManualStudent}
-              disabled={loading}
+              disabled={loading || !studentData.track_id}
               startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
               sx={{ mt: 3 }}
             >
@@ -445,7 +497,17 @@ export default function UploadStudentPage() {
               fullWidth
               name="track_id"
               value={studentData.track_id}
-              onChange={handleStudentInputChange}
+              onChange={e => {
+                const newTrackId = e.target.value;
+                setStudentData(prev => ({
+                  ...prev,
+                  track_id: newTrackId,
+                  intake_id: '',
+                  intake_name: ''
+                }));
+                fetchIntakes(newTrackId);
+              }}
+              disabled={!!track_id || tracksLoading}
               sx={{ mb: 3 }}
             >
               {tracksLoading ? (
@@ -453,105 +515,109 @@ export default function UploadStudentPage() {
               ) : tracks.length > 0 ? (
                 tracks.map(t => (
                   <MenuItem key={t.id} value={t.id}>
-                    {t.name}
-                  </MenuItem>
-                ))
-              ) : (
-                <MenuItem disabled>No tracks available</MenuItem>
-              )}
-            </StyledTextField>
-
-            <Autocomplete
-              freeSolo
-              options={intakes}
-              value={studentData.intake}
-              onChange={(event, newValue) => {
-                setStudentData(prev => ({ ...prev, intake: newValue || '' }));
-              }}
-              onInputChange={(event, newInputValue) => {
-                setStudentData(prev => ({ ...prev, intake: newInputValue }));
-              }}
-              renderInput={params => (
-                <StyledTextField
-                  {...params}
-                  label="Intake *"
-                  fullWidth
-                  name="intake"
-                  placeholder="Select or enter new intake (e.g., Intake 45)"
-                  sx={{ mb: 3 }}
+                        {t.name}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>No tracks available</MenuItem>
+                  )}
+                </StyledTextField>
+  
+                <Autocomplete
+                  freeSolo
+                  options={intakes}
+                  getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
+                  value={intakes.find(i => i.id === studentData.intake_id) || studentData.intake_name}
+                  onChange={(event, newValue) => {
+                    if (typeof newValue === 'object' && newValue) {
+                      setStudentData(prev => ({ ...prev, intake_id: newValue.id, intake_name: '' }));
+                    } else {
+                      setStudentData(prev => ({ ...prev, intake_id: '', intake_name: newValue || '' }));
+                    }
+                  }}
+                  onInputChange={(event, newInputValue) => {
+                    setStudentData(prev => ({ ...prev, intake_name: newInputValue, intake_id: '' }));
+                  }}
+                  renderInput={params => (
+                    <StyledTextField
+                      {...params}
+                      label="Intake *"
+                      fullWidth
+                      placeholder="Select or enter new intake (e.g., Intake 45)"
+                      sx={{ mb: 3 }}
+                    />
+                  )}
+                  disabled={intakesLoading || !studentData.track_id}
                 />
-              )}
-              disabled={intakesLoading}
-            />
-
-            <StyledButton
-              variant="contained"
-              fullWidth
-              onClick={handleUploadExcel}
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-            >
-              {loading ? 'Uploading...' : 'Upload Students'}
-            </StyledButton>
-
-            {studentStatuses.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" mb={2} fontWeight="600" color="text.secondary">
-                  Processing Students
-                </Typography>
-                <List dense>
-                  {studentStatuses.map((s, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        {s.success ? (
-                          <CheckCircle color="success" />
-                        ) : (
-                          <CircularProgress size={20} />
-                        )}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={s.email}
-                        secondary={s.status}
-                        primaryTypographyProps={{ fontWeight: s.success ? 'bold' : 'normal' }}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+  
+                <StyledButton
+                  variant="contained"
+                  fullWidth
+                  onClick={handleUploadExcel}
+                  disabled={loading || !studentData.track_id}
+                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                >
+                  {loading ? 'Uploading...' : 'Upload Students'}
+                </StyledButton>
+  
+                {studentStatuses.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" mb={2} fontWeight="600" color="text.secondary">
+                      Processing Students
+                    </Typography>
+                    <List dense>
+                      {studentStatuses.map((s, index) => (
+                        <ListItem key={index}>
+                          <ListItemIcon>
+                            {s.success ? (
+                              <CheckCircle color="success" />
+                            ) : (
+                              <CircularProgress size={20} />
+                            )}
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={s.email}
+                            secondary={s.status}
+                            primaryTypographyProps={{ fontWeight: s.success ? 'bold' : 'normal' }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
               </Box>
             )}
-          </Box>
-        )}
-      </StyledCard>
-
-      <Dialog
-        open={openModal}
-        onClose={handleCloseModal}
-        PaperProps={{ sx: { borderRadius: '16px', minWidth: '400px' } }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
-          {modalContent.isSuccess ? (
-            <CheckCircle color="success" sx={{ mr: 1, fontSize: 28 }} />
-          ) : (
-            <ErrorIcon color="error" sx={{ mr: 1, fontSize: 28 }} />
-          )}
-          {modalContent.title}
-          <IconButton
-            aria-label="close"
-            onClick={handleCloseModal}
-            sx={{ position: 'absolute', right: 8, top: 8, color: theme => theme.palette.grey[500] }}
+          </StyledCard>
+  
+          <Dialog
+            open={openModal}
+            onClose={handleCloseModal}
+            PaperProps={{ sx: { borderRadius: '16px', minWidth: '400px' } }}
           >
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" whiteSpace="pre-wrap">
-            {modalContent.message}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseModal} color="primary">Close</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-}
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+              {modalContent.isSuccess ? (
+                <CheckCircle color="success" sx={{ mr: 1, fontSize: 28 }} />
+              ) : (
+                <ErrorIcon color="error" sx={{ mr: 1, fontSize: 28 }} />
+              )}
+              {modalContent.title}
+              <IconButton
+                aria-label="close"
+                onClick={handleCloseModal}
+                sx={{ position: 'absolute', right: 8, top: 8, color: theme => theme.palette.grey[500] }}
+              >
+                <Close />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" whiteSpace="pre-wrap">
+                {modalContent.message}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseModal} color="primary">Close</Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      );
+    }

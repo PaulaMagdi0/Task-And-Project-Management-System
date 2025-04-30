@@ -1,4 +1,3 @@
-// File: src/pages/SupervisorDashboard.jsx
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Routes, Route, useLocation, Link } from 'react-router-dom';
@@ -13,7 +12,7 @@ import {
   FiUploadCloud
 } from 'react-icons/fi';
 import './SupervisorDashboard.css';
-import { NotebookText, ArchiveRestore } from 'lucide-react';
+import { NotebookText, ArchiveRestore, Users } from 'lucide-react';
 
 // Import your components
 import AllCourseManagement from "../../Components/AllCourseManagement/AllCourseManagement"
@@ -31,6 +30,7 @@ import ChatRoomView from '../../Components/Chat/ChatRoomView';
 import ChatRoomList from '../../Components/Chat/ChatRoomList';
 import Tracks from '../../Components/Tracks/Tracks';
 import ReassignInstructor from '../../Components/ReAssignCourse/ReAssignCourse';
+import ViewIntakes from '../../Components/ViewIntakes';
 
 const SupervisorDashboard = () => {
   const { username } = useSelector((state) => state.auth);
@@ -43,6 +43,7 @@ const SupervisorDashboard = () => {
     { text: 'My Tracks', icon: <FiMessageCircle />, path: '/supervisor/dashboard/tracks' },
     { text: 'Tracks Courses', icon: <FiBook />, path: '/supervisor/dashboard/courses' },
     { text: 'Add Student', icon: <FiClipboard />, path: '/supervisor/dashboard/addstudent' },
+    { text: 'View Intakes', icon: <Users />, path: '/supervisor/dashboard/view-intakes' },
     { text: 'Student Management', icon: <FiBook />, path: '/supervisor/dashboard/student-management' },
     { text: 'Create Assignment', icon: <ArchiveRestore />, path: '/supervisor/dashboard/create-assignment' },
     { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
@@ -51,9 +52,8 @@ const SupervisorDashboard = () => {
     { text: 'Course Management', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
     { text: 'AllCourseManagement', icon: <FiBook />, path: '/supervisor/dashboard/all-course-management' },
     { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
-    { text: "Grades",icon : <FiAward/>,path:"/supervisor/dashboard/Grades"},
+    { text: 'Grades', icon: <FiAward />, path: '/supervisor/dashboard/Grades' },
     { text: 'Chat', icon: <FiMessageCircle />, path: '/supervisor/dashboard/chat' },
-    
   ];
 
   return (
@@ -109,10 +109,9 @@ const SupervisorDashboard = () => {
             <Route path="Grades" element={<Grades />} />
             <Route path="ReAssignCourse" element={<ReassignInstructor />} />
             <Route path="all-course-management" element={<AllCourseManagement />} />
-            {/* Chat routes */}
             <Route path="chat" element={<ChatRoomList />} />
             <Route path="chat/rooms/:roomId" element={<ChatRoomView />} />
-            {/* <Route path="grades" element={<Grades />} /> */}
+            <Route path="view-intakes" element={<ViewIntakes />} />
           </Routes>
         </div>
       </div>

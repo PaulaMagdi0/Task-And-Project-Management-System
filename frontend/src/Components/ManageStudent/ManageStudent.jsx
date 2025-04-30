@@ -50,6 +50,7 @@ const ManageStudents = () => {
   const [localError, setLocalError] = useState('');
   const [selectedTrack, setSelectedTrack] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedIntake, setSelectedIntake] = useState('');
   const [searchName, setSearchName] = useState('');
 
   // Fetch students by staff on mount
@@ -86,6 +87,7 @@ const ManageStudents = () => {
     });
     setEditDialogOpen(true);
   };
+
   const handleEditChange = async () => {
     const { studentId, username, firstName, lastName, email, password, track, branch } = editData;
   
@@ -144,6 +146,10 @@ const ManageStudents = () => {
     setSelectedBranch(event.target.value);
   };
 
+  const handleIntakeFilterChange = (event) => {
+    setSelectedIntake(event.target.value);
+  };
+
   const handleNameSearchChange = (event) => {
     setSearchName(event.target.value);
   };
@@ -151,16 +157,21 @@ const ManageStudents = () => {
   const handleResetFilters = () => {
     setSelectedTrack('');
     setSelectedBranch('');
+    setSelectedIntake('');
     setSearchName('');
   };
 
-  // Compute unique tracks and branches
+  // Compute unique tracks, branches, and intakes
   const trackNames = useMemo(
     () => [...new Set(students?.map((student) => student.track?.name).filter(Boolean))].sort(),
     [students]
   );
   const branchNames = useMemo(
     () => [...new Set(students?.map((student) => student.branch?.name).filter(Boolean))].sort(),
+    [students]
+  );
+  const intakeNames = useMemo(
+    () => [...new Set(students?.map((student) => student.intake?.name).filter(Boolean))].sort(),
     [students]
   );
 
@@ -170,14 +181,15 @@ const ManageStudents = () => {
     return students.filter((student) => {
       const matchesTrack = selectedTrack ? student.track?.name === selectedTrack : true;
       const matchesBranch = selectedBranch ? student.branch?.name === selectedBranch : true;
+      const matchesIntake = selectedIntake ? student.intake?.name === selectedIntake : true;
       const matchesName = searchName
         ? `${student.first_name} ${student.last_name}`
             .toLowerCase()
             .includes(searchName.toLowerCase())
         : true;
-      return matchesTrack && matchesBranch && matchesName;
+      return matchesTrack && matchesBranch && matchesIntake && matchesName;
     });
-  }, [students, selectedTrack, selectedBranch, searchName]);
+  }, [students, selectedTrack, selectedBranch, selectedIntake, searchName]);
 
   return (
     <Box sx={{ p: 4, bgcolor: '#f4f6f8' }}>
@@ -204,6 +216,22 @@ const ManageStudents = () => {
           </FormControl>
         </Grid>
         <Grid item xs={12} sm={4}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={selectedIntake}
+              onChange={handleIntakeFilterChange}
+              label="Intake"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Intakes</em></MenuItem>
+              {intakeNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={4}>
           <TextField
             label="Search by Name"
             fullWidth
@@ -213,7 +241,7 @@ const ManageStudents = () => {
             sx={{ borderRadius: 2 }}
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={12} sm={4}>
           <Button
             fullWidth
             variant="contained"
@@ -260,6 +288,7 @@ const ManageStudents = () => {
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Last Name</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Track</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Intake</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -272,6 +301,7 @@ const ManageStudents = () => {
                   <TableCell>{student.last_name}</TableCell>
                   <TableCell>{student.email}</TableCell>
                   <TableCell>{student.track?.name}</TableCell>
+                  <TableCell>{student.intake?.name}</TableCell>
                   <TableCell>
                     <Button size="small" onClick={() => openEditDialog(student)}>
                       Edit

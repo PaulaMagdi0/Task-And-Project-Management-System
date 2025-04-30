@@ -4,7 +4,7 @@ from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer
+from .serializers import ExcelUploadSerializer, StudentSerializer, DashboardSerializer, IntakeSerializer
 from rest_framework import generics
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.hashers import make_password
@@ -12,7 +12,7 @@ from django.contrib.auth import authenticate
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from apps.staff_members.permissions import has_student_management_permission
-from .models import Student
+from .models import Student, Intake
 from apps.tracks.models import Track
 from apps.courses.models import Course
 from apps.assignments.models import Assignment
@@ -40,17 +40,23 @@ def upload_excel(request):
     if not has_student_management_permission(request.user):
         return Response({"detail": "You don't have permission to add students"}, status=403)
     
-    # Ensure file and intake are provided
+    # Ensure file, track, and intake are provided
     if 'excel_file' not in request.FILES:
         logger.warning("Excel file missing in upload request")
         return Response(
             {"error": "Excel file is required"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
-    if 'intake' not in request.data:
-        logger.warning("Intake missing in upload request")
+    if 'track_id' not in request.data:
+        logger.warning("Track ID missing in upload request")
         return Response(
-            {"error": "Intake is required"}, 
+            {"error": "Track ID is required"}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if 'intake_name' not in request.data:
+        logger.warning("Intake name missing in upload request")
+        return Response(
+            {"error": "Intake name is required"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -118,21 +124,51 @@ def create_student_from_form(request):
     - email
     - role
     - track_id
-    - intake
+    - intake_id
     """
     logger.debug(f"Incoming FormData: {dict(request.data)}")
 
     email = request.data.get("email", "").strip().lower()
-    intake = request.data.get("intake", "").strip()
+    intake_id = request.data.get("intake_id", "").strip()
+    track_id = request.data.get("track_id", "").strip()
     
     if not email:
         return Response(
             {"error": "Email is required", "field": "email"},
             status=status.HTTP_400_BAD_REQUEST
         )
-    if not intake:
+    if not intake_id:
         return Response(
-            {"error": "Intake is required", "field": "intake"},
+            {"error": "Intake is required", "field": "intake_id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not track_id:
+        return Response(
+            {"error": "Track is required", "field": "track_id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate track_id
+    try:
+        track = Track.objects.get(id=int(track_id))
+    except (ValueError, TypeError, Track.DoesNotExist):
+        return Response(
+            {
+                "error": f"Invalid track_id: '{track_id}'",
+                "field": "track_id"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate intake_id
+    try:
+        intake = Intake.objects.get(id=int(intake_id), track=track)
+    except (ValueError, TypeError, Intake.DoesNotExist):
+        return Response(
+            {
+                "error": f"Invalid intake_id: '{intake_id}' or intake does not belong to track",
+                "field": "intake_id"
+            },
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -140,7 +176,7 @@ def create_student_from_form(request):
     if Student.objects.filter(email=email, intake=intake).exists():
         return Response(
             {
-                "error": f"A student with email '{email}' already exists in intake '{intake}'",
+                "error": f"A student with email '{email}' already exists in intake '{intake.name}'",
                 "field": "email",
                 "email": email
             },
@@ -153,40 +189,18 @@ def create_student_from_form(request):
         "last_name": request.data.get("last_name", "").strip(),
         "email": email,
         "role": request.data.get("role", "student").strip().lower(),
-        "track_id": request.data.get("track_id", "").strip(),
-        "intake": intake,
+        "track_id": track_id,
+        "intake_id": intake_id,
     }
 
     # Validate required fields
-    required_fields = ['first_name', 'last_name', 'track_id', 'intake']
+    required_fields = ['first_name', 'last_name']
     missing_fields = [field for field in required_fields if not data.get(field)]
     if missing_fields:
         return Response(
             {
                 "error": f"Missing required fields: {', '.join(missing_fields)}",
                 "fields": missing_fields
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # Validate track_id
-    try:
-        track_id = int(data['track_id'])
-        track = Track.objects.get(id=track_id)
-        data["track_id"] = track_id  # Pass track_id to serializer
-    except (ValueError, TypeError):
-        return Response(
-            {
-                "error": f"Invalid track_id: '{data['track_id']}' must be a valid integer",
-                "field": "track_id"
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    except Track.DoesNotExist:
-        return Response(
-            {
-                "error": f"Track with ID '{data['track_id']}' does not exist",
-                "field": "track_id"
             },
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -230,18 +244,21 @@ def create_student_from_form(request):
 def list_students(request):
     """List students with optimized querying and pagination"""
     try:
-        # Admins/supervisors see all, branch managers see their branch only
+        # Admins/supervisors see only their track's students
         students = Student.objects.all()
         
         if request.user.groups.filter(name='branchmanager').exists():
             students = students.filter(branch=request.user.branch)
+        elif hasattr(request.user, 'staffmember') and request.user.staffmember.role == StaffMember.Role.SUPERVISOR:
+            track = request.user.staffmember.track
+            students = students.filter(track=track)
         
         # Apply filters
         if track_id := request.query_params.get('track_id'):
             students = students.filter(track_id=track_id)
         
-        if intake := request.query_params.get('intake'):
-            students = students.filter(intake=intake)
+        if intake_id := request.query_params.get('intake_id'):
+            students = students.filter(intake_id=intake_id)
         
         if is_active := request.query_params.get('is_active'):
             students = students.filter(is_active=is_active.lower() == 'true')
@@ -267,17 +284,56 @@ def list_students(request):
         )
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def list_intakes(request):
-    """List all unique intakes"""
+    """List intakes for the user's track"""
     try:
-        intakes = Student.objects.values('intake').distinct()
-        intake_list = [item['intake'] for item in intakes if item['intake']]
-        return Response({"intakes": intake_list}, status=status.HTTP_200_OK)
+        if hasattr(request.user, 'staffmember') and request.user.staffmember.role == StaffMember.Role.SUPERVISOR:
+            track = request.user.staffmember.track
+            intakes = Intake.objects.filter(track=track)
+        else:
+            intakes = Intake.objects.all()
+        if track_id := request.query_params.get('track_id'):
+            intakes = intakes.filter(track_id=track_id)
+        logger.debug(f"Intakes filtered by track_id={track_id}: {intakes.count()} intakes")
+        serializer = IntakeSerializer(intakes, many=True)
+        return Response({"intakes": serializer.data}, status=status.HTTP_200_OK)
     except Exception as e:
         logger.error(f"Intake listing error: {str(e)}")
         return Response(
             {"error": "Failed to retrieve intake list"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_intake(request):
+    """Create a new intake for the user's track"""
+    try:
+        if not has_student_management_permission(request.user):
+            return Response({"detail": "You don't have permission to create intakes"}, status=403)
+        
+        data = request.data.copy()
+        # For supervisors, automatically set track from their StaffMember profile
+        if hasattr(request.user, 'staffmember') and request.user.staffmember.role == StaffMember.Role.SUPERVISOR:
+            if not data.get('track'):
+                data['track'] = request.user.staffmember.track.id
+            elif str(data['track']) != str(request.user.staffmember.track.id):
+                return Response(
+                    {"detail": "Supervisors can only create intakes for their assigned track"},
+                    status=403
+                )
+        
+        serializer = IntakeSerializer(data=data)
+        if serializer.is_valid():
+            intake = serializer.save()
+            return Response(IntakeSerializer(intake).data, status=status.HTTP_201_CREATED)
+        logger.debug(f"Intake creation validation errors: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Intake creation error: {str(e)}")
+        return Response(
+            {"error": "Failed to create intake"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -302,25 +358,18 @@ def verify_email(request, verification_code):
         logger.error(f"Verification failed: {str(e)}")
         return redirect("http://localhost:5173/not-verified")
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get the student (from database, using select_related for track)
-        student = Student.objects.select_related('track').get(id=student_id)
+        # Get the student (from database, using select_related for track and intake)
+        student = Student.objects.select_related('track', 'intake').get(id=student_id)
 
         # Authorization check
         if request.user.id != student.id and not request.user.is_staff:
             return Response({"error": "Unauthorized access"}, status=403)
 
-        # Get all courses for the student's track
+        #非洲 Get all courses for the student's track
         courses = Course.objects.filter(tracks=student.track)
 
         course_data = [
@@ -344,7 +393,7 @@ def student_courses(request, student_id):
                 'role': student.role,
                 'date_joined': student.date_joined,
                 'track_id': student.track_id,
-                'intake': student.intake
+                'intake': student.intake.name if student.intake else None
             },
             'courses': course_data,
             'assignments': assignments_serializer.data
@@ -371,7 +420,7 @@ def update_student(request, student_id):
         new_email = request.data.get('email')
         first_name = request.data.get('firstName')
         last_name = request.data.get('lastName')
-        intake = request.data.get('intake')
+        intake_id = request.data.get('intake_id')
 
         # Initialize a dictionary to track updates
         updates = {}
@@ -380,18 +429,15 @@ def update_student(request, student_id):
         if new_password:
             if len(new_password) < 8:
                 return Response({"error": "Password too short"}, status=400)
-
-            # Set the new password
             student.set_password(new_password)
             updates['password'] = '******'
 
         # Update email if provided
         if new_email:
             try:
-                # Validate email format
                 validate_email(new_email)
                 if Student.objects.filter(email=new_email, intake=student.intake).exclude(id=student.id).exists():
-                    return Response({"error": f"Email '{new_email}' already exists in intake '{student.intake}'"}, status=400)
+                    return Response({"error": f"Email '{new_email}' already exists in intake '{student.intake.name}'"}, status=400)
                 student.email = new_email
                 updates['email'] = new_email
             except ValidationError:
@@ -407,11 +453,15 @@ def update_student(request, student_id):
             updates['lastName'] = last_name
 
         # Update intake if provided
-        if intake:
-            if Student.objects.filter(email=student.email, intake=intake).exclude(id=student.id).exists():
-                return Response({"error": f"Email '{student.email}' already exists in intake '{intake}'"}, status=400)
-            student.intake = intake
-            updates['intake'] = intake
+        if intake_id:
+            try:
+                intake = Intake.objects.get(id=intake_id, track=student.track)
+                if Student.objects.filter(email=student.email, intake=intake).exclude(id=student.id).exists():
+                    return Response({"error": f"Email '{student.email}' already exists in intake '{intake.name}'"}, status=400)
+                student.intake = intake
+                updates['intake'] = intake.name
+            except Intake.DoesNotExist:
+                return Response({"error": f"Intake with ID '{intake_id}' does not exist or does not belong to student's track"}, status=400)
 
         # Save the student object and commit changes to the database
         student.save()
@@ -445,7 +495,39 @@ def delete_student(request, student_id):
             {"error": "Deletion failed"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-        
+
+class IntakeDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        """Delete an intake and its associated students"""
+        if not has_student_management_permission(request.user):
+            raise PermissionDenied("You don't have permission to delete intakes")
+
+        try:
+            intake = Intake.objects.get(pk=pk)
+            # Supervisors can only delete intakes for their track
+            if (
+                hasattr(request.user, 'staffmember') 
+                and request.user.staffmember.role == StaffMember.Role.SUPERVISOR
+                and request.user.staffmember.track != intake.track
+            ):
+                return Response(
+                    {"error": "Supervisors can only delete intakes for their assigned track"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            # Explicitly delete associated students
+            Student.objects.filter(intake=intake).delete()
+            intake.delete()  # Delete the intake
+            logger.warning(f"Intake {pk} and associated students deleted by user {request.user.id}")
+            return Response({"detail": "Intake and associated students deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        except Intake.DoesNotExist:
+            logger.error(f"Intake {pk} not found")
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Deletion failed for intake {pk}: {str(e)}")
+            return Response({"error": f"Deletion failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class StudentDashboardAPI(generics.RetrieveAPIView):
     """
     Student dashboard with personalized data
@@ -470,6 +552,11 @@ def show_options(request):
                 'url': '/api/student/upload/',
                 'description': 'Upload students via Excel or create single student'
             },
+            'create': {
+                'method': 'POST',
+                'url': '/api/student/create/',
+                'description': 'Create a single student via form'
+            },
             'list': {
                 'method': 'GET',
                 'url': '/api/student/list/',
@@ -478,7 +565,17 @@ def show_options(request):
             'intakes': {
                 'method': 'GET',
                 'url': '/api/student/intakes/',
-                'description': 'List all unique intakes'
+                'description': 'List intakes for the user\'s track'
+            },
+            'create_intake': {
+                'method': 'POST',
+                'url': '/api/student/intakes/create/',
+                'description': 'Create a new intake for the user\'s track'
+            },
+            'delete_intake': {
+                'method': 'DELETE',
+                'url': '/api/student/intakes/<int:pk>/',
+                'description': 'Delete an intake and its associated students'
             },
             'verify': {
                 'method': 'GET',
@@ -489,6 +586,31 @@ def show_options(request):
                 'method': 'GET',
                 'url': '/api/student/dashboard/',
                 'description': 'Get student dashboard data (authenticated only)'
+            },
+            'update_student': {
+                'method': 'PATCH',
+                'url': '/api/student/<int:student_id>/update/',
+                'description': 'Update student details'
+            },
+            'delete_student': {
+                'method': 'DELETE',
+                'url': '/api/student/<int:student_id>/delete/',
+                'description': 'Delete a student'
+            },
+            'student_courses': {
+                'method': 'GET',
+                'url': '/api/student/<int:student_id>/courses/',
+                'description': 'Get courses for a student'
+            },
+            'students_by_track_and_course': {
+                'method': 'GET',
+                'url': '/api/student/tracks/<int:track_id>/courses/<int:course_id>/students/',
+                'description': 'Get students by track and course'
+            },
+            'students_by_staff': {
+                'method': 'GET',
+                'url': '/api/student/by-staff/<int:staff_id>/',
+                'description': 'Get students by staff member'
             }
         }
     }
@@ -520,7 +642,7 @@ class StudentsByTrackAndCourseView(APIView):
                 "id": student.id,
                 "name": student.full_name,
                 "email": student.email,
-                "intake": student.intake,
+                "intake": student.intake.name if student.intake else None,
                 "track": student.track.name,
                 "course": course.name,
             })

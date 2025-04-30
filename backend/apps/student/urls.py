@@ -11,7 +11,9 @@ from .views import (
     create_student_from_form,
     student_courses,
     StudentsByTrackAndCourseView,
-    StudentsByStaffView
+    StudentsByStaffView,
+    create_intake,
+    IntakeDetailView
 )
 
 urlpatterns = [
@@ -19,6 +21,8 @@ urlpatterns = [
     path('upload/', upload_excel, name='upload_excel'),#File
     path('list/', list_students, name='list_students'),#Listing
     path('intakes/', list_intakes, name='list_intakes'),#List intakes
+    path('intakes/create/', create_intake, name='create_intake'),
+    path('intakes/<int:pk>/', IntakeDetailView.as_view(), name='intake-detail'),
     path('verify/<str:verification_code>/', verify_email, name='verify_email'),#Verify
     path('<int:student_id>/update/', update_student, name='update_student'),
     path('<int:student_id>/delete/', delete_student, name='delete_student'),
