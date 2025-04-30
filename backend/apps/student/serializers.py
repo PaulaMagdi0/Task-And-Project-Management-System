@@ -295,6 +295,7 @@ class StudentSerializer(serializers.ModelSerializer):
             Hello {student.first_name},
             Please verify your email by visiting:
             {verification_url}
+            Email: {student.email}
             Your temporary password: {password}
             """
             send_mail(
