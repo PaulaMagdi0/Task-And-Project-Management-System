@@ -29,6 +29,9 @@ import {
   clearCourseStatus,
 } from '../../redux/coursesSlice';
 import { fetchInstructors } from '../../redux/supervisorsSlice';
+import Assignments from './../../pages/Instructor/Assignments';
+import WarningIcon from '@mui/icons-material/Warning';
+import Submissions from './../Submissions/Submissions';
 
 const AllCourseManagement = () => {
   const dispatch = useDispatch();
@@ -47,6 +50,8 @@ const AllCourseManagement = () => {
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [localError, setLocalError] = useState('');
   const [searchName, setSearchName] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState(''); // State for "I agree" input
 
   // Fetch courses and instructors on mount
   useEffect(() => {
@@ -81,7 +86,6 @@ const AllCourseManagement = () => {
   const handleEditChange = async () => {
     const { courseId, name, description, instructor } = editData;
 
-    // Validate required fields
     if (!name) {
       setLocalError('Course name is required.');
       return;
@@ -95,22 +99,29 @@ const AllCourseManagement = () => {
       setEditDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err || 'Failed to update course.');
+      setLocalError(err.message || 'Failed to update course.');
     }
   };
 
   const openDeleteDialog = (id) => {
+    console.log('Opening delete dialog for course ID:', id);
     setCourseToDelete(id);
+    setConfirmText(''); // Reset confirmation text
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
+    console.log('Deleting course with ID:', courseToDelete);
+    setIsDeleting(true);
     try {
       await dispatch(deleteCourse(courseToDelete)).unwrap();
       setDeleteDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err || 'Failed to delete course.');
+      console.error('Delete error:', err);
+      setLocalError(err.message || 'Failed to delete course.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -131,6 +142,10 @@ const AllCourseManagement = () => {
         : true
     );
   }, [allCourses, searchName]);
+
+  // Get course details for delete confirmation
+  const course = allCourses.find((c) => c.id === courseToDelete);
+  const isConfirmValid = confirmText.trim().toLowerCase() === 'i agree';
 
   return (
     <Box sx={{ p: 4, bgcolor: '#f4f6f8' }}>
@@ -275,18 +290,53 @@ const AllCourseManagement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Delete Course</DialogTitle>
-        <DialogContent>
-          <Typography>Are you sure you want to delete this course?</Typography>
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: '#d32f2f', color: 'white', py: 2 }}>
+          Confirm Course Deletion
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography variant="body1" color="error" sx={{ mb: 2, fontWeight: 500 }}>
+            Warning: You are about to permanently delete the course <strong>{course?.name || 'Unknown'}</strong>{' '}
+            associated with your track from the database as well <strong>Assignments , Submissions</strong> attached to it.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+            This action cannot be undone. To confirm, please type <strong>"I agree"</strong> below.
+          </Typography>
+          <TextField
+            label="Type 'I agree' to confirm"
+            variant="outlined"
+            fullWidth
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            sx={{ mb: 2 }}
+            helperText={!isConfirmValid && confirmText ? 'Text must exactly match "I agree"' : ''}
+            error={!isConfirmValid && confirmText}
+          />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            color="primary"
+            variant="outlined"
+            sx={{ minWidth: 100 }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleDelete} color="secondary">
-            Delete
+          <Button
+            onClick={handleDelete}
+            color="error"
+            variant="contained"
+            disabled={!isConfirmValid || isDeleting}
+            sx={{ minWidth: 100 }}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
