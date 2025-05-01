@@ -58,6 +58,7 @@ import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { isValidUrl } from "../../../utils/validation";
+import apiClient from "../../services/api";
 
 const steps = ["Basic Info", "Assignment Target", "Review"];
 
@@ -263,33 +264,27 @@ const CreateAssignment = () => {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/api/chatAI/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: recommendationDialog.chatInput }),
+        const { data } = await apiClient.post("/chatAI/", {
+          message: recommendationDialog.chatInput,
         });
 
-        const data = await response.json();
-        if (response.ok) {
-          const cleanedResponse = data.response
-            .replace(/(\*\*|###|```|`|[-*+]\s)/g, "")
-            .replace(/\n+/g, "\n")
-            .trim();
-          setRecommendationDialog((prev) => ({
-            ...prev,
-            chatResponse: cleanedResponse,
-            recommendations: [
-              {
-                title: formData.title || "AI-Generated Assignment",
-                description: cleanedResponse,
-              },
-            ],
-            loading: false,
-            chatInput: "",
-          }));
-        } else {
-          throw new Error(data.error || "Failed to fetch AI response");
-        }
+        const cleanedResponse = data.response
+          .replace(/(\*\*|###|```|`|[-*+]\s)/g, "")
+          .replace(/\n+/g, "\n")
+          .trim();
+
+        setRecommendationDialog((prev) => ({
+          ...prev,
+          chatResponse: cleanedResponse,
+          recommendations: [
+            {
+              title: formData.title || "AI-Generated Assignment",
+              description: cleanedResponse,
+            },
+          ],
+          loading: false,
+          chatInput: "",
+        }));
       } catch (error) {
         setRecommendationDialog((prev) => ({
           ...prev,
@@ -300,41 +295,35 @@ const CreateAssignment = () => {
         setSubmitDialog({
           open: true,
           success: false,
-          message: "Error fetching AI chat response",
+          message:
+            error.response?.data?.error ||
+            error.message ||
+            "Error fetching AI chat response",
         });
       }
       return;
     }
 
-    let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
+    let url = `/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
     if (recommendationDialog.methodChoice === "1") {
-      const courseName = courses.find((c) => c.id === formData.course)?.name || "";
-      url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
+      const courseName =
+        courses.find((c) => c.id === formData.course)?.name || "";
+      url += `&course_name=${encodeURIComponent(
+        courseName
+      )}&difficulty=${encodeURIComponent(formData.difficulty)}`;
     } else {
-      url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
+      url += `&brief_description=${encodeURIComponent(
+        recommendationDialog.briefDescription
+      )}`;
     }
 
     try {
-      const response = await fetch(url);
-      const data = await response.json();
-      if (response.ok) {
-        setRecommendationDialog((prev) => ({
-          ...prev,
-          recommendations: data.recommendations,
-          loading: false,
-        }));
-      } else {
-        setRecommendationDialog((prev) => ({
-          ...prev,
-          loading: false,
-          recommendations: [],
-        }));
-        setSubmitDialog({
-          open: true,
-          success: false,
-          message: data.error || "Failed to fetch recommendations",
-        });
-      }
+      const { data } = await apiClient.get(url);
+      setRecommendationDialog((prev) => ({
+        ...prev,
+        recommendations: data.recommendations,
+        loading: false,
+      }));
     } catch (error) {
       setRecommendationDialog((prev) => ({
         ...prev,
@@ -344,7 +333,10 @@ const CreateAssignment = () => {
       setSubmitDialog({
         open: true,
         success: false,
-        message: "Error fetching recommendations",
+        message:
+          error.response?.data?.error ||
+          error.message ||
+          "Error fetching recommendations",
       });
     }
   };
@@ -606,7 +598,9 @@ const CreateAssignment = () => {
                         ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={validationErrors.due_date ? "error" : "action"}
+                            color={
+                              validationErrors.due_date ? "error" : "action"
+                            }
                             sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
@@ -636,7 +630,9 @@ const CreateAssignment = () => {
                         ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={validationErrors.end_date ? "error" : "action"}
+                            color={
+                              validationErrors.end_date ? "error" : "action"
+                            }
                             sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
@@ -674,8 +670,13 @@ const CreateAssignment = () => {
                             <SchoolIcon sx={{ fontSize: 14 }} />
                           </Avatar>
                           <Box>
-                            <Typography variant="body2">{track.name}</Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="body2">
+                              {track.name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {track.description}
                             </Typography>
                           </Box>
@@ -683,7 +684,9 @@ const CreateAssignment = () => {
                       </MenuItem>
                     ))
                   ) : (
-                    <MenuItem disabled>You must be assigned to course first</MenuItem>
+                    <MenuItem disabled>
+                      You must be assigned to course first
+                    </MenuItem>
                   )}
                 </StyledSelect>
                 {validationErrors.track && (
@@ -740,7 +743,11 @@ const CreateAssignment = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required error={validationErrors.difficulty}>
+              <FormControl
+                fullWidth
+                required
+                error={validationErrors.difficulty}
+              >
                 <InputLabel sx={{ fontWeight: 500 }}>Difficulty</InputLabel>
                 <StyledSelect
                   value={formData.difficulty}
@@ -761,7 +768,9 @@ const CreateAssignment = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel sx={{ fontWeight: 500 }}>Assignment Type</InputLabel>
+                <InputLabel sx={{ fontWeight: 500 }}>
+                  Assignment Type
+                </InputLabel>
                 <StyledSelect
                   value={formData.assignment_type}
                   onChange={handleChange}
@@ -871,7 +880,10 @@ const CreateAssignment = () => {
                   <Box display="flex" alignItems="center">
                     <Typography
                       variant="body2"
-                      sx={{ fontWeight: 500, color: theme.palette.text.primary }}
+                      sx={{
+                        fontWeight: 500,
+                        color: theme.palette.text.primary,
+                      }}
                     >
                       Assign to all course students
                     </Typography>
@@ -907,7 +919,9 @@ const CreateAssignment = () => {
                               : "default"
                           }
                           avatar={
-                            <Avatar sx={{ bgcolor: theme.palette.primary.light }}>
+                            <Avatar
+                              sx={{ bgcolor: theme.palette.primary.light }}
+                            >
                               <PersonIcon sx={{ fontSize: 16 }} />
                             </Avatar>
                           }
@@ -1052,9 +1066,11 @@ const CreateAssignment = () => {
                         Course & Track
                       </Typography>
                       <Typography variant="body2">
-                        {courses.find((c) => c.id === formData.course)?.name || "Not selected"}
+                        {courses.find((c) => c.id === formData.course)?.name ||
+                          "Not selected"}
                         <br />
-                        {tracks.find((t) => t.id === formData.track)?.name || "Not selected"}
+                        {tracks.find((t) => t.id === formData.track)?.name ||
+                          "Not selected"}
                       </Typography>
                     </Box>
                     <Box>
@@ -1148,7 +1164,8 @@ const CreateAssignment = () => {
               bgcolor: theme.palette.warning.light,
             }}
           >
-            No courses assigned for the selected track. Please contact an admin to get assigned to a course.
+            No courses assigned for the selected track. Please contact an admin
+            to get assigned to a course.
           </Alert>
         )}
 
@@ -1195,7 +1212,14 @@ const CreateAssignment = () => {
           >
             {getStepContent(activeStep)}
 
-            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4, gap: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 4,
+                gap: 2,
+              }}
+            >
               <Button
                 disabled={activeStep === 0}
                 onClick={handleBack}
@@ -1265,12 +1289,18 @@ const CreateAssignment = () => {
                 fontSize: "1.25rem",
               }}
             >
-              {submitDialog.success ? "Assignment Created" : "Submission Failed"}
+              {submitDialog.success
+                ? "Assignment Created"
+                : "Submission Failed"}
             </Typography>
           </DialogTitle>
           <DialogContent sx={{ textAlign: "center" }}>
             <Typography
-              sx={{ mb: 2, fontSize: "0.875rem", color: theme.palette.text.secondary }}
+              sx={{
+                mb: 2,
+                fontSize: "0.875rem",
+                color: theme.palette.text.secondary,
+              }}
             >
               {submitDialog.message}
             </Typography>
