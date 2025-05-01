@@ -57,6 +57,20 @@ const StudentDashboard = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Reset state when username changes (new student logs in)
+    setData({
+      student: null,
+      courses: [],
+      assignments: [],
+      grades: [],
+      averageGrade: null,
+      loading: true,
+      error: null,
+    });
+    setSubmittedAssignments({});
+    setSelectedSection("courses");
+    localStorage.removeItem("submittedAssignments"); // Clear previous user's submissions
+
     // Parse query parameters
     const queryParams = new URLSearchParams(location.search);
     const section = queryParams.get("section");
@@ -66,14 +80,7 @@ const StudentDashboard = () => {
       setSelectedSection("assignments");
     } else if (section === "courses") {
       setSelectedSection("courses");
-    } else {
-      // Default to 'courses' if no section is specified
-      setSelectedSection("courses");
     }
-
-    const savedSubmissions =
-      JSON.parse(localStorage.getItem("submittedAssignments")) || {};
-    setSubmittedAssignments(savedSubmissions);
 
     const fetchData = async () => {
       try {
@@ -90,7 +97,7 @@ const StudentDashboard = () => {
           error: null,
         });
         setSubmittedAssignments((prev) => {
-          const updatedSubmissions = { ...prev, ...response.submissions };
+          const updatedSubmissions = { ...response.submissions };
           localStorage.setItem(
             "submittedAssignments",
             JSON.stringify(updatedSubmissions)
@@ -107,8 +114,21 @@ const StudentDashboard = () => {
       }
     };
 
-    fetchData();
-  }, [navigate, location.search]);
+    if (username) {
+      fetchData();
+    }
+  }, [username, navigate]); // Depend on username to trigger reset on user change
+
+  useEffect(() => {
+    // Update selectedSection based on query parameter changes
+    const queryParams = new URLSearchParams(location.search);
+    const section = queryParams.get("section");
+    if (section && section !== selectedSection) {
+      if (section === "assignments" || section === "courses") {
+        setSelectedSection(section);
+      }
+    }
+  }, [location.search]);
 
   const renderSection = () => {
     console.log("Rendering Section:", selectedSection, "Grades:", data.grades);

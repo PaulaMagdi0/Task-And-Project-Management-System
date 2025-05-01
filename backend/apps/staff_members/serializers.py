@@ -323,6 +323,10 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
             logger.error(f'Bulk create failed: {e}')
             raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))
         
+from rest_framework import serializers
+from django.contrib.auth.hashers import make_password
+from .models import StaffMember
+from apps.courses.models import Course  # adjust path as needed
 
 class CreateInstructorSerializer(serializers.ModelSerializer):
     course_id = serializers.IntegerField(required=False, write_only=True)
@@ -338,28 +342,21 @@ class CreateInstructorSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        # Hash the password before saving
         validated_data['password'] = make_password(validated_data['password'])
 
-        # Remove the 'course_id' from validated data before creating StaffMember
+        # Force the role to 'instructor'
+        validated_data['role'] = StaffMember.Role.INSTRUCTOR
+
         course_id = validated_data.pop('course_id', None)
 
-        # Create the StaffMember instance
         staff_member = super().create(validated_data)
 
-        # If course_id exists, associate the instructor with the Course
         if course_id:
             try:
-                # Get the course by its ID
                 course = Course.objects.get(id=course_id)
-                
-                # Assign the staff member (instructor) to the course
-                course.instructor = staff_member  # Assign the instructor
-                course.save()  # Save the course to reflect the changes
-
+                course.instructor = staff_member
+                course.save()
             except Course.DoesNotExist:
                 raise serializers.ValidationError(f"Course with ID {course_id} does not exist.")
 
         return staff_member
-
-

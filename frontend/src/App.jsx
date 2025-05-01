@@ -1,4 +1,3 @@
-// File: src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -41,7 +40,7 @@ import Hello from './pages/DashBoard/hello';
 import AdminDashboard from './pages/AdminDashboard/Admin';
 import GitHubStat from './Components/githubStat/githubStat';
 
-// ** Chat Components **
+// Chat Components
 import ChatRoomList from './Components/Chat/ChatRoomList';
 import ChatRoomMessages from './Components/Chat/ChatRoomMessages';
 
@@ -75,17 +74,14 @@ const App = () => {
           <Route path="/assignment" element={<Assignments />} />
           <Route path="/recommendation" element={<RecommendationForm />} />
           <Route path="/hello" element={<AddCourses />} />
-
-
           <Route path="/github-stat" element={<GitHubStat />} />
-      
+          <Route path="/verified" element={<VerifiedPage />} />
+          <Route path="/not-verified" element={<NotVerifiedPage />} />
 
           {/* Chat Routes */}
           <Route path="/chat/rooms" element={<ChatRoomList />} />
           <Route path="/chat/rooms/:roomId" element={<ChatRoomMessages />} />
 
-          <Route path="/verified" element={<VerifiedPage />} />
-          <Route path="/not-verified" element={<NotVerifiedPage />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route
@@ -104,22 +100,13 @@ const App = () => {
           />
 
           {/* Instructor Dashboard */}
-          {userType === 'staff' && role === 'instructor' && (
-            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
-
-          )}
-          {/* Instructor-Specific Routes */}
-          {userType === "staff" && role === "instructor" && (
-            <Route
-              path="/instructor/dashboard"
-              element={<InstructorDashboard />}
-            />
-          )}
+          <Route
+            path="/instructor/dashboard/*"
+            element={<InstructorDashboard />}
+          />
 
           {/* Admin Dashboard */}
-          {userType === 'staff' && role === 'admin' && (
-            <Route path="/admin/dashboard/*" element={<AdminDashboard />} />
-          )}
+          <Route path="/admin/dashboard/*" element={<AdminDashboard />} />
 
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />

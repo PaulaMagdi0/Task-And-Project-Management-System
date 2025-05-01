@@ -132,6 +132,7 @@ const coursesSlice = createSlice({
     userCourses: {
       tracks: [],
       track_courses: [],
+      courses:[]
     },
     allCourses: [],
     status: {
@@ -180,6 +181,7 @@ const coursesSlice = createSlice({
         state.userCourses = {
           tracks: action.payload.tracks || [],
           track_courses: action.payload.track_courses || [],
+          courses:action.payload.courses || [],
         };
         console.log('fetchCourses fulfilled:', action.payload);
       })

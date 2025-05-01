@@ -8,6 +8,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { styled } from '@mui/material/styles';
 import { fetchInstructors } from '../../redux/supervisorsSlice';
 import { fetchCourses, fetchAllCourses, createCourse, assignCourseToTrack } from '../../redux/coursesSlice';
+import Chip from '@mui/material/Chip';
 
 // Styled components
 const StyledCard = styled(Card)(({ theme }) => ({
@@ -101,7 +102,7 @@ const AddCourses = () => {
     selectedTrack: null,
     selectedOption: null
   });
-  console.log(assignCourseForm.selectedOption);
+  // console.log(assignCourseForm.selectedOption);
   const [formErrors, setFormErrors] = useState({
     name: '',
     description: '',

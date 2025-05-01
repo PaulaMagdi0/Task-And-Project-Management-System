@@ -1,30 +1,3 @@
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
-from .models import AssignmentSubmission
-from apps.staff_members.permissions import IsInstructor  # Assuming this is in permissions.py
-import logging
-from datetime import datetime
-# Define a logger instance
-logger = logging.getLogger(__name__)
-import os
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.core.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.http import HttpResponse
-from .models import Assignment
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from apps.student.models import Student
-from apps.courses.models import Course
-from apps.tracks.models import Track
-from apps.assignments.models import AssignmentStudent 
-from apps.assignments.serializers import AssignmentSerializer 
-from rest_framework.views import APIView
-from apps.assignments.serializers import AssignmentStudentSerializer
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -32,11 +5,36 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from io import BytesIO
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import NotFound
+from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.decorators import api_view, permission_classes
+from apps.staff_members.permissions import IsInstructor  # Assuming this is in permissions.py
+from rest_framework import generics, status
+from rest_framework.response import Response
+from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.http import HttpResponse
+import logging
+from datetime import datetime
+import os
+from .models import Assignment
+from apps.student.models import Student
+from apps.courses.models import Course
+from apps.tracks.models import Track
+from apps.assignments.models import AssignmentStudent 
+from apps.assignments.serializers import AssignmentSerializer 
+from apps.assignments.serializers import AssignmentStudentSerializer
+from .models import AssignmentSubmission
+
 from .serializers import AssignmentSubmissionSerializer,AssignmentDetailSerializer
 from apps.submission.models import AssignmentSubmission
-from rest_framework.permissions import IsAuthenticated
 from apps.staff_members.permissions import IsInstructor
 from apps.grades.models import Grade
+# Define a logger instance
+logger = logging.getLogger(__name__)
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
     queryset = AssignmentSubmission.objects.all()
@@ -158,9 +156,11 @@ class AssignmentStudentDetailView(APIView):
 
         return assignment, student, submission, course, track
 
+
     def get(self, request, assignment_id, student_id):
         try:
             assignment, student, submission, course, track = self.get_assignment_submission(assignment_id, student_id)
+            current_time = timezone.now()
 
             # Get the grade if it exists
             grade = Grade.objects.filter(assignment=assignment, student=student).first()
@@ -169,21 +169,36 @@ class AssignmentStudentDetailView(APIView):
                 "student": student.full_name,
                 "course": course.name,
                 "track": track.name,
-                "status": "Submitted" if submission else "Not Submitted",
             }
 
             if submission:
+                # Already submitted
                 submission_data.update({
-                    "id": submission.id,  # 👈 Add submission ID here
+                    "status": "Submitted",
+                    "id": submission.id,
                     "submission_time": submission.submission_date,
                     "file_url": submission.file_url,
                 })
 
-            if grade:
+                if grade:
+                    submission_data.update({
+                        "feedback": grade.feedback or "No feedback",
+                        "score": grade.score,
+                        "graded_date": grade.graded_date,
+                    })
+
+            elif assignment.end_date and current_time > assignment.end_date:
+                # Deadline missed
                 submission_data.update({
-                    "feedback": grade.feedback or "No feedback",
-                    "score": grade.score,
-                    "graded_date": grade.graded_date,
+                    "status": "Missed",
+                    "message": "Submission deadline has passed and no submission was made."
+                })
+
+            else:
+                # Not submitted but still in time
+                submission_data.update({
+                    "status": "Not Submitted",
+                    "message": "No submission yet, but still within deadline."
                 })
 
             assignment_data = AssignmentDetailSerializer(assignment).data
@@ -378,25 +393,22 @@ class SubmissionByStudentAssignmentView(generics.ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
+
+
+
 class AssignmentSubmissionNoFileViewSet(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        """
-        Handle both:
-        - /api/submission/<pk>/ (submission detail)
-        - /api/submission/assignment/<assignment_id>/ (validate by assignment)
-        """
         pk = kwargs.get('pk')
         assignment_id = kwargs.get('assignment_id')
 
         try:
+            # Fetch submission either by pk or by assignment_id and student_id
             if pk:
-                # Get by submission ID
                 submission = AssignmentSubmission.objects.get(id=pk)
             elif assignment_id:
-                # Get by assignment ID for current user
                 student_id = request.user.id
                 submission = AssignmentSubmission.objects.get(
                     assignment_id=assignment_id,
@@ -404,29 +416,24 @@ class AssignmentSubmissionNoFileViewSet(APIView):
                 )
             else:
                 return Response(
-                    {"detail": "Missing ID parameter"},
+                    {"detail": "Both 'pk' or 'assignment_id' are required to fetch a submission."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # If submission exists, return the serialized data
             return Response({
                 "exists": True,
-                "submission_date": submission.submission_date,
+                "submission_date": submission.submission_date if submission.submission_date else "Not submitted yet",
                 "data": AssignmentSubmissionSerializer(submission).data
             }, status=status.HTTP_200_OK)
-            
+
         except AssignmentSubmission.DoesNotExist:
-            return Response({
-                "exists": False
-            }, status=status.HTTP_200_OK)  # Return 200 instead of 404
-            
+            return Response({"exists": False}, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def post(self, request, *args, **kwargs):
-        # Your existing post method
         data = request.data
         required_fields = ['student', 'course', 'assignment', 'track', 'file_url']
         if not all(field in data for field in required_fields):
@@ -436,6 +443,15 @@ class AssignmentSubmissionNoFileViewSet(APIView):
             )
 
         try:
+            # Check deadline
+            assignment = Assignment.objects.get(id=data['assignment'])
+
+            if assignment.end_date and timezone.now() > assignment.end_date:
+                return Response(
+                    {"detail": "Submission deadline has passed. You cannot submit this assignment."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
             submission = AssignmentSubmission.objects.create(
                 student_id=data['student'],
                 assignment_id=data['assignment'],
@@ -445,10 +461,18 @@ class AssignmentSubmissionNoFileViewSet(APIView):
                 submission_date=timezone.now(),
                 submitted=True
             )
+
             return Response(
                 AssignmentSubmissionSerializer(submission).data,
                 status=status.HTTP_201_CREATED
             )
+
+        except Assignment.DoesNotExist:
+            return Response(
+                {"detail": "Assignment not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         except Exception as e:
             return Response(
                 {"detail": str(e)},
