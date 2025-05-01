@@ -173,6 +173,14 @@ const CreateAssignment = () => {
     (state) => state.createassignments
   );
 
+  // Debug logging to verify data
+  useEffect(() => {
+    console.log("Tracks:", tracks);
+    console.log("Courses:", courses);
+    console.log("Loading:", loading);
+    console.log("Error:", error);
+  }, [tracks, courses, loading, error]);
+
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     title: "",
@@ -263,10 +271,9 @@ const CreateAssignment = () => {
 
         const data = await response.json();
         if (response.ok) {
-          // Clean response: remove markdown and format
           const cleanedResponse = data.response
-            .replace(/(\*\*|###|```|`|[-*+]\s)/g, "") // Remove markdown symbols and list markers
-            .replace(/\n+/g, "\n") // Normalize newlines
+            .replace(/(\*\*|###|```|`|[-*+]\s)/g, "")
+            .replace(/\n+/g, "\n")
             .trim();
           setRecommendationDialog((prev) => ({
             ...prev,
@@ -439,11 +446,22 @@ const CreateAssignment = () => {
       }
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : updatedValue,
-    }));
-    setValidationErrors((prev) => ({ ...prev, [name]: false }));
+    if (name === "track") {
+      // Reset course and students when track changes
+      setFormData((prev) => ({
+        ...prev,
+        track: value,
+        course: "",
+        selectedStudents: [],
+      }));
+      setValidationErrors((prev) => ({ ...prev, track: false, course: false }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : updatedValue,
+      }));
+      setValidationErrors((prev) => ({ ...prev, [name]: false }));
+    }
   };
 
   const handleDateChange = (name) => (date) => {
@@ -494,9 +512,9 @@ const CreateAssignment = () => {
     }));
   };
 
-  const handleSubmit= async () => {
+  const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
-  
+
     if (formData.assignToAll && (!students || students.length === 0)) {
       setSubmitDialog({
         open: true,
@@ -505,7 +523,7 @@ const CreateAssignment = () => {
       });
       return;
     }
-  
+
     const assignmentData = {
       title: formData.title,
       description: formData.description,
@@ -520,7 +538,7 @@ const CreateAssignment = () => {
         ? students.map((s) => s.id)
         : formData.selectedStudents,
     };
-  
+
     try {
       const action = await dispatch(createAssignment(assignmentData));
       if (createAssignment.fulfilled.match(action)) {
@@ -638,28 +656,35 @@ const CreateAssignment = () => {
                   onChange={handleChange}
                   name="track"
                   label="Track"
+                  disabled={loading}
                 >
-                  {tracks.map((track) => (
-                    <MenuItem key={track.id} value={track.id}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Avatar
-                          sx={{
-                            bgcolor: theme.palette.primary.main,
-                            width: 24,
-                            height: 24,
-                          }}
-                        >
-                          <SchoolIcon sx={{ fontSize: 14 }} />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2">{track.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {track.description}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </MenuItem>
-                  ))}
+                  {loading ? (
+                    <MenuItem disabled>Loading tracks...</MenuItem>
+                  ) : tracks.length > 0 ? (
+                    tracks.map((track) => (
+                      <MenuItem key={track.id} value={track.id}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar
+                            sx={{
+                              bgcolor: theme.palette.primary.main,
+                              width: 24,
+                              height: 24,
+                            }}
+                          >
+                            <SchoolIcon sx={{ fontSize: 14 }} />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2">{track.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {track.description}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>You must be assigned to course first</MenuItem>
+                  )}
                 </StyledSelect>
                 {validationErrors.track && (
                   <Typography variant="caption" color="error">
@@ -672,7 +697,7 @@ const CreateAssignment = () => {
               <FormControl
                 fullWidth
                 required
-                disabled={!formData.track}
+                disabled={!formData.track || loading}
                 error={validationErrors.course}
               >
                 <InputLabel sx={{ fontWeight: 500 }}>Course</InputLabel>
@@ -682,22 +707,30 @@ const CreateAssignment = () => {
                   name="course"
                   label="Course"
                 >
-                  {courses.map((course) => (
-                    <MenuItem key={course.id} value={course.id}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Avatar
-                          sx={{
-                            bgcolor: theme.palette.primary.main,
-                            width: 24,
-                            height: 24,
-                          }}
-                        >
-                          <DescriptionIcon sx={{ fontSize: 14 }} />
-                        </Avatar>
-                        <Typography variant="body2">{course.name}</Typography>
-                      </Stack>
-                    </MenuItem>
-                  ))}
+                  {loading ? (
+                    <MenuItem disabled>Loading courses...</MenuItem>
+                  ) : !formData.track ? (
+                    <MenuItem disabled>Select a track first</MenuItem>
+                  ) : courses.length > 0 ? (
+                    courses.map((course) => (
+                      <MenuItem key={course.id} value={course.id}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar
+                            sx={{
+                              bgcolor: theme.palette.primary.main,
+                              width: 24,
+                              height: 24,
+                            }}
+                          >
+                            <DescriptionIcon sx={{ fontSize: 14 }} />
+                          </Avatar>
+                          <Typography variant="body2">{course.name}</Typography>
+                        </Stack>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>No assigned courses</MenuItem>
+                  )}
                 </StyledSelect>
                 {validationErrors.course && (
                   <Typography variant="caption" color="error">
@@ -1019,9 +1052,9 @@ const CreateAssignment = () => {
                         Course & Track
                       </Typography>
                       <Typography variant="body2">
-                        {courses.find((c) => c.id === formData.course)?.name}
+                        {courses.find((c) => c.id === formData.course)?.name || "Not selected"}
                         <br />
-                        {tracks.find((t) => t.id === formData.track)?.name}
+                        {tracks.find((t) => t.id === formData.track)?.name || "Not selected"}
                       </Typography>
                     </Box>
                     <Box>
@@ -1105,6 +1138,19 @@ const CreateAssignment = () => {
             {error}
           </Alert>
         )}
+        {!loading && courses.length === 0 && formData.track && (
+          <Alert
+            severity="warning"
+            sx={{
+              mb: 2,
+              borderRadius: "8px",
+              fontSize: "0.875rem",
+              bgcolor: theme.palette.warning.light,
+            }}
+          >
+            No courses assigned for the selected track. Please contact an admin to get assigned to a course.
+          </Alert>
+        )}
 
         <Stepper
           activeStep={activeStep}
@@ -1137,61 +1183,59 @@ const CreateAssignment = () => {
             border: `1px solid ${theme.palette.grey[200]}`,
           }}
         >
-          <form onSubmit={(e) => {
-  e.preventDefault();
-  if (activeStep === steps.length - 1) {
-    handleSubmit();
-  } else {
-    handleNext();
-  }
-}}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (activeStep === steps.length - 1) {
+                handleSubmit();
+              } else {
+                handleNext();
+              }
+            }}
+          >
             {getStepContent(activeStep)}
-            
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, gap: 2 }}>
-  <Button
-    disabled={activeStep === 0}
-    onClick={handleBack}
-    variant="outlined"
-    sx={{
-      borderRadius: "8px",
-      fontWeight: 500,
-      px: 3,
-      py: 1,
-      borderColor: theme.palette.grey[300],
-      color: theme.palette.text.primary,
-      textTransform: "none",
-      "&:hover": {
-        borderColor: theme.palette.primary.main,
-        bgcolor: theme.palette.grey[50],
-      },
-    }}
-  >
-    Back
-  </Button>
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4, gap: 2 }}>
+              <Button
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                variant="outlined"
+                sx={{
+                  borderRadius: "8px",
+                  fontWeight: 500,
+                  px: 3,
+                  py: 1,
+                  borderColor: theme.palette.grey[300],
+                  color: theme.palette.text.primary,
+                  textTransform: "none",
+                  "&:hover": {
+                    borderColor: theme.palette.primary.main,
+                    bgcolor: theme.palette.grey[50],
+                  },
+                }}
+              >
+                Back
+              </Button>
 
-  {activeStep === steps.length - 1 ? (
-    <SimpleButton
-      type="submit"
-      variant="contained"
-      disabled={loading}
-      endIcon={<SendIcon />}
-    >
-      {loading ? (
-        <CircularProgress size={20} color="inherit" />
-      ) : (
-        "Submit Assignment"
-      )}
-    </SimpleButton>
-  ) : (
-    <SimpleButton
-      type="submit"  // Changed from onClick={handleNext}
-      variant="contained"
-    >
-      Next
-    </SimpleButton>
-  )}
-</Box>
+              {activeStep === steps.length - 1 ? (
+                <SimpleButton
+                  type="submit"
+                  variant="contained"
+                  disabled={loading || !formData.course}
+                  endIcon={<SendIcon />}
+                >
+                  {loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    "Submit Assignment"
+                  )}
+                </SimpleButton>
+              ) : (
+                <SimpleButton type="submit" variant="contained">
+                  Next
+                </SimpleButton>
+              )}
+            </Box>
           </form>
         </Paper>
 
@@ -1202,30 +1246,28 @@ const CreateAssignment = () => {
           transitionDuration={400}
         >
           <DialogTitle sx={{ textAlign: "center", pb: 2 }}>
-  {submitDialog.success ? (
-    <CheckCircleIcon
-      color="success"
-      sx={{ fontSize: 50, mb: 1, animation: "bounce 0.5s" }}
-    />
-  ) : (
-    <ErrorIcon
-      color="error"
-      sx={{ fontSize: 50, mb: 1, animation: "shake 0.5s" }}
-    />
-  )}
-  <Typography
-    component="div"  // Changed from variant="h6"
-    sx={{ 
-      fontWeight: 500, 
-      color: theme.palette.text.primary,
-      fontSize: '1.25rem' // Adjust size as needed
-    }}
-  >
-    {submitDialog.success
-      ? "Assignment Created"
-      : "Submission Failed"}
-  </Typography>
-</DialogTitle>
+            {submitDialog.success ? (
+              <CheckCircleIcon
+                color="success"
+                sx={{ fontSize: 50, mb: 1, animation: "bounce 0.5s" }}
+              />
+            ) : (
+              <ErrorIcon
+                color="error"
+                sx={{ fontSize: 50, mb: 1, animation: "shake 0.5s" }}
+              />
+            )}
+            <Typography
+              component="div"
+              sx={{
+                fontWeight: 500,
+                color: theme.palette.text.primary,
+                fontSize: "1.25rem",
+              }}
+            >
+              {submitDialog.success ? "Assignment Created" : "Submission Failed"}
+            </Typography>
+          </DialogTitle>
           <DialogContent sx={{ textAlign: "center" }}>
             <Typography
               sx={{ mb: 2, fontSize: "0.875rem", color: theme.palette.text.secondary }}
@@ -1271,24 +1313,24 @@ const CreateAssignment = () => {
           fullWidth
         >
           <DialogTitle sx={{ display: "flex", alignItems: "center", pb: 2 }}>
-  <AutoAwesomeIcon
-    sx={{ mr: 1, color: theme.palette.primary.main, fontSize: 22 }}
-  />
-  <Typography
-    component="div"
-    sx={{ 
-      fontWeight: 500, 
-      color: theme.palette.text.primary,
-      fontSize: '1.25rem'
-    }}
-  >
-    AI Task Recommendations
-  </Typography>
-</DialogTitle>
+            <AutoAwesomeIcon
+              sx={{ mr: 1, color: theme.palette.primary.main, fontSize: 22 }}
+            />
+            <Typography
+              component="div"
+              sx={{
+                fontWeight: 500,
+                color: theme.palette.text.primary,
+                fontSize: "1.25rem",
+              }}
+            >
+              AI Task Recommendations
+            </Typography>
+          </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12}>
-                <FormControl fullWidth  sx={{ mt: 2 }}>
+                <FormControl fullWidth sx={{ mt: 2 }}>
                   <InputLabel sx={{ fontWeight: 500, fontSize: "0.875rem" }}>
                     Recommendation Method
                   </InputLabel>

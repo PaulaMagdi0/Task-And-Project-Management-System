@@ -62,10 +62,16 @@ export const deleteCourse = createAsyncThunk(
   'courses/deleteCourse',
   async (courseId, { rejectWithValue }) => {
     try {
-      await apiClient.delete(`/courses/${courseId}/`);
+      console.log('Sending DELETE request to:', `/courses/${courseId}/`); // Debug log
+      const response = await apiClient.delete(`/courses/${courseId}/`);
+      console.log('Delete response:', response); // Debug log
       return courseId; // Return courseId for state update
     } catch (error) {
-      console.error('deleteCourse error:', error);
+      console.error('deleteCourse error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       return rejectWithValue(error.response?.data?.error || 'Failed to delete course');
     }
   }
@@ -78,7 +84,7 @@ export const reassignInstructor = createAsyncThunk(
     try {
       const response = await apiClient.patch(`/courses/reassign-instructor/${courseId}/`, {
         instructor_id: instructorId,
-        track_id: trackId
+        track_id: trackId,
       });
       return response.data;
     } catch (error) {
@@ -96,7 +102,7 @@ export const assignCourseToTrack = createAsyncThunk(
       const response = await apiClient.post('/courses/assign-course-to-track/', {
         course_id: courseId,
         track_id: trackId,
-        option_id: optionId
+        option_id: optionId,
       });
       return response.data;
     } catch (error) {
@@ -328,5 +334,3 @@ const coursesSlice = createSlice({
 export const { clearCourseStatus } = coursesSlice.actions;
 
 export default coursesSlice.reducer;
-
-
