@@ -6,7 +6,7 @@ import "swiper/css/autoplay";
 import { Autoplay } from "swiper/modules";
 
 // Import team images
-import team2Image from "../../assets/img/team/team-2.jpg"; // 7ot sortk hna ya zalabany
+import zalabany from "../../assets/img/team/zalabany.jpg"; // 7ot sortk hna ya zalabany
 import mano from "../../assets/img/team/mano.png";
 import hossam from "../../assets/img/team/hossam.jpg";
 import khaled from "../../assets/img/team/khaled.jpg";
@@ -19,7 +19,7 @@ const teamMembers = [
     role: "Full Stack Developer",
     description:
       "Mahmoud is the backbone of our platform, ensuring that all the front-end and back-end functionalities work seamlessly. He has extensive experience in building scalable systems.",
-    image: team2Image,
+    image: zalabany,
     socialLinks: {
       linkedin: "https://www.linkedin.com/in/mahmoud-nasr-82aa822a9/",
       github: "https://github.com/MahmoudNasrZ",
