@@ -53,7 +53,7 @@ const StudentDashboard = () => {
   });
   const [submittedAssignments, setSubmittedAssignments] = useState({});
   const navigate = useNavigate();
-  const { username } = useSelector((state) => state.auth);
+  const { username, token } = useSelector((state) => state.auth);
   const location = useLocation();
 
   useEffect(() => {
@@ -85,8 +85,9 @@ const StudentDashboard = () => {
     const fetchData = async () => {
       try {
         setData((prev) => ({ ...prev, loading: true, error: null }));
+        console.log('StudentDashboard fetching data with token:', token ? 'Present' : 'Missing');
         const response = await fetchStudentData();
-        console.log("Fetched Data:", response);
+        console.log("Fetched Data:", JSON.stringify(response, null, 2));
         setData({
           student: response.student,
           courses: response.courses || [],
@@ -105,19 +106,22 @@ const StudentDashboard = () => {
           return updatedSubmissions;
         });
       } catch (error) {
-        console.error("Fetch Error:", error);
+        console.error("Fetch Error:", JSON.stringify(error, null, 2));
         setData((prev) => ({ ...prev, loading: false, error: error.message }));
         if (error.response?.status === 401) {
-          localStorage.removeItem("authToken");
+          console.warn('Unauthorized access, redirecting to login');
           navigate("/login");
         }
       }
     };
 
-    if (username) {
+    if (username && token) {
       fetchData();
+    } else {
+      console.warn('No username or token, redirecting to login');
+      navigate("/login");
     }
-  }, [username, navigate]); // Depend on username to trigger reset on user change
+  }, [username, token, navigate, location.search]);
 
   useEffect(() => {
     // Update selectedSection based on query parameter changes
@@ -128,7 +132,7 @@ const StudentDashboard = () => {
         setSelectedSection(section);
       }
     }
-  }, [location.search]);
+  }, [location.search, selectedSection]);
 
   const renderSection = () => {
     console.log("Rendering Section:", selectedSection, "Grades:", data.grades);

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '../redux/authSlice';
+import React, { useState, useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { loginUser, logout } from '../redux/authSlice';
 import { useNavigate } from 'react-router-dom';
 import heroBg from '/src/assets/img/newCapital.png';
 import {
@@ -42,14 +42,15 @@ const StyledTabs = styled(Tabs)(({ theme }) => ({
 export default function SignIn() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { userType, role, error: loginError, loading } = useSelector((state) => state.auth);
 
   const [tab, setTab] = useState('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [intakeId, setIntakeId] = useState('');
   const [intakeIdError, setIntakeIdError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [loginFailed, setLoginFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [resetMode, setResetMode] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -60,9 +61,39 @@ export default function SignIn() {
   const [resetMsg, setResetMsg] = useState('');
   const [resetError, setResetError] = useState('');
 
+  useEffect(() => {
+    // Clear any stale auth data
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userType');
+    localStorage.removeItem('role');
+    localStorage.removeItem('username');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('branch');
+    localStorage.removeItem('intake');
+    localStorage.removeItem('track');
+    dispatch(logout());
+  }, [dispatch]);
+
+  const backToSignIn = () => {
+    setResetMode(false);
+    setLoginFailed(false);
+    setLoginError('');
+    setIntakeIdError('');
+    setEmail('');
+    setPassword('');
+    setIntakeId('');
+    setOtpSent(false);
+    setOtpVerified(false);
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setResetMsg('');
+    setResetError('');
+  };
+
   const validateIntakeId = (value) => {
-    if (value === undefined || value === null || value === '') {
-      return 'Intake ID is required';
+    if (tab === 'student' && (value === undefined || value === null || value === '')) {
+      return 'Intake ID is required for student login';
     }
     const strValue = String(value);
     if (!/^[0-9]+$/.test(strValue)) {
@@ -77,67 +108,70 @@ export default function SignIn() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoginError('');
     setIntakeIdError('');
     setLoginFailed(false);
+    setLoading(true);
+
+    console.log('Form state:', { email, password, intakeId, tab });
 
     // Validate intakeId for student login
     if (tab === 'student') {
       const error = validateIntakeId(intakeId);
       if (error) {
         setIntakeIdError(error);
+        setLoading(false);
+        console.log('Client-side validation failed:', error);
         return;
       }
     }
 
+    const intakeIdNum = intakeId ? parseInt(intakeId, 10) : null;
     const payload = {
-      email,
+      email: email.trim().toLowerCase(),
       password,
-      intake_id: tab === 'student' ? parseInt(intakeId, 10) : undefined,
+      intake_id: tab === 'student' ? intakeIdNum : null,
     };
 
     console.log('Login payload:', JSON.stringify(payload, null, 2));
+    console.log('Payload types:', {
+      email: typeof payload.email,
+      password: typeof payload.password,
+      intake_id: typeof payload.intake_id,
+    });
 
-    await dispatch(loginUser(payload));
-  };
-
-  // Navigate after successful login
-  React.useEffect(() => {
-    if (!loading && !loginError && userType) {
-      console.log('Login successful, navigating...', { userType, role });
+    try {
+      const result = await dispatch(loginUser(payload)).unwrap();
+      console.log('Login result:', JSON.stringify(result, null, 2));
+      setLoading(false);
+      const { userType, role } = result;
+      console.log('Navigating with:', { userType, role });
+      // Verify token was stored
+      const storedToken = localStorage.getItem('authToken');
+      console.log('Stored authToken:', storedToken ? 'Present' : 'Missing');
       if (userType === 'student') navigate('/student/dashboard');
       else if (role === 'instructor') navigate('/instructor/dashboard');
       else if (role === 'supervisor') navigate('/supervisor/dashboard');
       else if (role === 'branch_manager') navigate('/branchmanager/dashboard');
       else if (role === 'admin') navigate('/admin/dashboard');
-      else navigate('/');
-    }
-    if (loginError) {
-      console.error('Login error:', loginError);
+      else {
+        console.warn('Unknown userType or role, redirecting to /');
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Login error:', JSON.stringify(error, null, 2));
+      const err = error.error || error.detail || error.message || 'Login failed';
+      setLoginError(err);
       setLoginFailed(true);
+      setLoading(false);
     }
-  }, [loading, loginError, userType, role, navigate]);
-
-  const backToSignIn = () => {
-    setResetMode(false);
-    setLoginFailed(false);
-    setIntakeIdError('');
-    setEmail('');
-    setPassword('');
-    setIntakeId('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setOtp('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setResetMsg('');
-    setResetError('');
   };
 
   const sendOtp = async () => {
     setResetError('');
     setResetMsg('');
     try {
-      const payload = { email };
+      const payload = { email: email.trim().toLowerCase() };
       if (tab === 'student' && intakeId) {
         const error = validateIntakeId(intakeId);
         if (error) {
@@ -161,7 +195,7 @@ export default function SignIn() {
     setResetError('');
     setResetMsg('');
     try {
-      const payload = { email, otp };
+      const payload = { email: email.trim().toLowerCase(), otp };
       console.log('OTP verify payload:', JSON.stringify(payload, null, 2));
       await apiClient.post('/auth/password-reset-verify/', payload);
       setOtpVerified(true);
@@ -180,7 +214,7 @@ export default function SignIn() {
       return;
     }
     try {
-      const payload = { email, otp, new_password: newPassword };
+      const payload = { email: email.trim().toLowerCase(), otp, new_password: newPassword };
       console.log('Password reset confirm payload:', JSON.stringify(payload, null, 2));
       await apiClient.post('/auth/password-reset-confirm/', payload);
       alert('Password reset successful! Please sign in.');
@@ -290,9 +324,9 @@ export default function SignIn() {
                   {loading ? 'Logging in…' : 'Log In'}
                 </Button>
               </Zoom>
-              {(loginError || loginFailed) && (
+              {loginError && (
                 <Typography color="error" align="center" sx={{ fontSize: '0.9rem' }}>
-                  {loginError || 'Login failed'}
+                  {loginError}
                 </Typography>
               )}
               {loginFailed && (
