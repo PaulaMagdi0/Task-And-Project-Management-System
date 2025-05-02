@@ -1,3 +1,4 @@
+# apps/custom_auth/urls.py
 from django.urls import path
 from .views import (
     login_view,
@@ -17,5 +18,4 @@ urlpatterns = [
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', MyTokenRefreshView.as_view(), name='token_refresh'),
-
-]   
+]

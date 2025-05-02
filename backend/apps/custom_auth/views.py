@@ -14,6 +14,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from apps.student.models import Student  # Added import
+from apps.staff_members.models import StaffMember
 
 from .serializers import (
     LoginSerializer,
@@ -30,7 +32,6 @@ User = get_user_model()
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    # … your existing login logic (unchanged) …
     email = request.data.get('email')
     password = request.data.get('password')
     if not email or not password:
@@ -42,8 +43,9 @@ def login_view(request):
     except serializers.ValidationError as exc:
         detail = exc.detail
         msg = detail.get('detail') if isinstance(detail, dict) and 'detail' in detail else (
-              detail[0] if isinstance(detail, list) else detail
+            detail[0] if isinstance(detail, list) else detail
         )
+        logger.error(f"Login failed: {msg}")
         raise AuthenticationFailed(msg)
 
     user = login_serializer.validated_data['user']
@@ -51,7 +53,29 @@ def login_view(request):
     access_token = str(token.access_token)
     refresh_token = str(token)
 
-    resp = Response({"access": access_token, "refresh": refresh_token}, status=status.HTTP_200_OK)
+    logger.info(f"Successful login for {user.email} ({'student' if isinstance(user, Student) else 'staff'})")
+    resp = Response({
+        "access": access_token,
+        "refresh": refresh_token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "username": getattr(user, 'username', user.email),
+            "role": getattr(user, 'role', 'unknown'),
+            "userType": 'student' if isinstance(user, Student) else 'staff',
+            "is_active": user.is_active,
+            **({
+                "intake": {"id": user.intake.id, "name": user.intake.name}
+            } if isinstance(user, Student) and user.intake else {}),
+            **({
+                "track": {"id": user.track.id, "name": user.track.name}
+            } if isinstance(user, Student) and user.track else {}),
+            **({
+                "branch": {"id": user.branch.id, "name": user.branch.name}
+            } if isinstance(user, StaffMember) and user.branch else {}),
+        }
+    }, status=status.HTTP_200_OK)
+
     cookie_kwargs = {
         "httponly": True,
         "secure": not settings.DEBUG,
@@ -143,9 +167,7 @@ class PasswordResetConfirmView(APIView):
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
     permission_classes = [AllowAny]
-    # … your existing `post()` override …
 
 
 class MyTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
-    # … your existing `post()` override …

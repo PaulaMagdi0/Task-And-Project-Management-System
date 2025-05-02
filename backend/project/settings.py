@@ -12,6 +12,10 @@ DEBUG = True  # Set to False in production
 
 ALLOWED_HOSTS = []
 AUTH_USER_MODEL = 'staff_members.StaffMember'
+AUTHENTICATION_BACKENDS = [
+    'apps.custom_auth.backends.MultiModelAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',  # Fallback
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

@@ -6,7 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from apps.student.models import Student
+from apps.student.models import Student, Intake
 from apps.staff_members.models import StaffMember
 import logging
 
@@ -16,25 +16,50 @@ logger = logging.getLogger(__name__)
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=255)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    intake_id = serializers.PrimaryKeyRelatedField(
+        queryset=Intake.objects.all(),
+        required=False,  # Optional, as StaffMember doesn't need it
+        allow_null=True,
+        help_text="ID of the intake (required for student login)"
+    )
 
     def validate(self, data):
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
+        intake = data.get('intake_id')
 
         if not email or not password:
             raise serializers.ValidationError({"detail": "Both email and password are required."})
 
         user = None
-        for model in (Student, StaffMember):
-            try:
-                user = model.objects.get(email=email)
-                break
-            except ObjectDoesNotExist:
-                continue
+        try:
+            if intake:  # Student login
+                try:
+                    user = Student.objects.get(email=email, intake=intake)
+                except Student.DoesNotExist:
+                    logger.warning(f"Student login failed: No student found with email '{email}' in intake ID {intake.id}")
+                    raise serializers.ValidationError({"detail": "No student account found with that email and intake."})
+                except Student.MultipleObjectsReturned:
+                    logger.error(f"Multiple students found for email '{email}' in intake ID {intake.id}")
+                    raise serializers.ValidationError({"detail": "Multiple accounts found. Please contact support."})
+            else:  # StaffMember login or fallback
+                for model in (Student, StaffMember):
+                    try:
+                        user = model.objects.get(email=email)
+                        break
+                    except ObjectDoesNotExist:
+                        continue
+        except Exception as e:
+            logger.error(f"Error during user lookup for email '{email}': {str(e)}")
+            raise serializers.ValidationError({"detail": "An error occurred during authentication."})
 
         if user is None:
             logger.warning(f"Login attempt with non-existent email: {email}")
             raise serializers.ValidationError({"detail": "No account found with that email."})
+
+        if isinstance(user, Student) and not intake:
+            logger.warning(f"Student login attempt for '{email}' without intake_id")
+            raise serializers.ValidationError({"detail": "Intake ID is required for student login."})
 
         if not user.check_password(password):
             logger.warning(f"Invalid password attempt for user: {email}")
@@ -56,8 +81,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        from apps.student.models import Student  # avoid circular import
-
         token['sub'] = str(user.pk)
         token['email'] = user.email
         token['role'] = getattr(user, 'role', 'unknown')
@@ -66,16 +89,21 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['is_active'] = user.is_active
 
         if isinstance(user, Student):
-            token['student_id'] = getattr(user, 'student_id', None)
             token['is_student'] = True
+            token['intake'] = {
+                'id': user.intake.id,
+                'name': user.intake.name
+            } if user.intake else None
+            token['track'] = {
+                'id': user.track.id,
+                'name': user.track.name
+            } if user.track else None
         else:
-            token['staff_id'] = getattr(user, 'staff_id', None)
             token['is_staff'] = True
-
-        if hasattr(user, 'branch') and user.branch:
-            token['branch'] = {'id': user.branch.id, 'name': user.branch.name}
-        else:
-            token['branch'] = None
+            token['branch'] = {
+                'id': user.branch.id,
+                'name': user.branch.name
+            } if user.branch else None
 
         return token
 
@@ -92,12 +120,24 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'userType': 'student' if isinstance(user, Student) else 'staff',
                 'username': getattr(user, 'username', user.email),
                 'is_active': user.is_active,
-                **({'student_id': user.student_id} if isinstance(user, Student) else {}),
-                **({'staff_id': user.staff_id} if isinstance(user, StaffMember) else {}),
-                'track': {
-                    'id': user.track.id,
-                    'name': user.track.name,
-                } if hasattr(user, 'track') and user.track else None,
+                **({
+                    'intake': {
+                        'id': user.intake.id,
+                        'name': user.intake.name
+                    }
+                } if isinstance(user, Student) and user.intake else {}),
+                **({
+                    'track': {
+                        'id': user.track.id,
+                        'name': user.track.name
+                    }
+                } if isinstance(user, Student) and user.track else {}),
+                **({
+                    'branch': {
+                        'id': user.branch.id,
+                        'name': user.branch.name
+                    }
+                } if isinstance(user, StaffMember) and user.branch else {}),
             }
         }
 
@@ -126,10 +166,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True)
 
     def validate_new_password(self, value):
-        """
-        Run the new password through Django's validators,
-        so you get e.g. "too common", "too similar to username", etc.
-        """
         email = self.initial_data.get('email')
         try:
             user = User.objects.get(email=email)
@@ -139,10 +175,8 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         try:
             validate_password(value, user)
         except DjangoValidationError as e:
-            # e.messages is a list of human‐readable errors
             raise serializers.ValidationError(e.messages)
         return value
 
     def validate(self, data):
-        # OTP check itself happens in the view; nothing extra here
         return data
