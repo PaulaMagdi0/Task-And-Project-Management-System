@@ -6,13 +6,27 @@ import "swiper/css/autoplay";
 import { Autoplay } from "swiper/modules";
 
 // Import team images
-import zalabany from "../../assets/img/team/zalabany.jpg"; // 7ot sortk hna ya zalabany
+import zalabany from "../../assets/img/team/zalabany.jpg";
+import team_2 from "../../assets/img/team/team-2.jpg";
 import mano from "../../assets/img/team/mano.png";
 import hossam from "../../assets/img/team/hossam.jpg";
 import khaled from "../../assets/img/team/khaled.jpg";
 import pola from "../../assets/img/team/pola.jpg";
 
 const teamMembers = [
+  {
+    portfolio: "7",
+    name: "Mahmoud Nasr",
+    role: "Full Stack Developer",
+    description:
+      "Mahmoud is the backbone of our platform, ensuring that all the front-end and back-end functionalities work seamlessly. He has extensive experience in building scalable systems.",
+    image: team_2,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/mahmoud-nasr-82aa822a9/",
+      github: "https://github.com/MahmoudNasrZ",
+      facebook: "https://www.facebook.com/mahmoud.nasr.9803",
+    },
+  },
   {
     portfolio: "1",
     name: "Mahmoud Nasr",
