@@ -2,7 +2,6 @@ from django.db import models
 from apps.staff_members.models import StaffMember
 from apps.branch_location.models import Branch  # Import Branch model
 from django.utils import timezone
-
 class Track(models.Model):
     TRACK_TYPE_CHOICES = [
         ('ICC', 'ICC'),
@@ -39,7 +38,6 @@ class Track(models.Model):
         blank=True,
     )
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
-
     class Meta:
         ordering = ["-created_at"]
         db_table = 'tracks'

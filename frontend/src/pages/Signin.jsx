@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { loginUser, logout } from '../redux/authSlice';
+import React, { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../redux/authSlice';
 import { useNavigate } from 'react-router-dom';
 import heroBg from '/src/assets/img/newCapital.png';
 import {
@@ -42,15 +42,14 @@ const StyledTabs = styled(Tabs)(({ theme }) => ({
 export default function SignIn() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { userType, role, error: loginError, loading } = useSelector((state) => state.auth);
 
   const [tab, setTab] = useState('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [intakeId, setIntakeId] = useState('');
   const [intakeIdError, setIntakeIdError] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [loginFailed, setLoginFailed] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const [resetMode, setResetMode] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -60,29 +59,6 @@ export default function SignIn() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetMsg, setResetMsg] = useState('');
   const [resetError, setResetError] = useState('');
-
-  useEffect(() => {
-    // Clear any stale auth token
-    localStorage.removeItem('authToken');
-    dispatch(logout());
-  }, [dispatch]);
-
-  const backToSignIn = () => {
-    setResetMode(false);
-    setLoginFailed(false);
-    setLoginError('');
-    setIntakeIdError('');
-    setEmail('');
-    setPassword('');
-    setIntakeId('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setOtp('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setResetMsg('');
-    setResetError('');
-  };
 
   const validateIntakeId = (value) => {
     if (value === undefined || value === null || value === '') {
@@ -101,73 +77,60 @@ export default function SignIn() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoginError('');
     setIntakeIdError('');
     setLoginFailed(false);
-    setLoading(true);
-
-    console.log('Form state:', { email, password, intakeId, tab });
 
     // Validate intakeId for student login
     if (tab === 'student') {
       const error = validateIntakeId(intakeId);
       if (error) {
         setIntakeIdError(error);
-        setLoading(false);
-        console.log('Client-side validation failed:', error);
         return;
       }
     }
 
-    const intakeIdNum = intakeId ? parseInt(intakeId, 10) : null;
     const payload = {
       email,
       password,
-      intake_id: tab === 'student' ? intakeIdNum : null,
+      intake_id: tab === 'student' ? parseInt(intakeId, 10) : undefined,
     };
 
     console.log('Login payload:', JSON.stringify(payload, null, 2));
-    console.log('Payload types:', {
-      email: typeof email,
-      password: typeof password,
-      intake_id: typeof payload.intake_id,
-    });
 
-    try {
-      // Ensure no auth token is sent
-      localStorage.removeItem('authToken');
+    await dispatch(loginUser(payload));
+  };
 
-      // Call apiClient directly to avoid loginUser config issues
-      const response = await apiClient.post('/auth/login/', payload);
-      console.log('API response:', JSON.stringify(response.data, null, 2));
-
-      // Simulate loginUser.fulfilled for consistency
-      const result = { payload: response.data };
-
-      setLoading(false);
-      if (response.status === 200) {
-        console.log('Login successful, navigating...');
-        dispatch({ type: 'auth/loginUser/fulfilled', payload: response.data });
-        const { userType, role } = result.payload;
-        if (userType === 'student') navigate('/student/dashboard');
-        else if (role === 'instructor') navigate('/instructor/dashboard');
-        else if (role === 'supervisor') navigate('/supervisor/dashboard');
-        else if (role === 'branch_manager') navigate('/branchmanager/dashboard');
-        else if (role === 'admin') navigate('/admin/dashboard');
-        else navigate('/');
-      } else {
-        const err = response.data?.error || 'Login failed';
-        console.error('Login error:', err);
-        setLoginError(err);
-        setLoginFailed(true);
-      }
-    } catch (error) {
-      console.error('Unexpected login error:', error.response?.data || error.message);
-      const err = error.response?.data?.error || error.response?.data?.detail || 'An unexpected error occurred';
-      setLoginError(err);
-      setLoginFailed(true);
-      setLoading(false);
+  // Navigate after successful login
+  React.useEffect(() => {
+    if (!loading && !loginError && userType) {
+      console.log('Login successful, navigating...', { userType, role });
+      if (userType === 'student') navigate('/student/dashboard');
+      else if (role === 'instructor') navigate('/instructor/dashboard');
+      else if (role === 'supervisor') navigate('/supervisor/dashboard');
+      else if (role === 'branch_manager') navigate('/branchmanager/dashboard');
+      else if (role === 'admin') navigate('/admin/dashboard');
+      else navigate('/');
     }
+    if (loginError) {
+      console.error('Login error:', loginError);
+      setLoginFailed(true);
+    }
+  }, [loading, loginError, userType, role, navigate]);
+
+  const backToSignIn = () => {
+    setResetMode(false);
+    setLoginFailed(false);
+    setIntakeIdError('');
+    setEmail('');
+    setPassword('');
+    setIntakeId('');
+    setOtpSent(false);
+    setOtpVerified(false);
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setResetMsg('');
+    setResetError('');
   };
 
   const sendOtp = async () => {
@@ -327,9 +290,9 @@ export default function SignIn() {
                   {loading ? 'Logging in…' : 'Log In'}
                 </Button>
               </Zoom>
-              {loginError && (
+              {(loginError || loginFailed) && (
                 <Typography color="error" align="center" sx={{ fontSize: '0.9rem' }}>
-                  {loginError}
+                  {loginError || 'Login failed'}
                 </Typography>
               )}
               {loginFailed && (
