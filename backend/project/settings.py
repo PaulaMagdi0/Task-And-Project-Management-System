@@ -1,20 +1,20 @@
 import os
 from pathlib import Path
-
 from decouple import config
-
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "your-secret-key"  # Keep this secure in production
+SECRET_KEY = config('SECRET_KEY', default='your-secret-key')
 
-DEBUG = True  # Set to False in production
+DEBUG = True
 
 ALLOWED_HOSTS = []
+
 AUTH_USER_MODEL = 'staff_members.StaffMember'
+
 AUTHENTICATION_BACKENDS = [
     'apps.custom_auth.backends.MultiModelAuthBackend',
-    'django.contrib.auth.backends.ModelBackend',  # Fallback
 ]
 
 INSTALLED_APPS = [
@@ -24,7 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'rest_framework.authtoken',  # Add this line for Token Authentication
+    'rest_framework.authtoken',
     'rest_framework_simplejwt',
     "rest_framework",
     "channels",
@@ -41,16 +41,11 @@ INSTALLED_APPS = [
     "apps.branch_location",
     "corsheaders",
     'django_extensions',
-    # 'ai_recommendations',
     'ai_recommendations',
     'chat_ai',
     'jokes',
     'githubStat',
-
 ]
-# settings.py
-# Add this import at the top of settings.py
-from datetime import timedelta
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
@@ -66,19 +61,12 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
-# settings.py
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': [
-#         'rest_framework.authentication.SessionAuthentication',
-#     ],
-# }
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -90,8 +78,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "project.urls"
 CORS_ALLOW_ALL_ORIGINS = True
+
+ROOT_URLCONF = "project.urls"
 
 TEMPLATES = [
     {
@@ -112,14 +101,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "project.wsgi.application"
 ASGI_APPLICATION = "project.asgi.application"
 
-# PostgreSQL Database Configuration
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "task-project-system",
         "USER": "postgres",
-        # "PASSWORD": "1234",  # Keep this secure Khalid
-        "PASSWORD": "2625",  # Keep this secure Mahmoud+Mano
+        "PASSWORD": config('DB_PASSWORD', default='2625'),
         "HOST": "localhost",
         "PORT": "5432",
     }
@@ -137,7 +124,6 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# Static & Media Files Configuration
 STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
@@ -147,7 +133,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SITE_URL = "http://127.0.0.1:8000"
 
-# Django Channels Configuration
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -155,12 +140,27 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Email Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "m.nasr266@gmail.com"
-EMAIL_HOST_PASSWORD = "efvh pzab wslt upfq"  # Keep this secure
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='m.nasr266@gmail.com')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='efvh pzab wslt upfq')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

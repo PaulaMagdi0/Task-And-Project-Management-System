@@ -1,5 +1,3 @@
-# apps/custom_auth/serializers.py
-
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.core.exceptions import ObjectDoesNotExist
@@ -8,6 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from apps.student.models import Student, Intake
 from apps.staff_members.models import StaffMember
+from apps.custom_auth.backends import MultiModelAuthBackend
 import logging
 
 User = get_user_model()
@@ -18,7 +17,7 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     intake_id = serializers.PrimaryKeyRelatedField(
         queryset=Intake.objects.all(),
-        required=False,  # Optional, as StaffMember doesn't need it
+        required=False,
         allow_null=True,
         help_text="ID of the intake (required for student login)"
     )
@@ -28,30 +27,62 @@ class LoginSerializer(serializers.Serializer):
         password = data.get('password', '')
         intake = data.get('intake_id')
 
+        logger.debug(f"Validating login: email={email}, intake_id={intake.id if intake else None}")
+
         if not email or not password:
             raise serializers.ValidationError({"detail": "Both email and password are required."})
 
         user = None
+        backend = MultiModelAuthBackend()
         try:
-            if intake:  # Student login
-                try:
-                    user = Student.objects.get(email=email, intake=intake)
-                except Student.DoesNotExist:
-                    logger.warning(f"Student login failed: No student found with email '{email}' in intake ID {intake.id}")
-                    raise serializers.ValidationError({"detail": "No student account found with that email and intake."})
-                except Student.MultipleObjectsReturned:
-                    logger.error(f"Multiple students found for email '{email}' in intake ID {intake.id}")
-                    raise serializers.ValidationError({"detail": "Multiple accounts found. Please contact support."})
-            else:  # StaffMember login or fallback
-                for model in (Student, StaffMember):
-                    try:
-                        user = model.objects.get(email=email)
-                        break
-                    except ObjectDoesNotExist:
-                        continue
+            logger.debug(f"Calling authenticate with email={email}, intake_id={intake.id if intake else None}")
+            user = backend.authenticate(
+                request=self.context.get('request'),
+                email=email,
+                password=password,
+                intake_id=intake.id if intake else None
+            )
+            if user:
+                logger.debug(f"Backend authenticated user: ID={user.id}, Type={'student' if isinstance(user, Student) else 'staff'}")
+            else:
+                logger.debug(f"Backend authentication failed for email={email}")
         except Exception as e:
-            logger.error(f"Error during user lookup for email '{email}': {str(e)}")
+            logger.error(f"Error during backend authentication for email='{email}': {str(e)}")
             raise serializers.ValidationError({"detail": "An error occurred during authentication."})
+
+        if user is None:
+            try:
+                if intake:
+                    logger.debug(f"Querying Student with email='{email}', intake_id={intake.id}")
+                    students = Student.objects.filter(email=email, intake=intake)
+                    logger.debug(f"Found {students.count()} students for email='{email}', intake_id={intake.id}")
+                    if students.count() > 1:
+                        logger.warning(f"Multiple students found for email='{email}', intake_id={intake.id}: {students.count()} records")
+                        for student in students:
+                            logger.debug(f" - Student ID: {student.id}, Username: {student.username}")
+                    user = students.first()
+                    if not user:
+                        logger.warning(f"No student found with email='{email}', intake_id={intake.id}")
+                        raise serializers.ValidationError({"detail": "No student account found with that email and intake."})
+                else:
+                    logger.debug(f"Querying without intake_id for email='{email}'")
+                    for model in (Student, StaffMember):
+                        try:
+                            users = model.objects.filter(email=email)
+                            logger.debug(f"Found {users.count()} users in {model.__name__} for email='{email}'")
+                            if users.count() > 1:
+                                logger.warning(f"Multiple {model.__name__} found for email='{email}': {users.count()} records")
+                                for u in users:
+                                    logger.debug(f" - {model.__name__} ID: {u.id}, Username: {u.username}")
+                            user = users.first()
+                            if user:
+                                break
+                        except Exception as e:
+                            logger.error(f"Error querying {model.__name__} for email='{email}': {str(e)}")
+                            continue
+            except Exception as e:
+                logger.error(f"Error during user lookup for email='{email}': {str(e)}")
+                raise serializers.ValidationError({"detail": "An error occurred during authentication."})
 
         if user is None:
             logger.warning(f"Login attempt with non-existent email: {email}")
@@ -69,9 +100,9 @@ class LoginSerializer(serializers.Serializer):
             logger.warning(f"Login attempt for inactive account: {email}")
             raise serializers.ValidationError({"detail": "Account is inactive."})
 
+        logger.debug(f"User validated: ID={user.id}, Type={'student' if isinstance(user, Student) else 'staff'}")
         data['user'] = user
         return data
-
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     default_error_messages = {
@@ -141,7 +172,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             }
         }
 
-
 class TokenRefreshSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 
@@ -150,15 +180,13 @@ class TokenRefreshSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": "Refresh token is required."})
         return attrs
 
-
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
-
+    intake_id = serializers.IntegerField(required=False, allow_null=True)
 
 class PasswordResetVerifySerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField()
-
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     email = serializers.EmailField()

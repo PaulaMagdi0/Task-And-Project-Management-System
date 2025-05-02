@@ -38,31 +38,30 @@ class ExcelUploadSerializer(serializers.Serializer):
     intake_name = serializers.CharField(required=True, max_length=100)
 
     def validate_excel_file(self, value):
-       
-            if not value.name.lower().endswith(('.xlsx', '.xls')):
-                raise ValidationError("Only .xlsx or .xls files allowed")
-            try:
-                content = value.read()
-                value.seek(0)
-                wb = openpyxl.load_workbook(filename=BytesIO(content))
-                sheet = wb.active
-            except Exception as e:
-                logger.error(f"Excel read error: {str(e)}")
-                raise ValidationError(f"Invalid Excel file: {str(e)}")
-            try:
-                header_row = [str(cell.value).strip().lower() for cell in sheet[1]]
-                required_columns = ['first name', 'last name', 'email', 'role']
-                missing = [col for col in required_columns if col not in header_row]
-                if missing:
-                    raise ValidationError(
-                        f"Missing columns: {', '.join(missing).title()}. "
-                        f"Found columns: {', '.join(header_row)}"
-                    )
-            except IndexError:
-                raise ValidationError("Excel file has no header row")
-            if sheet.max_row < 2:
-                raise ValidationError("Excel file contains no data rows")
-            return value
+        if not value.name.lower().endswith(('.xlsx', '.xls')):
+            raise ValidationError("Only .xlsx or .xls files allowed")
+        try:
+            content = value.read()
+            value.seek(0)
+            wb = openpyxl.load_workbook(filename=BytesIO(content))
+            sheet = wb.active
+        except Exception as e:
+            logger.error(f"Excel read error: {str(e)}")
+            raise ValidationError(f"Invalid Excel file: {str(e)}")
+        try:
+            header_row = [str(cell.value).strip().lower() for cell in sheet[1]]
+            required_columns = ['first name', 'last name', 'email', 'role']
+            missing = [col for col in required_columns if col not in header_row]
+            if missing:
+                raise ValidationError(
+                    f"Missing columns: {', '.join(missing).title()}. "
+                    f"Found columns: {', '.join(header_row)}"
+                )
+        except IndexError:
+            raise ValidationError("Excel file has no header row")
+        if sheet.max_row < 2:
+            raise ValidationError("Excel file contains no data rows")
+        return value
 
     def validate_intake_name(self, value):
         return value.strip()
@@ -79,7 +78,6 @@ class ExcelUploadSerializer(serializers.Serializer):
         track = self.validated_data['track']
         intake_name = self.validated_data['intake_name']
 
-        # Create or get intake
         intake, created = Intake.objects.get_or_create(
             name=intake_name,
             track=track,
@@ -199,17 +197,20 @@ class ExcelUploadSerializer(serializers.Serializer):
                 password = email_password_map.get(student.email)
                 if password:
                     verification_url = f"{settings.SITE_URL}/api/student/verify/{student.verification_code}/"
-                    subject = "Your Student Account Details"
+                    subject = "Verify Your Student Account"
                     message = f"""
                     Hello {student.first_name},
-                    Your student account has been created:
-                    Email: {student.email}
-                    Temporary Password: {password}
-                    Intake: {student.intake.name}
-                    Track: {student.track.name}
-                    Please verify your email by visiting:
+
+                    Your student account has been created. Please verify your email by visiting:
                     {verification_url}
-                    After verification, you can login and change your password.
+
+                    Your login information:
+                    - Email: {student.email}
+                    - Temporary Password: {password}
+                    - Intake ID: {student.intake.id}
+                    - Track: {student.track.name}
+
+                    Use these credentials to log in as a student. After verification, you can change your password.
                     """
                     send_mail(
                         subject,
@@ -346,12 +347,17 @@ class StudentSerializer(serializers.ModelSerializer):
             subject = "Verify Your Student Account"
             message = f"""
             Hello {student.first_name},
-            Please verify your email by visiting:
+
+            Your student account has been created. Please verify your email by visiting:
             {verification_url}
-            Email: {student.email}
-            Intake: {student.intake.name}
-            Track: {student.track.name}
-            Your temporary password: {password}
+
+            Your login information:
+            - Email: {student.email}
+            - Temporary Password: {password}
+            - Intake ID: {student.intake.id}
+            - Track: {student.track.name}
+
+            Use these credentials to log in as a student. After verification, you can change your password.
             """
             send_mail(
                 subject,
@@ -362,7 +368,7 @@ class StudentSerializer(serializers.ModelSerializer):
             )
             logger.info(f"Verification email sent to {student.email}")
         except Exception as e:
-            logger.error(f"Failed to send verification email: {str(e)}")
+            logger.error(f"Failed to send verification email to {student.email}: {str(e)}")
 
 class DashboardSerializer(serializers.ModelSerializer):
     upcoming_assignments = serializers.SerializerMethodField()
