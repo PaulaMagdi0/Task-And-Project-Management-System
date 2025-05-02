@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import about from "/src/assets/img/about.jpg";
+import about from "/src/assets/img/about2.png";
 
 const About = () => {
   const location = useLocation();
