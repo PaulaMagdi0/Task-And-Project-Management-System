@@ -3,11 +3,9 @@ import react from "@vitejs/plugin-react";
 import { splitVendorChunkPlugin } from "vite";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-
   return {
     plugins: [react(), splitVendorChunkPlugin()],
-    base: env.VITE_BASE_PATH,
+    base: process.env.VITE_BASE_PATH || "/Task-And-Project-Management-System",
     define: {
       __APP_ENV__: JSON.stringify(env.VITE_DEBUG),
     },
