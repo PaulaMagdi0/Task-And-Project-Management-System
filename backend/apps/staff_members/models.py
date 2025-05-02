@@ -7,7 +7,8 @@ from apps.branch_location.models import Branch
 
 class StaffMember(AbstractUser):
     email = models.EmailField(unique=True, verbose_name=_('email'))
-
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']  # required when creating superuser via command line
     class Role(models.TextChoices):
         BRANCH_MANAGER = 'branch_manager', _('Branch Manager')
         SUPERVISOR = 'supervisor', _('Supervisor')

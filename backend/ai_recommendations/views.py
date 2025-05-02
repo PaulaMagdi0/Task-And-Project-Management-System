@@ -47,12 +47,12 @@ def get_cached_embeddings():
     return assignments_queryset, assignments_embeddings
 
 # Fetch assignments and embeddings ONCE initially
-try:
-    from apps.assignments.models import Assignment
-    if Assignment.objects.exists():
-        refresh_embeddings()
-except Exception as e:
-    print(f"[WARNING] Couldn't refresh embeddings at startup: {e}")
+# try:
+#     from apps.assignments.models import Assignment
+#     if Assignment.objects.exists():
+#         refresh_embeddings()
+# except Exception as e:
+#     print(f"[WARNING] Couldn't refresh embeddings at startup: {e}")
 
 # ========== Recommendation Logic ==========
 
@@ -104,8 +104,8 @@ def get_recommendations(request):
 
     # Auto-refresh if assignments count changed
     cached_assignments, _ = get_cached_embeddings()
-    if Assignment.objects.count() != len(cached_assignments):
-        refresh_embeddings()
+    # if Assignment.objects.count() != len(cached_assignments):
+    #     refresh_embeddings()
 
     if method_choice == "1":
         course_name = request.GET.get("course_name", "Java")
