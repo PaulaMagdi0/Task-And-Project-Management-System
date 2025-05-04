@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
@@ -14,8 +14,20 @@ import ChatWithAISection from "./ChatWithAISection";
 import { fetchStudentData } from "./api";
 import "./StudentDashboard.css";
 
+// Menu items from Sidebar for validation
+const menuItems = [
+  "courses",
+  "assignments",
+  "deadlines",
+  "averageGrade",
+  "bookHub",
+  "entertainment",
+  "library",
+  "chatWithAI",
+];
+
 // Error Boundary for the entire dashboard
-class DashboardErrorBoundary extends Component {
+class DashboardErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
 
   static getDerivedStateFromError(error) {
@@ -53,10 +65,21 @@ const StudentDashboard = () => {
   });
   const [submittedAssignments, setSubmittedAssignments] = useState({});
   const navigate = useNavigate();
-  const { username, token } = useSelector((state) => state.auth);
   const location = useLocation();
+  const { username, token } = useSelector((state) => state.auth);
 
   useEffect(() => {
+    // Handle query parameter for section
+    const queryParams = new URLSearchParams(location.search);
+    const section = queryParams.get("section");
+    if (section && menuItems.includes(section)) {
+      setSelectedSection(section);
+    } else {
+      // Default to 'courses' if no valid section is provided
+      setSelectedSection("courses");
+      navigate("/student/dashboard?section=courses", { replace: true });
+    }
+
     // Reset state when username changes (new student logs in)
     setData({
       student: null,
@@ -68,24 +91,12 @@ const StudentDashboard = () => {
       error: null,
     });
     setSubmittedAssignments({});
-    setSelectedSection("courses");
     localStorage.removeItem("submittedAssignments"); // Clear previous user's submissions
-
-    // Parse query parameters
-    const queryParams = new URLSearchParams(location.search);
-    const section = queryParams.get("section");
-
-    // Set selectedSection based on query parameter
-    if (section === "assignments") {
-      setSelectedSection("assignments");
-    } else if (section === "courses") {
-      setSelectedSection("courses");
-    }
 
     const fetchData = async () => {
       try {
         setData((prev) => ({ ...prev, loading: true, error: null }));
-        console.log('StudentDashboard fetching data with token:', token ? 'Present' : 'Missing');
+        console.log("StudentDashboard fetching data with token:", token ? "Present" : "Missing");
         const response = await fetchStudentData();
         console.log("Fetched Data:", JSON.stringify(response, null, 2));
         setData({
@@ -99,17 +110,14 @@ const StudentDashboard = () => {
         });
         setSubmittedAssignments((prev) => {
           const updatedSubmissions = { ...response.submissions };
-          localStorage.setItem(
-            "submittedAssignments",
-            JSON.stringify(updatedSubmissions)
-          );
+          localStorage.setItem("submittedAssignments", JSON.stringify(updatedSubmissions));
           return updatedSubmissions;
         });
       } catch (error) {
         console.error("Fetch Error:", JSON.stringify(error, null, 2));
         setData((prev) => ({ ...prev, loading: false, error: error.message }));
         if (error.response?.status === 401) {
-          console.warn('Unauthorized access, redirecting to login');
+          console.warn("Unauthorized access, redirecting to login");
           navigate("/login");
         }
       }
@@ -118,21 +126,10 @@ const StudentDashboard = () => {
     if (username && token) {
       fetchData();
     } else {
-      console.warn('No username or token, redirecting to login');
+      console.warn("No username or token, redirecting to login");
       navigate("/login");
     }
   }, [username, token, navigate, location.search]);
-
-  useEffect(() => {
-    // Update selectedSection based on query parameter changes
-    const queryParams = new URLSearchParams(location.search);
-    const section = queryParams.get("section");
-    if (section && section !== selectedSection) {
-      if (section === "assignments" || section === "courses") {
-        setSelectedSection(section);
-      }
-    }
-  }, [location.search, selectedSection]);
 
   const renderSection = () => {
     console.log("Rendering Section:", selectedSection, "Grades:", data.grades);
