@@ -362,16 +362,13 @@ def verify_email(request, verification_code):
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
-        # Get the student (from database, using select_related for track and intake)
         student = Student.objects.select_related('track', 'intake').get(id=student_id)
-
-        # Authorization check
-        if request.user.id != student.id and not request.user.is_staff:
-            return Response({"error": "Unauthorized access"}, status=403)
-
-        #非洲 Get all courses for the student's track
+        # Allow the student to access their own courses or staff members to access any student's courses
+        if request.user.id != student.id and not isinstance(request.user, StaffMember):
+            logger.warning(f"User {request.user.id} unauthorized to access courses for student {student_id}")
+            return Response({"error": "Unauthorized access"}, status=status.HTTP_403_FORBIDDEN)
+        
         courses = Course.objects.filter(tracks=student.track)
-
         course_data = [
             {
                 'course_id': course.id,
@@ -381,10 +378,8 @@ def student_courses(request, student_id):
             }
             for course in courses
         ]
-
         assignments = Assignment.objects.filter(course__in=courses)
         assignments_serializer = AssignmentSerializer(assignments, many=True)
-
         return Response({
             'student': {
                 'id': student.id,
@@ -398,12 +393,11 @@ def student_courses(request, student_id):
             'courses': course_data,
             'assignments': assignments_serializer.data
         })
-
     except Student.DoesNotExist:
-        return Response({"error": "Student not found"}, status=404)
+        return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
+        logger.error(f"Error retrieving courses for student {student_id}: {str(e)}")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
