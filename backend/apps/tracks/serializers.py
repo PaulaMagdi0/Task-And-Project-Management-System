@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.tracks.models import Track
 from apps.courses.models import Course
-
+from apps.student.serializers import IntakeSerializer
 
 class BaseTrackSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,10 +16,11 @@ class TrackSerializer(serializers.ModelSerializer):
         required=False,
         allow_empty=True
     )
+    intakes = IntakeSerializer(many=True, read_only=True)
 
     class Meta:
         model = Track
-        fields = ['id', 'name', 'description', 'supervisor', 'branch', 'courses', 'track_type','created_at']
+        fields = ['id', 'name', 'description', 'supervisor', 'branch', 'courses', 'track_type','created_at','intakes']
 
     def create(self, validated_data):
         courses = validated_data.pop('courses', [])

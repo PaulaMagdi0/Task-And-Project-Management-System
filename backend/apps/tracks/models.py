@@ -1,26 +1,26 @@
 from django.db import models
 from apps.staff_members.models import StaffMember
-from apps.branch_location.models import Branch  # Import Branch model
+from apps.branch_location.models import Branch
 from django.utils import timezone
+
 class Track(models.Model):
     TRACK_TYPE_CHOICES = [
         ('ICC', 'ICC'),
         ('9month', '9 Month'),
-        # Add more track types as needed
     ]
     
     name = models.CharField(max_length=255)
     courses = models.ManyToManyField(
         "courses.Course", 
-        related_name="tracks_set",  # Renamed related_name to avoid clashes
+        related_name="tracks_set",
         blank=True,
-        through="courses.CourseTrack"  # Corrected to reference the model path explicitly
+        through="courses.CourseTrack"
     )
     description = models.TextField()
     track_type = models.CharField(
         max_length=10,
         choices=TRACK_TYPE_CHOICES,
-        default='ICC',  # Set a default track type
+        default='ICC',
     )
     created_at = models.DateTimeField(default=timezone.now)
     supervisor = models.ForeignKey(
@@ -32,12 +32,13 @@ class Track(models.Model):
     )
     branch = models.ForeignKey(
         Branch,
-        on_delete=models.CASCADE,  # If the branch is deleted, the track will also be deleted
-        related_name="tracks",  # Allows access to tracks from the Branch instance
+        on_delete=models.CASCADE,
+        related_name="tracks",
         null=True,
         blank=True,
     )
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
     class Meta:
         ordering = ["-created_at"]
         db_table = 'tracks'

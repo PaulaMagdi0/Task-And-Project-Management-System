@@ -670,3 +670,17 @@ class StudentsByStaffView(APIView):
 
         serializer = StudentSerializer(students, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+@permission_classes([IsAuthenticated])
+class IntakeStudentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, intake_id):
+        try:
+            intake = Intake.objects.get(id=intake_id)
+            students = Student.objects.filter(intake=intake)
+            serializer = StudentSerializer(students, many=True)
+            return Response(serializer.data)
+        except Intake.DoesNotExist:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)

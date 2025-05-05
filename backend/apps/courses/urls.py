@@ -7,6 +7,7 @@ from .views import (
     CourseFilterView,
     ReassignCourseInstructorView,
     CourseDetailView,  # Add new view
+    IntakeCourseListView,
 )
 
 urlpatterns = [
@@ -17,4 +18,6 @@ urlpatterns = [
     path("courses/filter/", CourseFilterView.as_view(), name="course-filter"),
     path("reassign-instructor/<int:pk>/", ReassignCourseInstructorView.as_view(), name="reassign-course-instructor"),
     path("assign-course-to-track/", AssignCourseToTrackView.as_view(), name="assign-course-to-track"),
+    path('intakes/<int:intake_id>/courses/', IntakeCourseListView.as_view(), name='intake-course-list'),
+
 ]

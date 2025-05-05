@@ -11,15 +11,16 @@ import logging
 from django.db import transaction
 from django.core.validators import validate_email
 from io import BytesIO
-from apps.tracks.serializers import TrackSerializer
+
 
 logger = logging.getLogger(__name__)
 
 class IntakeSerializer(serializers.ModelSerializer):
+    track = serializers.StringRelatedField()
     class Meta:
         model = Intake
         fields = ['id', 'name', 'track']
-        read_only_fields = ['id']
+        
 
     def validate(self, data):
         name = data.get('name')
@@ -233,6 +234,8 @@ class ExcelUploadSerializer(serializers.Serializer):
             raise ValidationError("Failed to process Excel file")
 
 class StudentSerializer(serializers.ModelSerializer):
+    intake2 = IntakeSerializer(read_only=True)
+    
     track = serializers.StringRelatedField(read_only=True)
     track_id = serializers.PrimaryKeyRelatedField(
         queryset=Track.objects.all(),
@@ -427,3 +430,21 @@ class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
         except AssignmentStudent.DoesNotExist:
             return None
         return None
+from rest_framework import serializers
+from apps.student.models import Student, Intake
+from apps.tracks.models import Track
+
+class IntakeSerializer(serializers.ModelSerializer):
+    track = serializers.StringRelatedField()
+
+    class Meta:
+        model = Intake
+        fields = ['id', 'name', 'track']
+
+class StudentSerializer(serializers.ModelSerializer):
+    intake = IntakeSerializer(read_only=True)
+    track = serializers.StringRelatedField()
+
+    class Meta:
+        model = Student
+        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'intake', 'track', 'verified', 'date_joined']

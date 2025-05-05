@@ -243,3 +243,16 @@ class ReassignCourseInstructorView(generics.UpdateAPIView):
             course.save()
             logger.info("Reassigned instructor %s to course %s successfully.", instructor, course)
             return Response({'detail': 'Instructor reassigned successfully.'}, status=status.HTTP_200_OK)
+        
+from apps.student.models import Intake        
+class IntakeCourseListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, intake_id):
+        try:
+            intake = Intake.objects.get(id=intake_id)
+            courses = Course.objects.filter(tracks=intake.track)
+            serializer = CourseSerializer(courses, many=True)
+            return Response(serializer.data)
+        except Intake.DoesNotExist:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)

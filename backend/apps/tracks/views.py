@@ -153,3 +153,16 @@ def remove_course_from_track(request, track_id, course_id):
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+from apps.student.models import Intake
+class IntakeTrackListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, intake_id):
+        try:
+            intake = Intake.objects.get(id=intake_id)
+            tracks = Track.objects.filter(intakes=intake)
+            serializer = TrackSerializer(tracks, many=True)
+            return Response(serializer.data)
+        except Intake.DoesNotExist:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)

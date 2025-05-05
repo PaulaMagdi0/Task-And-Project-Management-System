@@ -13,7 +13,8 @@ from .views import (
     StudentsByTrackAndCourseView,
     StudentsByStaffView,
     create_intake,
-    IntakeDetailView
+    IntakeDetailView,
+    IntakeStudentListView,
 )
 
 urlpatterns = [
@@ -32,4 +33,5 @@ urlpatterns = [
     path('tracks/<int:track_id>/courses/<int:course_id>/students/', StudentsByTrackAndCourseView.as_view(), name='course_and_students_by_track'),
     # returns Student For Tracks
     path('by-staff/<int:staff_id>/', StudentsByStaffView.as_view(), name='students-by-staff'),
+    path('intakes/<int:intake_id>/students/', IntakeStudentListView.as_view(), name='intake-student-list'),
 ]

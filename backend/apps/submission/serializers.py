@@ -3,10 +3,13 @@ from .models import AssignmentSubmission
 from apps.courses.models import Course
 from apps.assignments.models import Assignment
 from apps.assignments.serializers import AssignmentStudentSerializer
+from apps.student.serializers import  IntakeSerializer
+
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
+    intake = IntakeSerializer(read_only=True)
     class Meta:
         model = AssignmentSubmission
-        fields = ['id', 'student', 'course', 'assignment', 'file', 'file_url', 'submission_date', 'track', 'submitted']
+        fields = ['id', 'student','intake', 'course', 'assignment', 'file', 'file_url', 'submission_date', 'track', 'submitted']
         read_only_fields = ['submission_date', 'student', 'track']  # Track is derived from the student automatically
 
     def validate(self, data):
@@ -14,6 +17,7 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         student = request.user if request else None
         course = data.get('course')
         assignment = data.get('assignment')
+        
 
         if student:
             print(f"Student ID: {student.id}")

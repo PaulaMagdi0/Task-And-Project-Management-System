@@ -478,3 +478,18 @@ class AssignmentSubmissionNoFileViewSet(APIView):
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+from apps.student.models import Intake
+
+class IntakeSubmissionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, intake_id):
+        try:
+            intake = Intake.objects.get(id=intake_id)
+            submissions = AssignmentSubmission.objects.filter(intake=intake)
+            serializer = AssignmentSubmissionSerializer(submissions, many=True)
+            return Response(serializer.data)
+        except Intake.DoesNotExist:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
