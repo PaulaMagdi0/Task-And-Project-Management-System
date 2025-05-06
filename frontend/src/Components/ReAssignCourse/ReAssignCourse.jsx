@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCourses, reassignInstructor, removeCourseFromTrack } from "../../redux/coursesSlice";
+import { fetchCourses, reassignInstructor, removeCourseFromTrack, fetchIntakes, fetchIntakeCourses } from "../../redux/coursesSlice";
 import { fetchInstructors } from "../../redux/supervisorsSlice";
 import {
   Button,
@@ -67,23 +67,33 @@ const sortRows = (rows, sortBy, sortOrder) => {
       aValue = a.instructor?.name || "Not assigned";
       bValue = b.instructor?.name || "Not assigned";
     }
+    if (sortBy === "intake") {
+      aValue = a.intakeName || "Not assigned";
+      bValue = b.intakeName || "Not assigned";
+    }
     if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
     if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
     return 0;
   });
 };
 
-const SupervisorCourses = () => {
+const ReAssignCourses = () => {
   const dispatch = useDispatch();
   const user_id = useSelector((state) => state.auth.user_id);
   const {
     userCourses: { tracks, track_courses: courses },
+    intakes,
+    intakeCourses,
     status: { 
       fetchCoursesLoading, 
       fetchCoursesError, 
       reassignInstructorLoading,
       removeCourseFromTrackLoading,
       removeCourseFromTrackError,
+      fetchIntakesLoading,
+      fetchIntakesError,
+      fetchIntakeCoursesLoading,
+      fetchIntakeCoursesError,
       success
     },
   } = useSelector((state) => state.courses);
@@ -101,12 +111,27 @@ const SupervisorCourses = () => {
   const [selectedTrack, setSelectedTrack] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [selectedInstructor, setSelectedInstructor] = useState("");
+  const [selectedIntake, setSelectedIntake] = useState("");
   const [sortBy, setSortBy] = useState("trackName");
   const [sortOrder, setSortOrder] = useState("asc");
   const [deletingRows, setDeletingRows] = useState(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteCourseTrack, setDeleteCourseTrack] = useState(null);
   const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
+  const [intakeWarning, setIntakeWarning] = useState(false);
+
+  // Debug course and intake data
+  useEffect(() => {
+    console.log('Courses data:', courses);
+    console.log('Intakes data:', intakes);
+    console.log('IntakeCourses data:', intakeCourses);
+    courses?.forEach((course) => {
+      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake);
+    });
+    // Check if any course has intake data or is mapped
+    const hasIntakeData = courses?.some((course) => course.intake || Object.values(intakeCourses).some((ic) => ic.some((c) => c.id === course.id)));
+    setIntakeWarning(!hasIntakeData && courses?.length > 0 && intakes?.length > 0);
+  }, [courses, intakes, intakeCourses]);
 
   // Fetch data
   useEffect(() => {
@@ -114,7 +139,17 @@ const SupervisorCourses = () => {
       dispatch(fetchCourses(user_id));
     }
     dispatch(fetchInstructors());
+    dispatch(fetchIntakes());
   }, [dispatch, user_id]);
+
+  // Fetch courses for each intake
+  useEffect(() => {
+    if (intakes?.length > 0) {
+      intakes.forEach((intake) => {
+        dispatch(fetchIntakeCourses(intake.id));
+      });
+    }
+  }, [intakes, dispatch]);
 
   // Set instructor ID when editing course
   useEffect(() => {
@@ -133,14 +168,14 @@ const SupervisorCourses = () => {
       });
       dispatch(fetchCourses(user_id)); // Refetch to update table
     }
-    if (removeCourseFromTrackError) {
+    if (removeCourseFromTrackError || fetchIntakesError || fetchIntakeCoursesError) {
       setSnackbar({
         open: true,
-        message: removeCourseFromTrackError,
+        message: removeCourseFromTrackError || fetchIntakesError || fetchIntakeCoursesError,
         severity: "error",
       });
     }
-  }, [success, removeCourseFromTrackError, dispatch, user_id]);
+  }, [success, removeCourseFromTrackError, fetchIntakesError, fetchIntakeCoursesError, dispatch, user_id]);
 
   // Handlers
   const handleEditClick = (course, trackName) => {
@@ -151,7 +186,7 @@ const SupervisorCourses = () => {
 
   const handleDeleteClick = (courseId, trackId, courseName, trackName) => {
     setDeleteCourseTrack({ courseId, trackId, courseName, trackName });
-    setIsDeleteConfirmed(false); // Reset checkbox
+    setIsDeleteConfirmed(false);
     setDeleteDialogOpen(true);
   };
 
@@ -233,7 +268,7 @@ const SupervisorCourses = () => {
 
   const handleSnackbarClose = () => {
     setSnackbar({ ...snackbar, open: false });
-    dispatch(clearCourseStatus()); // Clear status after snackbar closes
+    dispatch(clearCourseStatus());
   };
 
   const handleSort = (columnId) => {
@@ -254,10 +289,28 @@ const SupervisorCourses = () => {
     setSelectedInstructor(event.target.value);
   };
 
+  const handleIntakeFilterChange = (event) => {
+    setSelectedIntake(event.target.value);
+  };
+
   const handleResetFilters = () => {
     setSelectedTrack("");
     setSelectedCourse("");
     setSelectedInstructor("");
+    setSelectedIntake("");
+  };
+
+  // Map course IDs to intake names
+  const getIntakeName = (courseId) => {
+    for (const intakeId in intakeCourses) {
+      const courses = intakeCourses[intakeId];
+      const course = courses.find((c) => c.id === courseId);
+      if (course) {
+        const intake = intakes.find((i) => i.id === parseInt(intakeId));
+        return intake?.name || "Not assigned";
+      }
+    }
+    return "Not assigned";
   };
 
   // Filter and prepare rows
@@ -274,9 +327,13 @@ const SupervisorCourses = () => {
       [...new Set(instructors?.map((instructor) => instructor.full_name) || [])].sort(),
     [instructors]
   );
+  const intakeNames = useMemo(
+    () => [...new Set(intakes?.map((intake) => intake.name) || [])].sort(),
+    [intakes]
+  );
 
   const filteredRows = useMemo(() => {
-    const uniqueRows = new Map(); // Track unique course-track pairs
+    const uniqueRows = new Map();
     tracks?.forEach((track) => {
       const filteredCourses = courses
         ?.filter((course) => course?.tracks?.some((t) => t.id === track.id))
@@ -286,12 +343,16 @@ const SupervisorCourses = () => {
           const matchesInstructor = selectedInstructor
             ? course.instructor?.name === selectedInstructor
             : true;
-          return matchesTrack && matchesCourse && matchesInstructor;
+          const matchesIntake = selectedIntake
+            ? (course.intake?.name || getIntakeName(course.id)) === selectedIntake
+            : true;
+          return matchesTrack && matchesCourse && matchesInstructor && matchesIntake;
         })
         ?.map((course) => ({
           trackName: track.name,
           courseName: course.name,
           instructor: course.instructor,
+          intakeName: course.intake?.name || getIntakeName(course.id),
           courseId: course.id,
           trackId: track.id,
         }));
@@ -307,15 +368,21 @@ const SupervisorCourses = () => {
     const result = Array.from(uniqueRows.values());
     console.log("Filtered rows:", result);
     return result;
-  }, [tracks, courses, selectedTrack, selectedCourse, selectedInstructor]);
+  }, [tracks, courses, intakes, intakeCourses, selectedTrack, selectedCourse, selectedInstructor, selectedIntake]);
 
   const sortedRows = useMemo(
     () => sortRows(filteredRows, sortBy, sortOrder),
     [filteredRows, sortBy, sortOrder]
   );
 
+  // Combined loading state
+  const isLoading = fetchCoursesLoading || instructorsLoading || fetchIntakesLoading || fetchIntakeCoursesLoading;
+
+  // Combined error state
+  const hasError = fetchCoursesError || instructorsError || fetchIntakesError || fetchIntakeCoursesError;
+
   // Loading state
-  if (fetchCoursesLoading || instructorsLoading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
         <Box sx={{ width: "100%", maxWidth: "1200px" }}>
@@ -343,17 +410,19 @@ const SupervisorCourses = () => {
   }
 
   // Error state
-  if (fetchCoursesError || instructorsError) {
+  if (hasError) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
         <Alert severity="error" sx={{ mb: 2, maxWidth: "600px" }}>
-          {fetchCoursesError || instructorsError}
+          {fetchCoursesError || instructorsError || fetchIntakesError || fetchIntakeCoursesError}
         </Alert>
         <Button
           variant="contained"
           onClick={() => {
             if (fetchCoursesError) dispatch(fetchCourses(user_id));
             if (instructorsError) dispatch(fetchInstructors());
+            if (fetchIntakesError) dispatch(fetchIntakes());
+            if (fetchIntakeCoursesError) intakes.forEach((intake) => dispatch(fetchIntakeCourses(intake.id)));
           }}
           sx={{ bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, borderRadius: 2 }}
         >
@@ -364,15 +433,18 @@ const SupervisorCourses = () => {
   }
 
   // Empty data state
-  if (!tracks?.length && !courses?.length) {
+  if (!tracks?.length && !courses?.length && !intakes?.length) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px", bgcolor: "#f4f6f8" }}>
         <Typography variant="h6" sx={{ mb: 2, color: "#64748b" }}>
-          No tracks or courses available
+          No tracks, courses, or intakes available
         </Typography>
         <Button
           variant="contained"
-          onClick={() => dispatch(fetchCourses(user_id))}
+          onClick={() => {
+            dispatch(fetchCourses(user_id));
+            dispatch(fetchIntakes());
+          }}
           sx={{ bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, borderRadius: 2 }}
         >
           Retry
@@ -389,6 +461,13 @@ const SupervisorCourses = () => {
       >
         My Tracks and Courses
       </Typography>
+
+      {/* Intake Warning */}
+      {intakeWarning && (
+        <Alert severity="warning" sx={{ mb: 2, maxWidth: "1200px", mx: "auto" }}>
+          No intake data found for courses. Ensure courses are assigned to intakes in the backend.
+        </Alert>
+      )}
 
       {/* Filters */}
       <Grid container spacing={3} sx={{ mb: 3, maxWidth: "1200px", mx: "auto" }}>
@@ -441,6 +520,22 @@ const SupervisorCourses = () => {
           </FormControl>
         </Grid>
         <Grid item xs={12} md={3}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={selectedIntake}
+              onChange={handleIntakeFilterChange}
+              label="Intake"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Intakes</em></MenuItem>
+              {intakeNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
           <Button
             fullWidth
             variant="contained"
@@ -467,6 +562,7 @@ const SupervisorCourses = () => {
                   { id: "trackName", label: "Track Name", minWidth: 150 },
                   { id: "courseName", label: "Course Name", minWidth: 150 },
                   { id: "instructor", label: "Instructor", minWidth: 150 },
+                  { id: "intake", label: "Intake", minWidth: 150 },
                   { id: "actions", label: "Actions", minWidth: 180, align: "right" },
                 ].map((column) => (
                   <StyledTableCell
@@ -488,7 +584,7 @@ const SupervisorCourses = () => {
             <TableBody>
               {sortedRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     <Typography variant="body1" sx={{ color: "#64748b" }}>
                       No tracks or courses found
                     </Typography>
@@ -501,6 +597,9 @@ const SupervisorCourses = () => {
                     <TableCell sx={{ p: 2 }}>{row.courseName}</TableCell>
                     <TableCell sx={{ p: 2 }}>
                       {row.instructor?.name || "Not assigned"}
+                    </TableCell>
+                    <TableCell sx={{ p: 2 }}>
+                      {row.intakeName}
                     </TableCell>
                     <TableCell align="right" sx={{ p: 2 }}>
                       <Button
@@ -689,4 +788,4 @@ const SupervisorCourses = () => {
   );
 };
 
-export default SupervisorCourses;
+export default ReAssignCourses;

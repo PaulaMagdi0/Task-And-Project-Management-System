@@ -27,17 +27,32 @@ import {
   updateCourse,
   deleteCourse,
   clearCourseStatus,
+  fetchIntakes,
+  fetchIntakeCourses,
 } from '../../redux/coursesSlice';
 import { fetchInstructors } from '../../redux/supervisorsSlice';
-import Assignments from './../../pages/Instructor/Assignments';
-import WarningIcon from '@mui/icons-material/Warning';
-import Submissions from './../Submissions/Submissions';
 
 const AllCourseManagement = () => {
   const dispatch = useDispatch();
-  const { allCourses, status: { fetchAllCoursesLoading: loading, fetchAllCoursesError: error, success: message } } = useSelector((state) => state.courses);
+  const {
+    allCourses,
+    intakes,
+    intakeCourses,
+    status: {
+      fetchAllCoursesLoading: loading,
+      fetchAllCoursesError: error,
+      fetchIntakesLoading,
+      fetchIntakesError,
+      fetchIntakeCoursesLoading,
+      fetchIntakeCoursesError,
+      updateCourseLoading,
+      updateCourseError,
+      deleteCourseLoading,
+      deleteCourseError,
+      success: message,
+    },
+  } = useSelector((state) => state.courses);
   const { instructors } = useSelector((state) => state.supervisors);
-  const { user_id } = useSelector((state) => state.auth);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
@@ -45,25 +60,62 @@ const AllCourseManagement = () => {
     name: '',
     description: '',
     instructor: '',
+    intake: '',
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [localError, setLocalError] = useState('');
   const [searchName, setSearchName] = useState('');
+  const [selectedIntake, setSelectedIntake] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmText, setConfirmText] = useState(''); // State for "I agree" input
+  const [confirmText, setConfirmText] = useState('');
+  const [intakeWarning, setIntakeWarning] = useState(false);
 
-  // Fetch courses and instructors on mount
+  // Fetch courses, instructors, and intakes on mount
   useEffect(() => {
     dispatch(fetchAllCourses());
     dispatch(fetchInstructors());
+    dispatch(fetchIntakes());
   }, [dispatch]);
+
+  // Fetch courses for each intake
+  useEffect(() => {
+    if (intakes?.length > 0) {
+      intakes.forEach((intake) => {
+        dispatch(fetchIntakeCourses(intake.id));
+      });
+    }
+  }, [intakes, dispatch]);
+
+  // Debug course and intake data
+  useEffect(() => {
+    console.log('AllCourses data:', allCourses);
+    console.log('Intakes data:', intakes);
+    console.log('IntakeCourses data:', intakeCourses);
+    allCourses?.forEach((course) => {
+      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake);
+    });
+    // Check if any course has intake data or is mapped
+    const hasIntakeData =
+      allCourses?.some((course) => course.intake) ||
+      Object.values(intakeCourses).some((courses) => courses.length > 0);
+    setIntakeWarning(!hasIntakeData && allCourses?.length > 0 && intakes?.length > 0);
+  }, [allCourses, intakes, intakeCourses]);
 
   // Handle error state
   useEffect(() => {
-    if (error) setLocalError(error);
-    else setLocalError('');
-  }, [error]);
+    if (error || fetchIntakesError || fetchIntakeCoursesError || updateCourseError || deleteCourseError) {
+      setLocalError(
+        error ||
+        fetchIntakesError ||
+        fetchIntakeCoursesError ||
+        updateCourseError ||
+        deleteCourseError
+      );
+    } else {
+      setLocalError('');
+    }
+  }, [error, fetchIntakesError, fetchIntakeCoursesError, updateCourseError, deleteCourseError]);
 
   // Clear success message after 3 seconds
   useEffect(() => {
@@ -73,18 +125,32 @@ const AllCourseManagement = () => {
     }
   }, [message, dispatch]);
 
+  // Map course IDs to intake names
+  const getIntakeName = (courseId) => {
+    for (const intakeId in intakeCourses) {
+      const courses = intakeCourses[intakeId];
+      const course = courses.find((c) => c.id === courseId);
+      if (course) {
+        const intake = intakes.find((i) => i.id === parseInt(intakeId));
+        return intake?.name || 'Not assigned';
+      }
+    }
+    return 'Not assigned';
+  };
+
   const openEditDialog = (course) => {
     setEditData({
       courseId: course.id,
       name: course.name,
-      description: course.description,
-      instructor: course.instructor || '',
+      description: course.description || '',
+      instructor: course.instructor?.id || '',
+      intake: course.intake?.id || '',
     });
     setEditDialogOpen(true);
   };
 
   const handleEditChange = async () => {
-    const { courseId, name, description, instructor } = editData;
+    const { courseId, name, description, instructor, intake } = editData;
 
     if (!name) {
       setLocalError('Course name is required.');
@@ -92,34 +158,34 @@ const AllCourseManagement = () => {
     }
 
     try {
-      const updatedData = { name, description };
-      if (instructor) updatedData.instructor = instructor;
-
+      const updatedData = {
+        name,
+        description: description || null,
+        instructor: instructor || null,
+        intake: intake || null,
+      };
       await dispatch(updateCourse({ courseId, ...updatedData })).unwrap();
       setEditDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err.message || 'Failed to update course.');
+      setLocalError(err || 'Failed to update course.');
     }
   };
 
   const openDeleteDialog = (id) => {
-    console.log('Opening delete dialog for course ID:', id);
     setCourseToDelete(id);
-    setConfirmText(''); // Reset confirmation text
+    setConfirmText('');
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
-    console.log('Deleting course with ID:', courseToDelete);
     setIsDeleting(true);
     try {
       await dispatch(deleteCourse(courseToDelete)).unwrap();
       setDeleteDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      console.error('Delete error:', err);
-      setLocalError(err.message || 'Failed to delete course.');
+      setLocalError(err || 'Failed to delete course.');
     } finally {
       setIsDeleting(false);
     }
@@ -129,29 +195,54 @@ const AllCourseManagement = () => {
     setSearchName(event.target.value);
   };
 
+  const handleIntakeFilterChange = (event) => {
+    setSelectedIntake(event.target.value);
+  };
+
   const handleResetFilters = () => {
     setSearchName('');
+    setSelectedIntake('');
   };
 
   // Filter courses
   const filteredCourses = useMemo(() => {
     if (!allCourses) return [];
-    return allCourses.filter((course) =>
-      searchName
+    return allCourses.filter((course) => {
+      const matchesName = searchName
         ? course.name.toLowerCase().includes(searchName.toLowerCase())
-        : true
-    );
-  }, [allCourses, searchName]);
+        : true;
+      const matchesIntake = selectedIntake
+        ? (course.intake?.name || getIntakeName(course.id)) === selectedIntake
+        : true;
+      return matchesName && matchesIntake;
+    });
+  }, [allCourses, searchName, selectedIntake, intakeCourses, intakes]);
+
+  // Intake names for filter
+  const intakeNames = useMemo(
+    () => [...new Set(intakes?.map((intake) => intake.name) || [])].sort(),
+    [intakes]
+  );
 
   // Get course details for delete confirmation
   const course = allCourses.find((c) => c.id === courseToDelete);
   const isConfirmValid = confirmText.trim().toLowerCase() === 'i agree';
+
+  // Combined loading state
+  const isLoading = loading || fetchIntakesLoading || fetchIntakeCoursesLoading;
 
   return (
     <Box sx={{ p: 4, bgcolor: '#f4f6f8' }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#1e3a8a', textAlign: 'center' }}>
         Manage Courses
       </Typography>
+
+      {/* Intake Warning */}
+      {intakeWarning && (
+        <Alert severity="warning" sx={{ mb: 2, maxWidth: '1200px', mx: 'auto' }}>
+          No intake data found for courses. Ensure courses are assigned to intakes in the backend.
+        </Alert>
+      )}
 
       {/* Filters and Search */}
       <Grid container spacing={3} sx={{ mb: 3, maxWidth: '1200px', mx: 'auto' }}>
@@ -165,7 +256,23 @@ const AllCourseManagement = () => {
             sx={{ borderRadius: 2 }}
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={12} sm={4}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={selectedIntake}
+              onChange={handleIntakeFilterChange}
+              label="Intake"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Intakes</em></MenuItem>
+              {intakeNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={4}>
           <Button
             fullWidth
             variant="contained"
@@ -177,7 +284,7 @@ const AllCourseManagement = () => {
               borderRadius: 2,
             }}
           >
-            Reset Filter
+            Reset Filters
           </Button>
         </Grid>
       </Grid>
@@ -200,7 +307,7 @@ const AllCourseManagement = () => {
           Course List
         </Typography>
 
-        {loading ? (
+        {isLoading ? (
           <Typography>Loading...</Typography>
         ) : filteredCourses.length > 0 ? (
           <Table>
@@ -209,6 +316,7 @@ const AllCourseManagement = () => {
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>ID</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Instructor</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Intake</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Description</TableCell>
                 <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Actions</TableCell>
               </TableRow>
@@ -218,7 +326,8 @@ const AllCourseManagement = () => {
                 <TableRow key={course.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                   <TableCell>{course.id}</TableCell>
                   <TableCell>{course.name}</TableCell>
-                  <TableCell>{course.instructor_name || 'Not assigned'}</TableCell>
+                  <TableCell>{course.instructor?.full_name || course.instructor_name || 'Not assigned'}</TableCell>
+                  <TableCell>{course.intake?.name || getIntakeName(course.id)}</TableCell>
                   <TableCell>{course.description || '-'}</TableCell>
                   <TableCell>
                     <Button size="small" onClick={() => openEditDialog(course)}>
@@ -279,12 +388,27 @@ const AllCourseManagement = () => {
               ))}
             </Select>
           </FormControl>
+          <FormControl variant="outlined" fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={editData.intake}
+              onChange={(e) => setEditData({ ...editData, intake: e.target.value })}
+              label="Intake"
+            >
+              <MenuItem value=""><em>Not assigned</em></MenuItem>
+              {intakes.map((intake) => (
+                <MenuItem key={intake.id} value={intake.id}>
+                  {intake.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)} color="primary">
             Cancel
           </Button>
-          <Button onClick={handleEditChange} color="primary">
+          <Button onClick={handleEditChange} color="primary" disabled={updateCourseLoading}>
             Save
           </Button>
         </DialogActions>
@@ -300,7 +424,6 @@ const AllCourseManagement = () => {
         <DialogTitle sx={{ bgcolor: '#d32f2f', color: 'white', py: 2 }}>
           Confirm Course Deletion
         </DialogTitle>
-        
         <DialogContent sx={{ pt: 3 }}>
           <Typography variant="body1" color="error" sx={{ mb: 2, fontWeight: 500 }}>
             Warning: You are about to permanently delete the course <strong>{course?.name || 'Unknown'}</strong>{' '}

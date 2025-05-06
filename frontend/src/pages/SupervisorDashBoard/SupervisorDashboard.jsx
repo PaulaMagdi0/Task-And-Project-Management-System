@@ -49,7 +49,7 @@ const SupervisorDashboard = () => {
     { text: 'View Assignments', icon: <FiCalendar />, path: '/supervisor/dashboard/view-assignment' },
     { text: 'Add Instructor', icon: <FiAward />, path: '/supervisor/dashboard/addinstructor' },
     { text: 'Add Courses', icon: <NotebookText />, path: '/supervisor/dashboard/addcourses' },
-    { text: 'Course Management', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
+    { text: 'ReassignCourse', icon: <FiBook />, path: '/supervisor/dashboard/ReassignCourse' },
     { text: 'AllCourseManagement', icon: <FiBook />, path: '/supervisor/dashboard/all-course-management' },
     { text: 'Submissions', icon: <FiUploadCloud />, path: '/supervisor/dashboard/Submissions' },
     { text: 'Grades', icon: <FiAward />, path: '/supervisor/dashboard/Grades' },
