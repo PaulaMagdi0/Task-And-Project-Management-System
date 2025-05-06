@@ -29,6 +29,47 @@ export const fetchAllCourses = createAsyncThunk(
   }
 );
 
+// Fetch all intakes
+export const fetchIntakes = createAsyncThunk(
+  'courses/fetchIntakes',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get('/student/intakes/');
+      return response.data.intakes;
+    } catch (error) {
+      console.error('fetchIntakes error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch intakes');
+    }
+  }
+);
+
+// Fetch available intakes for selected tracks
+export const fetchAvailableIntakes = createAsyncThunk(
+  'courses/fetchAvailableIntakes',
+  async (trackIds, { rejectWithValue }) => {
+    try {
+      // Make separate API calls for each track ID and combine results
+      const intakePromises = trackIds.map(async (trackId) => {
+        const response = await apiClient.get('/student/intakes/', {
+          params: { track_id: trackId },
+        });
+        return response.data.intakes;
+      });
+      const intakeArrays = await Promise.all(intakePromises);
+      // Flatten and remove duplicates based on intake ID
+      const uniqueIntakes = Array.from(
+        new Map(
+          intakeArrays.flat().map((intake) => [intake.id, intake])
+        ).values()
+      );
+      return uniqueIntakes;
+    } catch (error) {
+      console.error('fetchAvailableIntakes error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch available intakes');
+    }
+  }
+);
+
 // Create a new course
 export const createCourse = createAsyncThunk(
   'courses/createCourse',
@@ -48,7 +89,7 @@ export const updateCourse = createAsyncThunk(
   'courses/updateCourse',
   async ({ courseId, ...courseData }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.patch(`/courses/${courseId}/`, courseData);
+      const response = await apiClient.patch(`/courses/${courseId}/`);
       return response.data;
     } catch (error) {
       console.error('updateCourse error:', error);
@@ -132,9 +173,11 @@ const coursesSlice = createSlice({
     userCourses: {
       tracks: [],
       track_courses: [],
-      courses:[]
+      courses: [],
     },
     allCourses: [],
+    intakes: [],
+    availableIntakes: [],
     status: {
       fetchCoursesLoading: false,
       fetchAllCoursesLoading: false,
@@ -144,6 +187,8 @@ const coursesSlice = createSlice({
       reassignInstructorLoading: false,
       assignCourseToTrackLoading: false,
       removeCourseFromTrackLoading: false,
+      fetchIntakesLoading: false,
+      fetchAvailableIntakesLoading: false,
       fetchCoursesError: null,
       fetchAllCoursesError: null,
       createCourseError: null,
@@ -152,6 +197,8 @@ const coursesSlice = createSlice({
       reassignInstructorError: null,
       assignCourseToTrackError: null,
       removeCourseFromTrackError: null,
+      fetchIntakesError: null,
+      fetchAvailableIntakesError: null,
       success: null,
     },
   },
@@ -166,6 +213,8 @@ const coursesSlice = createSlice({
       state.status.reassignInstructorError = null;
       state.status.assignCourseToTrackError = null;
       state.status.removeCourseFromTrackError = null;
+      state.status.fetchIntakesError = null;
+      state.status.fetchAvailableIntakesError = null;
     },
   },
   extraReducers: (builder) => {
@@ -181,7 +230,7 @@ const coursesSlice = createSlice({
         state.userCourses = {
           tracks: action.payload.tracks || [],
           track_courses: action.payload.track_courses || [],
-          courses:action.payload.courses || [],
+          courses: action.payload.courses || [],
         };
         console.log('fetchCourses fulfilled:', action.payload);
       })
@@ -203,6 +252,36 @@ const coursesSlice = createSlice({
       .addCase(fetchAllCourses.rejected, (state, action) => {
         state.status.fetchAllCoursesLoading = false;
         state.status.fetchAllCoursesError = action.payload;
+      })
+      // Fetch intakes
+      .addCase(fetchIntakes.pending, (state) => {
+        state.status.fetchIntakesLoading = true;
+        state.status.fetchIntakesError = null;
+        state.status.success = null;
+      })
+      .addCase(fetchIntakes.fulfilled, (state, action) => {
+        state.status.fetchIntakesLoading = false;
+        state.intakes = action.payload || [];
+        console.log('fetchIntakes fulfilled:', action.payload);
+      })
+      .addCase(fetchIntakes.rejected, (state, action) => {
+        state.status.fetchIntakesLoading = false;
+        state.status.fetchIntakesError = action.payload;
+      })
+      // Fetch available intakes
+      .addCase(fetchAvailableIntakes.pending, (state) => {
+        state.status.fetchAvailableIntakesLoading = true;
+        state.status.fetchAvailableIntakesError = null;
+        state.status.success = null;
+      })
+      .addCase(fetchAvailableIntakes.fulfilled, (state, action) => {
+        state.status.fetchAvailableIntakesLoading = false;
+        state.availableIntakes = action.payload || [];
+        console.log('fetchAvailableIntakes fulfilled:', action.payload);
+      })
+      .addCase(fetchAvailableIntakes.rejected, (state, action) => {
+        state.status.fetchAvailableIntakesLoading = false;
+        state.status.fetchAvailableIntakesError = action.payload;
       })
       // Create course
       .addCase(createCourse.pending, (state) => {
