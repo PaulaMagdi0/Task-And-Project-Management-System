@@ -311,29 +311,49 @@ def create_intake(request):
     """Create a new intake for the user's track"""
     try:
         if not has_student_management_permission(request.user):
-            return Response({"detail": "You don't have permission to create intakes"}, status=403)
-        
+            return Response(
+                {"detail": "You don't have permission to create intakes"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         data = request.data.copy()
         # For supervisors, automatically set track from their StaffMember profile
         if hasattr(request.user, 'staffmember') and request.user.staffmember.role == StaffMember.Role.SUPERVISOR:
             if not data.get('track'):
+                if not request.user.staffmember.track:
+                    return Response(
+                        {"detail": "Supervisor is not assigned to a track"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 data['track'] = request.user.staffmember.track.id
             elif str(data['track']) != str(request.user.staffmember.track.id):
                 return Response(
                     {"detail": "Supervisors can only create intakes for their assigned track"},
-                    status=403
+                    status=status.HTTP_403_FORBIDDEN
                 )
-        
+        # For non-supervisors, ensure track is provided
+        elif not data.get('track'):
+            return Response(
+                {"detail": "Track is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = IntakeSerializer(data=data)
         if serializer.is_valid():
             intake = serializer.save()
             return Response(IntakeSerializer(intake).data, status=status.HTTP_201_CREATED)
         logger.debug(f"Intake creation validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Track.DoesNotExist:
+        logger.error("Invalid track ID provided")
+        return Response(
+            {"detail": "Invalid track ID"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         logger.error(f"Intake creation error: {str(e)}")
         return Response(
-            {"error": "Failed to create intake"},
+            {"error": f"Failed to create intake: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -398,6 +418,7 @@ def student_courses(request, student_id):
     except Exception as e:
         logger.error(f"Error retrieving courses for student {student_id}: {str(e)}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):

@@ -12,21 +12,28 @@ from django.db import transaction
 from django.core.validators import validate_email
 from io import BytesIO
 
-
 logger = logging.getLogger(__name__)
 
 class IntakeSerializer(serializers.ModelSerializer):
-    track = serializers.StringRelatedField()
+    track = serializers.PrimaryKeyRelatedField(
+        queryset=Track.objects.all(),
+        required=True,
+        allow_null=False
+    )
+
     class Meta:
         model = Intake
         fields = ['id', 'name', 'track']
-        
 
     def validate(self, data):
         name = data.get('name')
         track = data.get('track')
+        if not track:
+            raise serializers.ValidationError({"track": "Track is required."})
         if Intake.objects.filter(name=name, track=track).exists():
-            raise serializers.ValidationError(f"Intake '{name}' already exists for this track")
+            raise serializers.ValidationError(
+                f"Intake '{name}' already exists for track '{track.name}'."
+            )
         return data
 
 class ExcelUploadSerializer(serializers.Serializer):
@@ -71,7 +78,7 @@ class ExcelUploadSerializer(serializers.Serializer):
         track = data.get('track')
         intake_name = data.get('intake_name')
         if not track:
-            raise ValidationError("Track is required")
+            raise ValidationError({"track": "Track is required"})
         return data
 
     def _process_excel_file(self):
@@ -262,7 +269,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'track', 'track_id', 'intake', 'intake_id', 
-            'password', 'is_active', 'verified', 'date_joined'
+            'password', 'is_active', 'verified', 'date_joined', 'intake2'
         ]
         read_only_fields = [
             'id', 'is_active', 'verified', 'date_joined'
@@ -430,21 +437,3 @@ class StudentSubmissionStatusSerializer(serializers.ModelSerializer):
         except AssignmentStudent.DoesNotExist:
             return None
         return None
-from rest_framework import serializers
-from apps.student.models import Student, Intake
-from apps.tracks.models import Track
-
-class IntakeSerializer(serializers.ModelSerializer):
-    track = serializers.StringRelatedField()
-
-    class Meta:
-        model = Intake
-        fields = ['id', 'name', 'track']
-
-class StudentSerializer(serializers.ModelSerializer):
-    intake = IntakeSerializer(read_only=True)
-    track = serializers.StringRelatedField()
-
-    class Meta:
-        model = Student
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'intake', 'track', 'verified', 'date_joined']
