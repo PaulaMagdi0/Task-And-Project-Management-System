@@ -22,7 +22,7 @@ class Track(models.Model):
         choices=TRACK_TYPE_CHOICES,
         default='ICC',
     )
-    created_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
     supervisor = models.ForeignKey(
         StaffMember,
         on_delete=models.SET_NULL,
@@ -37,7 +37,6 @@ class Track(models.Model):
         null=True,
         blank=True,
     )
-    created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
