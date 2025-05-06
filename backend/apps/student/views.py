@@ -632,10 +632,11 @@ def show_options(request):
     return Response(options)
 
 class StudentsByTrackAndCourseView(APIView):
-    def get(self, request, track_id, course_id):
-        # Get the track and course based on the provided IDs
+    def get(self, request, track_id, course_id, intake_id):
+        # Get the track, course, and intake based on the provided IDs
         track = get_object_or_404(Track, id=track_id)
         course = get_object_or_404(Course, id=course_id)
+        intake = get_object_or_404(Intake, id=intake_id, track=track)
 
         # Check if the course is part of the track
         if course not in track.courses.all():
@@ -644,15 +645,16 @@ class StudentsByTrackAndCourseView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Filter students based on the track and course using the many-to-many relationship through CourseTrack
-        students_in_track_and_course = Student.objects.filter(
+        # Filter students based on track, course, and intake
+        students_in_track_course_intake = Student.objects.filter(
             track=track,
+            intake=intake,
             track__courses=course
         )
 
         # Prepare the data for response
         student_data = []
-        for student in students_in_track_and_course:
+        for student in students_in_track_course_intake:
             student_data.append({
                 "id": student.id,
                 "name": student.full_name,
@@ -663,7 +665,6 @@ class StudentsByTrackAndCourseView(APIView):
             })
 
         return Response(student_data, status=status.HTTP_200_OK)
-
 class StudentsByStaffView(APIView):
     def get(self, request, staff_id):
         try:

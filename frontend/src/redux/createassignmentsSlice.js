@@ -18,7 +18,8 @@ export const fetchTracks = createAsyncThunk(
       const response = await apiClient.get(`/tracks/instructors/${userId}/available_tracks/`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('fetchTracks error:', error);
+      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch tracks');
     }
   }
 );
@@ -27,27 +28,88 @@ export const fetchCourses = createAsyncThunk(
   'assignments/fetchCourses',
   async ({ userId, trackId }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get(
-        `/courses/instructors/${userId}/tracks/${trackId}/assigned_courses/`
+      const response = await apiClient.get(`/staff/track-and-courses/${userId}/`);
+      console.log('fetchCourses API Response:', response.data);
+
+      const trackCourses = Array.isArray(response.data.track_courses)
+        ? response.data.track_courses
+        : [];
+      const filteredTrackCourses = trackCourses.filter((tc) =>
+        Array.isArray(tc.tracks) && tc.tracks.some((track) => track.id === trackId)
       );
-      return response.data;
+      console.log('Filtered Track Courses:', filteredTrackCourses);
+      const courseIds = filteredTrackCourses.map((tc) => tc.id);
+
+      const courses = Array.isArray(response.data.taught_courses)
+        ? response.data.taught_courses
+        : [];
+      let filteredCourses = courses.filter((course) =>
+        courseIds.includes(course.id)
+      );
+      console.log('Filtered Courses (before intake):', filteredCourses);
+
+      const intakeResponse = await apiClient.get('/student/intakes/');
+      const intakes = Array.isArray(intakeResponse.data.intakes)
+        ? intakeResponse.data.intakes
+        : [];
+      console.log('All Intakes:', intakes);
+
+      const intakeCourses = {};
+      await Promise.all(
+        intakes.map(async (intake) => {
+          try {
+            const response = await apiClient.get(`/courses/intakes/${intake.id}/courses/`);
+            intakeCourses[intake.id] = Array.isArray(response.data) ? response.data : [];
+          } catch (error) {
+            console.warn(`Failed to fetch courses for intake ${intake.id}:`, error);
+            intakeCourses[intake.id] = [];
+          }
+        })
+      );
+      console.log('Intake Courses:', intakeCourses);
+
+      filteredCourses = filteredCourses.map((course) => {
+        let intake = null;
+        for (const intakeId in intakeCourses) {
+          const courses = intakeCourses[intakeId];
+          if (courses.some((c) => c.id === course.id)) {
+            const matchingIntake = intakes.find((i) => i.id === parseInt(intakeId));
+            if (matchingIntake) {
+              intake = { id: matchingIntake.id, name: matchingIntake.name };
+              break;
+            }
+          }
+        }
+        return {
+          ...course,
+          intake,
+        };
+      });
+      console.log('Filtered Courses (with intake):', filteredCourses);
+
+      return filteredCourses;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('fetchCourses error:', error);
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch courses');
     }
   }
 );
 
 export const fetchStudents = createAsyncThunk(
   'assignments/fetchStudents',
-  async ({ trackId, courseId }, { rejectWithValue }) => {
+  async ({ trackId, courseId, intakeId }, { rejectWithValue }) => {
     try {
+      console.log('Fetching students with:', { trackId, courseId, intakeId });
       const response = await apiClient.get(
-        `/student/tracks/${trackId}/courses/${courseId}/students/`
+        `/student/tracks/${trackId}/courses/${courseId}/intakes/${intakeId}/students/`
       );
-      // Directly return the array response since your API returns the array directly
-      return response.data; // Changed from response.data.students to response.data
+      console.log('fetchStudents API Response:', response.data);
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('fetchStudents error:', error);
+      return rejectWithValue(
+        error.response?.data?.detail || 'Failed to fetch students'
+      );
     }
   }
 );
@@ -59,7 +121,8 @@ export const createAssignment = createAsyncThunk(
       const response = await apiClient.post('/assignments/create/', assignmentData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('createAssignment error:', error);
+      return rejectWithValue(error.response?.data?.detail || 'Failed to create assignment');
     }
   }
 );
@@ -73,6 +136,7 @@ const assignmentSlice = createSlice({
     },
     clearStudents: (state) => {
       state.students = [];
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -83,40 +147,42 @@ const assignmentSlice = createSlice({
       })
       .addCase(fetchTracks.fulfilled, (state, action) => {
         state.loading = false;
-        state.tracks = action.payload;
+        state.tracks = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchTracks.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to fetch tracks';
       })
-
       .addCase(fetchCourses.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.courses = [];
+        state.students = [];
       })
       .addCase(fetchCourses.fulfilled, (state, action) => {
         state.loading = false;
-        state.courses = action.payload;
+        state.courses = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchCourses.rejected, (state, action) => {
         state.loading = false;
+        state.courses = [];
+        state.students = [];
         state.error = action.payload || 'Failed to fetch courses';
       })
-
       .addCase(fetchStudents.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.students = [];
       })
       .addCase(fetchStudents.fulfilled, (state, action) => {
         state.loading = false;
-        state.students = action.payload; // Now correctly sets the student array
+        state.students = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchStudents.rejected, (state, action) => {
         state.loading = false;
         state.students = [];
         state.error = action.payload || 'Failed to fetch students';
       })
-
       .addCase(createAssignment.pending, (state) => {
         state.loading = true;
         state.error = null;

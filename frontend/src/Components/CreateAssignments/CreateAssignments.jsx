@@ -173,13 +173,13 @@ const CreateAssignment = () => {
     (state) => state.createassignments
   );
 
-  // Debug logging to verify data
   useEffect(() => {
     console.log("Tracks:", tracks);
     console.log("Courses:", courses);
+    console.log("Students:", students);
     console.log("Loading:", loading);
     console.log("Error:", error);
-  }, [tracks, courses, loading, error]);
+  }, [tracks, courses, students, loading, error]);
 
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
@@ -220,8 +220,22 @@ const CreateAssignment = () => {
     course: false,
     difficulty: false,
   });
+  const [isTrackMenuOpen, setIsTrackMenuOpen] = useState(false);
 
-  // Memoized fetch functions to prevent unnecessary re-renders
+  useEffect(() => {
+    if (formData.track && tracks.length > 0) {
+      const isValidTrack = tracks.some((track) => track.id === formData.track);
+      if (!isValidTrack) {
+        setFormData((prev) => ({
+          ...prev,
+          track: "",
+          course: "",
+          selectedStudents: [],
+        }));
+      }
+    }
+  }, [tracks, formData.track]);
+
   const fetchCoursesMemoized = useCallback(() => {
     if (formData.track) {
       dispatch(fetchCourses({ userId: user_id, trackId: formData.track }));
@@ -230,11 +244,21 @@ const CreateAssignment = () => {
 
   const fetchStudentsMemoized = useCallback(() => {
     if (formData.course && formData.track) {
-      dispatch(
-        fetchStudents({ trackId: formData.track, courseId: formData.course })
-      );
+      const selectedCourse = courses.find((c) => c.id === formData.course);
+      const intakeId = selectedCourse?.intake?.id;
+      if (intakeId) {
+        dispatch(
+          fetchStudents({
+            trackId: formData.track,
+            courseId: formData.course,
+            intakeId,
+          })
+        );
+      } else {
+        dispatch({ type: 'assignments/clearStudents' });
+      }
     }
-  }, [dispatch, formData.track, formData.course]);
+  }, [dispatch, formData.track, formData.course, courses]);
 
   useEffect(() => {
     dispatch(fetchTracks(user_id));
@@ -308,7 +332,8 @@ const CreateAssignment = () => {
 
     let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
     if (recommendationDialog.methodChoice === "1") {
-      const courseName = courses.find((c) => c.id === formData.course)?.name || "";
+      const course = courses.find((c) => c.id === formData.course);
+      const courseName = course ? `${course.name} Intake(${course.intake?.name || 'No Intake'})` : "";
       url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
     } else {
       url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
@@ -447,7 +472,6 @@ const CreateAssignment = () => {
     }
 
     if (name === "track") {
-      // Reset course and students when track changes
       setFormData((prev) => ({
         ...prev,
         track: value,
@@ -455,6 +479,13 @@ const CreateAssignment = () => {
         selectedStudents: [],
       }));
       setValidationErrors((prev) => ({ ...prev, track: false, course: false }));
+    } else if (name === "course") {
+      setFormData((prev) => ({
+        ...prev,
+        course: value,
+        selectedStudents: [],
+      }));
+      setValidationErrors((prev) => ({ ...prev, course: false }));
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -519,7 +550,7 @@ const CreateAssignment = () => {
       setSubmitDialog({
         open: true,
         success: false,
-        message: "Please wait while student data loads",
+        message: "Please wait while student data loads or select a valid course with students",
       });
       return;
     }
@@ -657,6 +688,26 @@ const CreateAssignment = () => {
                   name="track"
                   label="Track"
                   disabled={loading}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        borderRadius: "8px",
+                        boxShadow: theme.shadows[3],
+                      },
+                    },
+                    TransitionProps: {
+                      onEntered: () => setIsTrackMenuOpen(true),
+                      onExited: () => setIsTrackMenuOpen(false),
+                    },
+                    disablePortal: true,
+                    sx: {
+                      '&[aria-hidden="true"]': {
+                        display: isTrackMenuOpen ? 'block' : 'none',
+                      },
+                    },
+                  }}
+                  onOpen={() => setIsTrackMenuOpen(true)}
+                  onClose={() => setIsTrackMenuOpen(false)}
                 >
                   {loading ? (
                     <MenuItem disabled>Loading tracks...</MenuItem>
@@ -683,7 +734,7 @@ const CreateAssignment = () => {
                       </MenuItem>
                     ))
                   ) : (
-                    <MenuItem disabled>You must be assigned to course first</MenuItem>
+                    <MenuItem disabled>No tracks available</MenuItem>
                   )}
                 </StyledSelect>
                 {validationErrors.track && (
@@ -697,7 +748,7 @@ const CreateAssignment = () => {
               <FormControl
                 fullWidth
                 required
-                disabled={!formData.track || loading}
+                disabled={!formData.track || loading || courses.length === 0}
                 error={validationErrors.course}
               >
                 <InputLabel sx={{ fontWeight: 500 }}>Course</InputLabel>
@@ -724,12 +775,14 @@ const CreateAssignment = () => {
                           >
                             <DescriptionIcon sx={{ fontSize: 14 }} />
                           </Avatar>
-                          <Typography variant="body2">{course.name}</Typography>
+                          <Typography variant="body2">
+                            {course.name} {course.intake ? `Intake(${course.intake.name})` : '(No Intake)'}
+                          </Typography>
                         </Stack>
                       </MenuItem>
                     ))
                   ) : (
-                    <MenuItem disabled>No assigned courses</MenuItem>
+                    <MenuItem disabled>No courses assigned to this track</MenuItem>
                   )}
                 </StyledSelect>
                 {validationErrors.course && (
@@ -929,7 +982,7 @@ const CreateAssignment = () => {
                       bgcolor: theme.palette.info.light,
                     }}
                   >
-                    No students found in this course/track combination
+                    No students found for this course and intake combination
                   </Alert>
                 )}
               </Grid>
@@ -1052,7 +1105,9 @@ const CreateAssignment = () => {
                         Course & Track
                       </Typography>
                       <Typography variant="body2">
-                        {courses.find((c) => c.id === formData.course)?.name || "Not selected"}
+                        {courses.find((c) => c.id === formData.course)
+                          ? `${courses.find((c) => c.id === formData.course).name} Intake(${courses.find((c) => c.id === formData.course).intake?.name || 'No Intake'})`
+                          : "Not selected"}
                         <br />
                         {tracks.find((t) => t.id === formData.track)?.name || "Not selected"}
                       </Typography>
