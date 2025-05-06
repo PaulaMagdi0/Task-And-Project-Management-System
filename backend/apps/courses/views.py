@@ -3,39 +3,42 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
-from .serializers import CourseSerializer, CourseInstructorUpdateSerializer
+from .serializers import CourseSerializer, CourseInstructorUpdateSerializer, IntakeSerializer
 from apps.staff_members.models import StaffMember
 from apps.tracks.models import Track
 from .models import Course
+from apps.student.models import Intake
 import logging
 from rest_framework.permissions import IsAuthenticated
 
 logger = logging.getLogger(__name__)
 
-# Existing CourseListView (unchanged)
 class CourseListView(generics.ListCreateAPIView):
     """
     GET: List all courses
-    POST: Create a new course and link it to one or more tracks
+    POST: Create a new course and link it to one or more tracks and an intake
     """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    permission_classes = [IsAuthenticated]  # Add authentication
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         """
-        Handles the creation of a new course and associating it with tracks and instructor.
+        Handles the creation of a new course and associating it with tracks, instructor, and intake.
         """
         logger.debug(f"✅ Validated Data: {serializer.validated_data}")
         course = serializer.save()
         instructor = serializer.validated_data.get('instructor', None)
         tracks = serializer.validated_data.get('tracks', [])
+        intake = serializer.validated_data.get('intake', None)
         if instructor:
             course.instructor = instructor
-            course.save()
+        if intake:
+            course.intake = intake
         if tracks:
             course.tracks.set(tracks)
-        logger.debug(f"✅ Associated course '{course}' with tracks")
+        course.save()
+        logger.debug(f"✅ Associated course '{course}' with tracks and intake")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -43,7 +46,7 @@ class CourseListView(generics.ListCreateAPIView):
             self.perform_create(serializer)
             return Response({
                 'status': 'success',
-                'message': 'Course created and associated with tracks and instructor.',
+                'message': 'Course created and associated with tracks, instructor, and intake.',
                 'data': serializer.data
             }, status=status.HTTP_201_CREATED)
         return Response({
@@ -52,7 +55,6 @@ class CourseListView(generics.ListCreateAPIView):
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
-# New CourseDetailView to handle GET/PATCH/DELETE for individual courses
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET: Retrieve a single course
@@ -64,10 +66,24 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'pk'
 
+    def perform_update(self, serializer):
+        """
+        Handles updating the course, including tracks and intake.
+        """
+        logger.debug(f"✅ Updating course: {serializer.instance}")
+        course = serializer.save()
+        tracks = serializer.validated_data.get('tracks', [])
+        intake = serializer.validated_data.get('intake', None)
+        if tracks:
+            course.tracks.set(tracks)
+        if intake:
+            course.intake = intake
+        course.save()
+        logger.debug(f"✅ Updated course '{course}' with tracks and intake")
+
     def perform_destroy(self, instance):
         """
         Log the deletion and perform the delete operation.
-        Related CourseTrack entries are automatically deleted due to on_delete=models.CASCADE.
         """
         logger.info(f"Deleting course: {instance.name} (ID: {instance.id})")
         instance.delete()
@@ -83,7 +99,19 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
             'message': 'Course deleted successfully.'
         }, status=status.HTTP_204_NO_CONTENT)
 
-# Existing StaffMemberCoursesView (unchanged)
+class AvailableIntakesView(APIView):
+    """
+    GET: Retrieve available intakes for a course based on its tracks
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        course = get_object_or_404(Course, pk=pk)
+        track_ids = course.tracks.values_list('id', flat=True)
+        intakes = Intake.objects.filter(track__id__in=track_ids)
+        serializer = IntakeSerializer(intakes, many=True)
+        return Response(serializer.data)
+
 class StaffMemberCoursesView(APIView):
     def get(self, request, staff_member_id):
         staff_member = get_object_or_404(StaffMember, id=staff_member_id)
@@ -91,7 +119,6 @@ class StaffMemberCoursesView(APIView):
         serializer = CourseSerializer(courses, many=True)
         return Response(serializer.data)
 
-# Existing AssignedCoursesInTrackView (unchanged)
 class AssignedCoursesInTrackView(APIView):
     def get(self, request, user_id, track_id):
         user = get_object_or_404(StaffMember, id=user_id)
@@ -104,11 +131,11 @@ class AssignedCoursesInTrackView(APIView):
         course_data = CourseSerializer(assigned_courses, many=True).data
         return Response(course_data, status=status.HTTP_200_OK)
 
-# Existing CourseFilterView (unchanged)
 class CourseFilterView(generics.ListAPIView):
     serializer_class = CourseSerializer
 
     def get_queryset(self):
+        from django.db.models import Q
         queryset = Course.objects.all()
         search = self.request.query_params.get('search', None)
         instructor = self.request.query_params.get('instructor', None)
@@ -128,7 +155,6 @@ class CourseFilterView(generics.ListAPIView):
             queryset = queryset.filter(tracks__name__icontains=track)
         return queryset.distinct()
 
-# Existing AssignCourseToTrackView (unchanged)
 class AssignCourseToTrackView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -174,6 +200,9 @@ class AssignCourseToTrackView(generics.CreateAPIView):
             else:
                 logger.error("Invalid option value: %s", option)
                 return Response({'detail': 'Invalid option.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Unexpected error: %s", str(e))
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except (Course.DoesNotExist, Track.DoesNotExist) as e:
             logger.error("Error: %s", str(e))
             return Response({'detail': 'Course or Track not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -181,7 +210,6 @@ class AssignCourseToTrackView(generics.CreateAPIView):
             logger.exception("Unexpected error: %s", str(e))
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# Existing ReassignCourseInstructorView (unchanged)
 class ReassignCourseInstructorView(generics.UpdateAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseInstructorUpdateSerializer
@@ -227,7 +255,8 @@ class ReassignCourseInstructorView(generics.UpdateAPIView):
             new_course = Course.objects.create(
                 name=course.name,
                 description=course.description,
-                instructor=instructor
+                instructor=instructor,
+                intake=course.intake
             )
             logger.info("Created new duplicated course: %s", new_course)
             CourseTrack.objects.create(course=new_course, track=track)
@@ -243,15 +272,14 @@ class ReassignCourseInstructorView(generics.UpdateAPIView):
             course.save()
             logger.info("Reassigned instructor %s to course %s successfully.", instructor, course)
             return Response({'detail': 'Instructor reassigned successfully.'}, status=status.HTTP_200_OK)
-        
-from apps.student.models import Intake        
+
 class IntakeCourseListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, intake_id):
         try:
             intake = Intake.objects.get(id=intake_id)
-            courses = Course.objects.filter(tracks=intake.track)
+            courses = Course.objects.filter(intake=intake)
             serializer = CourseSerializer(courses, many=True)
             return Response(serializer.data)
         except Intake.DoesNotExist:
