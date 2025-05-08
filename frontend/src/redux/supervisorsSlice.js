@@ -1,4 +1,3 @@
-// File: src/redux/supervisorsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../services/api';
 
@@ -30,15 +29,57 @@ export const bulkUploadSupervisors = createAsyncThunk(
   }
 );
 
-// ✅ New: Fetch all instructors
 export const fetchInstructors = createAsyncThunk(
   'supervisors/fetchInstructors',
   async (_, { rejectWithValue }) => {
     try {
       const response = await apiClient.get('/staff/instructors/');
-      return response.data; // Expecting an array of instructors
+      return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data || error.message);
+    }
+  }
+);
+
+export const fetchInstructorsTrackData = createAsyncThunk(
+  'supervisors/fetchInstructorsTrackData',
+  async (_, { rejectWithValue, getState }) => {
+    try {
+      const { supervisors: { instructors } } = getState();
+      const trackDataPromises = instructors.map(async (instructor) => {
+        try {
+          const response = await apiClient.get(`/staff/track-and-courses/${instructor.id}/`);
+          console.log(`Raw track data response for instructor ${instructor.id}:`, response.data);
+          const tracks = (response.data.courses || [])
+            .flatMap(course => course.tracks || [])
+            .filter(track => track && track.id && track.name)
+            .map(track => ({
+              id: track.id,
+              name: track.name,
+            }));
+          console.log(`Processed tracks for instructor ${instructor.id}:`, tracks);
+          return {
+            instructorId: instructor.id,
+            tracks,
+          };
+        } catch (error) {
+          console.error(`Failed to fetch track data for instructor ${instructor.id}:`, {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+          });
+          return { instructorId: instructor.id, tracks: [] };
+        }
+      });
+      const trackData = await Promise.all(trackDataPromises);
+      console.log('Processed instructorsTrackData:', trackData);
+      return trackData;
+    } catch (error) {
+      console.error('Error in fetchInstructorsTrackData:', {
+        message: error.message,
+        response: error.response?.data,
+      });
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
@@ -50,7 +91,8 @@ const supervisorsSlice = createSlice({
     error: null,
     message: '',
     supervisor: null,
-    instructors: [], // ✅ Add instructors array
+    instructors: [],
+    instructorsTrackData: [],
   },
   reducers: {
     clearSupervisorState: (state) => {
@@ -59,11 +101,11 @@ const supervisorsSlice = createSlice({
       state.message = '';
       state.supervisor = null;
       state.instructors = [];
+      state.instructorsTrackData = [];
     },
   },
   extraReducers: (builder) => {
     builder
-      // Create Supervisor
       .addCase(createSupervisor.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -77,8 +119,6 @@ const supervisorsSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Error creating supervisor';
       })
-
-      // Bulk Upload
       .addCase(bulkUploadSupervisors.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -91,8 +131,6 @@ const supervisorsSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Error during bulk upload';
       })
-
-      // ✅ Fetch Instructors
       .addCase(fetchInstructors.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -104,6 +142,18 @@ const supervisorsSlice = createSlice({
       .addCase(fetchInstructors.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Error fetching instructors';
+      })
+      .addCase(fetchInstructorsTrackData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchInstructorsTrackData.fulfilled, (state, action) => {
+        state.loading = false;
+        state.instructorsTrackData = action.payload;
+      })
+      .addCase(fetchInstructorsTrackData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Error fetching instructors track data';
       });
   },
 });

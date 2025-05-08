@@ -119,19 +119,21 @@ const ReAssignCourses = () => {
   const [deleteCourseTrack, setDeleteCourseTrack] = useState(null);
   const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
   const [intakeWarning, setIntakeWarning] = useState(false);
+  const [instructorWarning, setInstructorWarning] = useState("");
 
   // Debug course and intake data
   useEffect(() => {
     console.log('Courses data:', courses);
     console.log('Intakes data:', intakes);
     console.log('IntakeCourses data:', intakeCourses);
+    console.log('Instructors data:', instructors);
     courses?.forEach((course) => {
-      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake);
+      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake, 'Tracks:', course.tracks, 'Instructor:', course.instructor);
     });
     // Check if any course has intake data or is mapped
     const hasIntakeData = courses?.some((course) => course.intake || Object.values(intakeCourses).some((ic) => ic.some((c) => c.id === course.id)));
     setIntakeWarning(!hasIntakeData && courses?.length > 0 && intakes?.length > 0);
-  }, [courses, intakes, intakeCourses]);
+  }, [courses, intakes, intakeCourses, instructors]);
 
   // Fetch data
   useEffect(() => {
@@ -155,8 +157,16 @@ const ReAssignCourses = () => {
   useEffect(() => {
     if (editingCourse) {
       setSelectedInstructorId(editingCourse.instructor?.id || "");
+      // Set instructor warning based on track instructors
+      const trackInstructors = getTrackInstructors(selectedTrackId);
+      console.log('Track instructors for trackId', selectedTrackId, ':', trackInstructors);
+      setInstructorWarning(
+        trackInstructors.length === 0
+          ? 'No instructors assigned to courses in this track.'
+          : ''
+      );
     }
-  }, [editingCourse]);
+  }, [editingCourse, selectedTrackId]);
 
   // Handle success/error messages
   useEffect(() => {
@@ -176,6 +186,45 @@ const ReAssignCourses = () => {
       });
     }
   }, [success, removeCourseFromTrackError, fetchIntakesError, fetchIntakeCoursesError, dispatch, user_id]);
+
+  // Filter instructors by track
+  const getTrackInstructors = (trackId) => {
+    if (!trackId || !courses.length || !instructors.length) {
+      console.log('No trackId, courses, or instructors, returning empty array', {
+        trackId,
+        coursesLength: courses.length,
+        instructorsLength: instructors.length,
+      });
+      return [];
+    }
+
+    // Get all courses in the track
+    const trackCourses = courses.filter((course) =>
+      course.tracks?.some((track) => track.id === trackId)
+    );
+    console.log(`Courses for trackId ${trackId}:`, trackCourses);
+
+    // Collect unique instructor IDs from track courses
+    const instructorIds = [
+      ...new Set(
+        trackCourses
+          .filter((course) => course.instructor?.id)
+          .map((course) => {
+            console.log(`Course ${course.name} (ID: ${course.id}) has instructor:`, course.instructor);
+            return course.instructor.id;
+          })
+      ),
+    ];
+    console.log(`Unique instructor IDs for trackId ${trackId}:`, instructorIds);
+
+    // Get instructor objects
+    const trackInstructors = instructors.filter((instructor) =>
+      instructorIds.includes(instructor.id)
+    );
+    console.log(`Track instructors for trackId ${trackId}:`, trackInstructors);
+
+    return trackInstructors;
+  };
 
   // Handlers
   const handleEditClick = (course, trackName) => {
@@ -264,11 +313,12 @@ const ReAssignCourses = () => {
   const handleModalClose = () => {
     setEditingCourse(null);
     setSelectedTrackId(null);
+    setInstructorWarning("");
   };
 
   const handleSnackbarClose = () => {
     setSnackbar({ ...snackbar, open: false });
-    dispatch(clearCourseStatus());
+    dispatch({ type: 'courses/clearCourseStatus' });
   };
 
   const handleSort = (columnId) => {
@@ -466,6 +516,13 @@ const ReAssignCourses = () => {
       {intakeWarning && (
         <Alert severity="warning" sx={{ mb: 2, maxWidth: "1200px", mx: "auto" }}>
           No intake data found for courses. Ensure courses are assigned to intakes in the backend.
+        </Alert>
+      )}
+
+      {/* Instructor Warning */}
+      {instructorWarning && editingCourse && (
+        <Alert severity="warning" sx={{ mb: 2, maxWidth: "1200px", mx: "auto" }}>
+          {instructorWarning}
         </Alert>
       )}
 
@@ -676,6 +733,12 @@ const ReAssignCourses = () => {
             Assign Instructor for: {editingCourse?.name}
           </Typography>
 
+          {instructorWarning && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {instructorWarning}
+            </Alert>
+          )}
+
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel id="instructor-select-label">Instructor</InputLabel>
             <Select
@@ -684,14 +747,14 @@ const ReAssignCourses = () => {
               onChange={(e) => setSelectedInstructorId(e.target.value)}
               label="Instructor"
               sx={{ borderRadius: 2 }}
-              disabled={reassignInstructorLoading}
+              disabled={reassignInstructorLoading || !getTrackInstructors(selectedTrackId).length}
             >
               <MenuItem value="">
-                <em>None</em>
+                <em>Not assigned</em>
               </MenuItem>
-              {instructors?.map((instructor) => (
+              {getTrackInstructors(selectedTrackId).map((instructor) => (
                 <MenuItem key={instructor.id} value={instructor.id}>
-                  {instructor.full_name}
+                  {instructor.full_name || instructor.username || `Instructor ${instructor.id}`}
                 </MenuItem>
               ))}
             </Select>
