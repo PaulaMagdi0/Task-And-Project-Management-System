@@ -19,12 +19,14 @@ import {
   DialogActions,
   Button,
   IconButton,
+  ToggleButton,
+  ToggleButtonGroup,
   styled
 } from '@mui/material';
 import { Close, Error as ErrorIcon } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import apiClient from '../services/api';
-import { fetchCourses } from '../redux/coursesSlice';
+import { fetchCourses, fetchIntakeCourses } from '../redux/coursesSlice';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -72,9 +74,16 @@ const DeleteButton = styled(Button)(({ theme }) => ({
 export default function ViewIntakes() {
   const dispatch = useDispatch();
   const { user_id, role, loading: authLoading } = useSelector(s => s.auth);
-  const { userCourses, status } = useSelector(s => s.courses);
+  const { 
+    userCourses, 
+    intakeCourses, 
+    status: { 
+      fetchCoursesLoading: tracksLoading, 
+      fetchIntakeCoursesLoading: coursesLoading, 
+      fetchIntakeCoursesError: coursesError 
+    } 
+  } = useSelector(s => s.courses);
   const tracks = userCourses?.tracks || [];
-  const tracksLoading = status.fetchCoursesLoading;
 
   // State for UI
   const [selectedTrackId, setSelectedTrackId] = useState('');
@@ -83,6 +92,7 @@ export default function ViewIntakes() {
   const [students, setStudents] = useState([]);
   const [intakesLoading, setIntakesLoading] = useState(false);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('students'); // 'students' or 'courses'
   const [errorModal, setErrorModal] = useState({ open: false, message: '' });
   const [deleteIntakeModal, setDeleteIntakeModal] = useState({ open: false });
 
@@ -114,15 +124,29 @@ export default function ViewIntakes() {
     }
   }, [selectedTrackId]);
 
-  // Fetch students when selectedIntakeId changes
+  // Fetch students or courses when selectedIntakeId or viewMode changes
   useEffect(() => {
     if (selectedIntakeId) {
-      fetchStudents(selectedIntakeId);
+      if (viewMode === 'students') {
+        fetchStudents(selectedIntakeId);
+      } else {
+        dispatch(fetchIntakeCourses(selectedIntakeId));
+      }
     } else {
       setStudents([]);
       setStudentsLoading(false);
     }
-  }, [selectedIntakeId]);
+  }, [selectedIntakeId, viewMode, dispatch]);
+
+  // Handle courses error
+  useEffect(() => {
+    if (coursesError) {
+      setErrorModal({
+        open: true,
+        message: coursesError || 'Failed to fetch courses. Please try again.',
+      });
+    }
+  }, [coursesError]);
 
   const fetchIntakes = async (trackId) => {
     if (!trackId) {
@@ -195,12 +219,28 @@ export default function ViewIntakes() {
     }
   };
 
+  const handleViewModeChange = (event, newViewMode) => {
+    if (newViewMode) {
+      setViewMode(newViewMode);
+    }
+  };
+
   const handleCloseErrorModal = () => {
     setErrorModal({ open: false, message: '' });
   };
 
   const handleCloseDeleteIntakeModal = () => {
     setDeleteIntakeModal({ open: false });
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return 'N/A';
+    }
   };
 
   if (authLoading || tracksLoading) {
@@ -211,7 +251,7 @@ export default function ViewIntakes() {
     );
   }
 
-  console.log('Redux state:', { user_id, role, tracks });
+  console.log('Redux state:', { user_id, role, tracks, intakeCourses });
 
   return (
     <Box sx={{ p: 3, background: '#f5f7fa', minHeight: '100vh' }}>
@@ -268,7 +308,7 @@ export default function ViewIntakes() {
           {selectedIntakeId && (
             <DeleteButton
               onClick={() => setDeleteIntakeModal({ open: true })}
-              disabled={intakesLoading || studentsLoading}
+              disabled={intakesLoading || studentsLoading || coursesLoading}
             >
               Delete Intake
             </DeleteButton>
@@ -277,45 +317,117 @@ export default function ViewIntakes() {
 
         {selectedIntakeId && (
           <Box>
-            <Typography variant="h6" mb={2} fontWeight="600" color="text.secondary">
-              Students in {intakes.find(i => i.id === selectedIntakeId)?.name || 'Selected Intake'}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight="600" color="text.secondary">
+                {viewMode === 'students' 
+                  ? `Students in ${intakes.find(i => i.id === selectedIntakeId)?.name || 'Selected Intake'}`
+                  : `Courses in ${intakes.find(i => i.id === selectedIntakeId)?.name || 'Selected Intake'}`}
+              </Typography>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                aria-label="view mode"
+                sx={{ borderRadius: '12px' }}
+              >
+                <ToggleButton 
+                  value="students" 
+                  sx={{ 
+                    borderRadius: '12px 0 0 12px', 
+                    '&.Mui-selected': { 
+                      backgroundColor: 'primary.main', 
+                      color: 'white',
+                      '&:hover': { backgroundColor: 'primary.dark' }
+                    }
+                  }}
+                >
+                  Students
+                </ToggleButton>
+                <ToggleButton 
+                  value="courses" 
+                  sx={{ 
+                    borderRadius: '0 12px 12px 0', 
+                    '&.Mui-selected': { 
+                      backgroundColor: 'primary.main', 
+                      color: 'white',
+                      '&:hover': { backgroundColor: 'primary.dark' }
+                    }
+                  }}
+                >
+                  Courses
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
             <TableContainer component={Paper} sx={{ borderRadius: '12px', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)' }}>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <StyledTableCell><strong>Name</strong></StyledTableCell>
-                    <StyledTableCell><strong>Email</strong></StyledTableCell>
-                    <StyledTableCell><strong>Role</strong></StyledTableCell>
-                    <StyledTableCell><strong>Date Joined</strong></StyledTableCell>
+                    {viewMode === 'students' ? (
+                      <>
+                        <StyledTableCell><strong>Name</strong></StyledTableCell>
+                        <StyledTableCell><strong>Email</strong></StyledTableCell>
+                        <StyledTableCell><strong>Role</strong></StyledTableCell>
+                        <StyledTableCell><strong>Date Joined</strong></StyledTableCell>
+                      </>
+                    ) : (
+                      <>
+                        <StyledTableCell><strong>Name</strong></StyledTableCell>
+                        <StyledTableCell><strong>Description</strong></StyledTableCell>
+                        <StyledTableCell><strong>Instructor</strong></StyledTableCell>
+                        <StyledTableCell><strong>Created Date</strong></StyledTableCell>
+                      </>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {studentsLoading ? (
-                    <TableRow>
-                      <StyledTableCell colSpan={4} align="center">
-                        <CircularProgress size={24} />
-                      </StyledTableCell>
-                    </TableRow>
-                  ) : students.length > 0 ? (
-                    students.map(student => (
-                      <StyledTableRow key={student.id}>
-                        <StyledTableCell>{student.name || `${student.first_name} ${student.last_name}`}</StyledTableCell>
-                        <StyledTableCell>{student.email}</StyledTableCell>
-                        <StyledTableCell>{student.role}</StyledTableCell>
-                        <StyledTableCell>
-                          {student.date_joined
-                            ? new Date(student.date_joined).toLocaleDateString()
-                            : 'N/A'}
+                  {viewMode === 'students' ? (
+                    studentsLoading ? (
+                      <TableRow>
+                        <StyledTableCell colSpan={4} align="center">
+                          <CircularProgress size={24} />
                         </StyledTableCell>
-                      </StyledTableRow>
-                    ))
+                      </TableRow>
+                    ) : students.length > 0 ? (
+                      students.map(student => (
+                        <StyledTableRow key={student.id}>
+                          <StyledTableCell>{student.name || `${student.first_name} ${student.last_name}`}</StyledTableCell>
+                          <StyledTableCell>{student.email}</StyledTableCell>
+                          <StyledTableCell>{student.role}</StyledTableCell>
+                          <StyledTableCell>{formatDate(student.date_joined)}</StyledTableCell>
+                        </StyledTableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <StyledTableCell colSpan={4} align="center">
+                          No students found for this intake.
+                        </StyledTableCell>
+                      </TableRow>
+                    )
                   ) : (
-                    <TableRow>
-                      <StyledTableCell colSpan={4} align="center">
-                        No students found for this intake.
-                      </StyledTableCell>
-                    </TableRow>
+                    coursesLoading ? (
+                      <TableRow>
+                        <StyledTableCell colSpan={4} align="center">
+                          <CircularProgress size={24} />
+                        </StyledTableCell>
+                      </TableRow>
+                    ) : intakeCourses[selectedIntakeId]?.length > 0 ? (
+                      intakeCourses[selectedIntakeId].map(course => (
+                        <StyledTableRow key={course.id}>
+                          <StyledTableCell>{course.name}</StyledTableCell>
+                          <StyledTableCell>{course.description || 'N/A'}</StyledTableCell>
+                          <StyledTableCell>
+                            {course.instructor?.name || course.instructor?.username || 'Not assigned'}
+                          </StyledTableCell>
+                          <StyledTableCell>{formatDate(course.created_at)}</StyledTableCell>
+                        </StyledTableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <StyledTableCell colSpan={4} align="center">
+                          No courses found for this intake.
+                        </StyledTableCell>
+                      </TableRow>
+                    )
                   )}
                 </TableBody>
               </Table>

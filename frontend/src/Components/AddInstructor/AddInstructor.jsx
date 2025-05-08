@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Button,
@@ -13,7 +13,6 @@ import {
     DialogContent,
     DialogActions,
     IconButton,
-    Paper,
     styled,
     MenuItem,
     Select,
@@ -21,7 +20,8 @@ import {
     InputLabel
 } from '@mui/material';
 import { Close, CheckCircle, Error } from '@mui/icons-material';
-import CloudUpload from '@mui/icons-material/CloudUpload';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchCourses } from '../../redux/coursesSlice';
 import apiClient from '../../services/api';
 
 const StyledCard = styled(Card)(({ theme }) => ({
@@ -52,12 +52,14 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
     },
 }));
 
-const FileInput = styled('input')({
-    display: 'none',
-});
-
 const UploadInstructor = () => {
-    const [isExcelUpload, setIsExcelUpload] = useState(false);
+    const dispatch = useDispatch();
+    const { user_id, role } = useSelector((state) => state.auth);
+    const {
+        userCourses: { track_courses },
+        status: { fetchCoursesLoading, fetchCoursesError }
+    } = useSelector((state) => state.courses);
+
     const [staffData, setStaffData] = useState({
         username: '',
         password: '',
@@ -69,32 +71,118 @@ const UploadInstructor = () => {
         course_id: '',
     });
 
-    const [courses, setCourses] = useState([]);
-    const [excelFile, setExcelFile] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [fetchingCourses, setFetchingCourses] = useState(false);
     const [openModal, setOpenModal] = useState(false);
     const [modalContent, setModalContent] = useState({
         title: '',
         message: '',
         isSuccess: false
     });
+    const [intakes, setIntakes] = useState([]);
+    const [intakeCourses, setIntakeCourses] = useState({});
+    const [intakesLoading, setIntakesLoading] = useState(false);
+    const [intakesError, setIntakesError] = useState(null);
 
+    // Fetch courses on mount
     useEffect(() => {
-        const fetchCourses = async () => {
-            setFetchingCourses(true);
+        if (user_id) {
+            dispatch(fetchCourses(user_id));
+        }
+    }, [dispatch, user_id]);
+
+    // Fetch intakes and intake-specific courses
+    useEffect(() => {
+        const fetchIntakeData = async () => {
+            setIntakesLoading(true);
+            setIntakesError(null);
             try {
-                const response = await apiClient.get('/courses/');
-                setCourses(response.data);
+                // Fetch all intakes
+                const intakeResponse = await apiClient.get('/student/intakes/');
+                const fetchedIntakes = Array.isArray(intakeResponse.data.intakes)
+                    ? intakeResponse.data.intakes
+                    : [];
+                setIntakes(fetchedIntakes);
+
+                // Fetch courses for each intake
+                const fetchedIntakeCourses = {};
+                await Promise.all(
+                    fetchedIntakes.map(async (intake) => {
+                        try {
+                            const response = await apiClient.get(`/courses/intakes/${intake.id}/courses/`);
+                            fetchedIntakeCourses[intake.id] = Array.isArray(response.data)
+                                ? response.data
+                                : [];
+                        } catch (error) {
+                            console.warn(`Failed to fetch courses for intake ${intake.id}:`, error);
+                            fetchedIntakeCourses[intake.id] = [];
+                        }
+                    })
+                );
+                setIntakeCourses(fetchedIntakeCourses);
             } catch (error) {
-                console.error('Error fetching courses:', error);
-                showErrorModal('Failed to load courses');
+                console.error('Error fetching intakes:', error);
+                setIntakesError(error.response?.data?.detail || 'Failed to fetch intakes');
             } finally {
-                setFetchingCourses(false);
+                setIntakesLoading(false);
             }
         };
-        fetchCourses();
-    }, []);
+
+        if (user_id) {
+            fetchIntakeData();
+        }
+    }, [user_id]);
+
+    // Show error modals
+    useEffect(() => {
+        if (fetchCoursesError) {
+            showErrorModal('Failed to load courses');
+        }
+        if (intakesError) {
+            showErrorModal('Failed to load intake data');
+        }
+    }, [fetchCoursesError, intakesError]);
+
+    // Deduplicate and filter courses by role, enrich with intake data
+    const uniqueCourses = useMemo(() => {
+        const courseMap = new Map();
+        const courses = role === 'supervisor'
+            ? track_courses || []
+            : track_courses?.filter((course) => course.instructor?.id === user_id) || [];
+
+        courses.forEach((course) => {
+            if (!courseMap.has(course.id)) {
+                // Find intake for this course
+                let intake = null;
+                for (const intakeId in intakeCourses) {
+                    const coursesInIntake = intakeCourses[intakeId];
+                    if (coursesInIntake.some((c) => c.id === course.id)) {
+                        const matchingIntake = intakes.find((i) => i.id === parseInt(intakeId));
+                        if (matchingIntake) {
+                            intake = { id: matchingIntake.id, name: matchingIntake.name };
+                            break;
+                        }
+                    }
+                }
+
+                courseMap.set(course.id, {
+                    ...course,
+                    intake,
+                    tracks: Array.isArray(course.tracks) ? course.tracks : [],
+                });
+            } else {
+                const existing = courseMap.get(course.id);
+                const existingTrackIds = new Set(existing.tracks.map((t) => t.id));
+                course.tracks?.forEach((track) => {
+                    if (!existingTrackIds.has(track.id)) {
+                        existing.tracks.push(track);
+                        existingTrackIds.add(track.id);
+                    }
+                });
+            }
+        });
+
+        return Array.from(courseMap.values());
+    }, [track_courses, role, user_id, intakes, intakeCourses]);
 
     const handleStaffInputChange = (e) => {
         const { name, value } = e.target;
@@ -102,10 +190,6 @@ const UploadInstructor = () => {
             ...prevData,
             [name]: value,
         }));
-    };
-
-    const handleFileChange = (e) => {
-        setExcelFile(e.target.files[0]);
     };
 
     const handleCloseModal = () => {
@@ -134,6 +218,7 @@ const UploadInstructor = () => {
         const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         return emailPattern.test(email);
     };
+
     const handleSubmitManualStaff = async () => {
         if (!staffData.username || !staffData.password || !staffData.first_name ||
             !staffData.last_name || !staffData.email || !staffData.course_id || !staffData.phone) {
@@ -144,7 +229,14 @@ const UploadInstructor = () => {
             showErrorModal('Please enter a valid email');
             return;
         }
-    
+
+        // Validate course_id
+        const selectedCourse = uniqueCourses.find((course) => course.id === staffData.course_id);
+        if (!selectedCourse) {
+            showErrorModal('Selected course is invalid');
+            return;
+        }
+
         setLoading(true);
         try {
             const formData = new FormData();
@@ -156,14 +248,13 @@ const UploadInstructor = () => {
             formData.append('phone', staffData.phone);
             formData.append('role', 'instructor');
             formData.append('course_id', staffData.course_id);
-    
+
             const response = await apiClient.post('/staff/create-instructor/', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-    
-            // If successful, handle success
+
             showSuccessModal('Instructor added successfully!');
             setStaffData({
                 username: '',
@@ -172,51 +263,12 @@ const UploadInstructor = () => {
                 last_name: '',
                 email: '',
                 phone: '',
+                role: 'instructor',
                 course_id: ''
             });
         } catch (error) {
             const errorMsg = error?.response?.data?.detail || error?.response?.data?.message || 'Failed to add instructor';
             console.error('Error submitting instructor data:', error);
-            showErrorModal(errorMsg);
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    const handleUploadExcel = async () => {
-        if (!excelFile || !staffData.course_id) {
-            showErrorModal('Please upload a file and select a course.');
-            return;
-        }
-
-        // Validate file type
-        const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-        if (!allowedTypes.includes(excelFile.type)) {
-            showErrorModal('Invalid file type. Please upload an Excel file.');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', excelFile);
-            formData.append('course_id', staffData.course_id);
-
-            const response = await apiClient.post(
-                '/staff/upload/',
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
-
-            showSuccessModal('Instructors uploaded successfully!');
-            setExcelFile(null);
-        } catch (error) {
-            const errorMsg = error.response?.data?.error || 'Failed to upload instructors';
-            console.error('Error uploading instructors:', error);
             showErrorModal(errorMsg);
         } finally {
             setLoading(false);
@@ -310,14 +362,18 @@ const UploadInstructor = () => {
                                     value={staffData.course_id}
                                     onChange={handleStaffInputChange}
                                     label="Assign To Course"
-                                    disabled={fetchingCourses}
+                                    disabled={fetchCoursesLoading || intakesLoading}
+                                    sx={{ borderRadius: 2 }}
                                 >
-                                    {fetchingCourses ? (
+                                    <MenuItem value=""><em>Select Course</em></MenuItem>
+                                    {fetchCoursesLoading || intakesLoading ? (
                                         <MenuItem disabled>Loading courses...</MenuItem>
+                                    ) : uniqueCourses.length === 0 ? (
+                                        <MenuItem disabled>No courses available</MenuItem>
                                     ) : (
-                                        courses.map((course) => (
+                                        uniqueCourses.map((course) => (
                                             <MenuItem key={course.id} value={course.id}>
-                                                {course.name}
+                                                {course.name} Intake({course.intake?.name || 'No Intake'})
                                             </MenuItem>
                                         ))
                                     )}
