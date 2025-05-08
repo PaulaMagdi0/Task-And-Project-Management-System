@@ -382,43 +382,46 @@ def verify_email(request, verification_code):
 @permission_classes([IsAuthenticated])
 def student_courses(request, student_id):
     try:
+        # Fetch the student with related track and intake
         student = Student.objects.select_related('track', 'intake').get(id=student_id)
-        # Allow the student to access their own courses or staff members to access any student's courses
+
+        # Permission check
         if request.user.id != student.id and not isinstance(request.user, StaffMember):
-            logger.warning(f"User {request.user.id} unauthorized to access courses for student {student_id}")
             return Response({"error": "Unauthorized access"}, status=status.HTTP_403_FORBIDDEN)
-        
-        courses = Course.objects.filter(tracks=student.track)
-        course_data = [
-            {
-                'course_id': course.id,
-                'name': course.name,
-                'created_at': course.created_at,
-                'description': course.description,
-            }
-            for course in courses
-        ]
-        assignments = Assignment.objects.filter(course__in=courses)
-        assignments_serializer = AssignmentSerializer(assignments, many=True)
+
+        # Filter courses by both track and intake
+        courses = Course.objects.filter(tracks=student.track, intake=student.intake)
+
+        # Filter assignments by course in the student's track and intake
+        assignments = Assignment.objects.filter(
+            course__in=courses,
+            assignment_students__intake=student.intake
+        ).distinct()
+
+        # Serialize data
+        course_serializer = CourseSerializer(courses, many=True)
+        assignment_serializer = AssignmentSerializer(assignments, many=True)
+
         return Response({
             'student': {
                 'id': student.id,
-                'name': student.full_name,
+                'full_name': student.full_name,
                 'email': student.email,
                 'role': student.role,
                 'date_joined': student.date_joined,
-                'track_id': student.track_id,
+                'track_id': student.track.id if student.track else None,
                 'intake': student.intake.name if student.intake else None
             },
-            'courses': course_data,
-            'assignments': assignments_serializer.data
-        })
+            'courses': course_serializer.data,
+            'assignments': assignment_serializer.data
+        }, status=status.HTTP_200_OK)
+
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         logger.error(f"Error retrieving courses for student {student_id}: {str(e)}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_student(request, student_id):
