@@ -7,6 +7,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   Button,
   Paper,
   Dialog,
@@ -23,7 +24,7 @@ import {
 } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  fetchAllCourses,
+  fetchCourses,
   updateCourse,
   deleteCourse,
   clearCourseStatus,
@@ -46,6 +47,7 @@ const AllCourseManagement = () => {
   const { instructors } = useSelector((state) => state.supervisors);
   const { user_id } = useSelector((state) => state.auth);
 
+  // State management
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
     courseId: null,
@@ -62,11 +64,23 @@ const AllCourseManagement = () => {
 
   // Fetch courses and instructors on mount
   useEffect(() => {
-    dispatch(fetchAllCourses());
-    dispatch(fetchInstructors());
-  }, [dispatch]);
+    console.log('Courses data:', courses);
+    console.log('Tracks data:', tracks);
+    console.log('Intakes data:', intakes);
+    console.log('IntakeCourses data:', intakeCourses);
+    console.log('AvailableIntakes data:', availableIntakes);
+    console.log('Instructors data:', instructors);
+    console.log('InstructorsTrackData:', instructorsTrackData);
+    courses?.forEach((course) => {
+      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake, 'Tracks:', course.tracks, 'Instructor:', course.instructor);
+    });
+    const hasIntakeData = courses?.some((course) =>
+      course.intake || Object.values(intakeCourses).some((ic) => ic.some((c) => c.id === course.id))
+    );
+    setIntakeWarning(!hasIntakeData && courses?.length > 0 && intakes?.length > 0);
+  }, [courses, tracks, intakes, intakeCourses, availableIntakes, instructors, instructorsTrackData]);
 
-  // Handle error state
+  // Handle error and success states
   useEffect(() => {
     if (error) setLocalError(error);
     else setLocalError("");
@@ -74,13 +88,69 @@ const AllCourseManagement = () => {
 
   // Clear success message after 3 seconds
   useEffect(() => {
-    if (message) {
+    if (success) {
       const timer = setTimeout(() => dispatch(clearCourseStatus()), 3000);
       return () => clearTimeout(timer);
     }
-  }, [message, dispatch]);
+  }, [success, dispatch]);
 
-  const openEditDialog = (course) => {
+  // Map course IDs to intake names
+  const getIntakeName = (courseId) => {
+    for (const intakeId in intakeCourses) {
+      const courses = intakeCourses[intakeId];
+      const course = courses.find((c) => c.id === courseId);
+      if (course) {
+        const intake = intakes.find((i) => i.id === parseInt(intakeId));
+        return intake?.name || 'Not assigned';
+      }
+    }
+    return 'Not assigned';
+  };
+
+  // Filter instructors by track
+  const getTrackInstructors = (trackId) => {
+    if (!trackId || !courses.length || !instructors.length) {
+      console.log('No trackId, courses, or instructors, returning empty array', {
+        trackId,
+        coursesLength: courses.length,
+        instructorsLength: instructors.length,
+      });
+      return [];
+    }
+
+    // Get all courses in the track
+    const trackCourses = courses.filter((course) =>
+      course.tracks?.some((track) => track.id === trackId)
+    );
+    console.log(`Courses for trackId ${trackId}:`, trackCourses);
+
+    // Collect unique instructor IDs from track courses
+    const instructorIds = [
+      ...new Set(
+        trackCourses
+          .filter((course) => course.instructor?.id)
+          .map((course) => {
+            console.log(`Course ${course.name} (ID: ${course.id}) has instructor:`, course.instructor);
+            return course.instructor.id;
+          })
+      ),
+    ];
+    console.log(`Unique instructor IDs for trackId ${trackId}:`, instructorIds);
+
+    // Get instructor objects
+    const trackInstructors = instructors.filter((instructor) =>
+      instructorIds.includes(instructor.id)
+    );
+    console.log(`Track instructors for trackId ${trackId}:`, trackInstructors);
+
+    return trackInstructors;
+  };
+
+  // Handlers
+  const openEditDialog = (course, trackId) => {
+    console.log('Opening edit dialog for course:', course, 'with trackId:', trackId);
+    const trackCourses = courses.filter((c) => c.tracks?.some((t) => t.id === trackId));
+    console.log(`Courses for trackId ${trackId}:`, trackCourses);
     setEditData({
       courseId: course.id,
       name: course.name,
@@ -88,10 +158,14 @@ const AllCourseManagement = () => {
       instructor: course.instructor || "",
     });
     setEditDialogOpen(true);
+    // Fetch track-specific intakes
+    if (trackId) {
+      dispatch(fetchAvailableIntakes([trackId]));
+    }
   };
 
   const handleEditChange = async () => {
-    const { courseId, name, description, instructor } = editData;
+    const { courseId, name, description, instructor, intake } = editData;
 
     if (!name) {
       setLocalError("Course name is required.");
@@ -99,12 +173,15 @@ const AllCourseManagement = () => {
     }
 
     try {
-      const updatedData = { name, description };
-      if (instructor) updatedData.instructor = instructor;
-
+      const updatedData = {
+        name,
+        description: description || null,
+        instructor: instructor || null,
+        intake: intake || null,
+      };
       await dispatch(updateCourse({ courseId, ...updatedData })).unwrap();
       setEditDialogOpen(false);
-      dispatch(fetchAllCourses());
+      dispatch(fetchCourses(user_id));
     } catch (err) {
       setLocalError(err.message || "Failed to update course.");
     }
@@ -121,9 +198,9 @@ const AllCourseManagement = () => {
     console.log("Deleting course with ID:", courseToDelete);
     setIsDeleting(true);
     try {
-      await dispatch(deleteCourse(courseToDelete)).unwrap();
+      await dispatch(deleteCourse(courseToDelete.courseId)).unwrap();
       setDeleteDialogOpen(false);
-      dispatch(fetchAllCourses());
+      dispatch(fetchCourses(user_id));
     } catch (err) {
       console.error("Delete error:", err);
       setLocalError(err.message || "Failed to delete course.");
@@ -134,6 +211,14 @@ const AllCourseManagement = () => {
 
   const handleNameSearchChange = (event) => {
     setSearchName(event.target.value);
+  };
+
+  const handleTrackFilterChange = (event) => {
+    setSelectedTrack(event.target.value);
+  };
+
+  const handleIntakeFilterChange = (event) => {
+    setSelectedIntake(event.target.value);
   };
 
   const handleResetFilters = () => {
@@ -186,7 +271,23 @@ const AllCourseManagement = () => {
             sx={{ borderRadius: 2 }}
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={12} md={3}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={selectedIntake}
+              onChange={handleIntakeFilterChange}
+              label="Intake"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value=""><em>All Intakes</em></MenuItem>
+              {intakeNames.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
           <Button
             fullWidth
             variant="contained"
@@ -198,7 +299,7 @@ const AllCourseManagement = () => {
               borderRadius: 2,
             }}
           >
-            Reset Filter
+            Reset Filters
           </Button>
         </Grid>
       </Grid>
@@ -284,14 +385,12 @@ const AllCourseManagement = () => {
               ))}
             </TableBody>
           </Table>
-        ) : (
-          <Typography>No courses found</Typography>
-        )}
-      </Paper>
+        </TableContainer>
+      </StyledPaper>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
-        <DialogTitle>Edit Course</DialogTitle>
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Course: {editData.name}</DialogTitle>
         <DialogContent>
           <TextField
             label="Course Name"
@@ -321,24 +420,56 @@ const AllCourseManagement = () => {
                 setEditData({ ...editData, instructor: e.target.value })
               }
               label="Instructor"
+              sx={{ borderRadius: 2 }}
+              disabled={instructorsLoading || fetchAvailableIntakesLoading || !getTrackInstructors(editData.trackId).length}
             >
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
               {instructors.map((instructor) => (
                 <MenuItem key={instructor.id} value={instructor.id}>
-                  {instructor.full_name || instructor.username}
+                  {instructor.full_name || instructor.username || `Instructor ${instructor.id}`}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl variant="outlined" fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Intake</InputLabel>
+            <Select
+              value={editData.intake}
+              onChange={(e) => setEditData({ ...editData, intake: e.target.value })}
+              label="Intake"
+              sx={{ borderRadius: 2 }}
+              disabled={fetchAvailableIntakesLoading}
+            >
+              <MenuItem value=""><em>Not assigned</em></MenuItem>
+              {availableIntakes.map((intake) => (
+                <MenuItem key={intake.id} value={intake.id}>
+                  {intake.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)} color="primary">
+          <Button
+            onClick={() => setEditDialogOpen(false)}
+            sx={{ color: '#64748b', borderRadius: 2 }}
+            disabled={updateCourseLoading}
+          >
             Cancel
           </Button>
-          <Button onClick={handleEditChange} color="primary">
-            Save
+          <Button
+            onClick={handleEditChange}
+            variant="contained"
+            disabled={updateCourseLoading}
+            sx={{
+              bgcolor: '#3b82f6',
+              '&:hover': { bgcolor: '#2563eb' },
+              borderRadius: 2,
+            }}
+          >
+            {updateCourseLoading ? <CircularProgress size={20} color="inherit" /> : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -384,21 +515,23 @@ const AllCourseManagement = () => {
             error={!isConfirmValid && confirmText}
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
           <Button
             onClick={() => setDeleteDialogOpen(false)}
-            color="primary"
-            variant="outlined"
-            sx={{ minWidth: 100 }}
+            sx={{ color: '#64748b', borderRadius: 2 }}
           >
             Cancel
           </Button>
           <Button
             onClick={handleDelete}
-            color="error"
             variant="contained"
-            disabled={!isConfirmValid || isDeleting}
-            sx={{ minWidth: 100 }}
+            color="error"
+            disabled={!isDeleteConfirmed || isDeleting}
+            sx={{
+              bgcolor: '#ef4444',
+              '&:hover': { bgcolor: '#dc2626' },
+              borderRadius: 2,
+            }}
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </Button>

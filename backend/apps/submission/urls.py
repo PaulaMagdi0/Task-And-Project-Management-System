@@ -6,7 +6,9 @@ from .views import (
     AssignmentStudentDetailView,
     AssignmentReportView,
     SubmissionByStudentAssignmentView,
-    AssignmentSubmissionNoFileViewSet  # Make sure this is imported
+    AssignmentSubmissionNoFileViewSet,  # Make sure this is imported
+    IntakeSubmissionListView,
+
 )
 from django.http import HttpResponse
 router = DefaultRouter()
@@ -17,6 +19,7 @@ def test_view(request):
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('intakes/<int:intake_id>/submissions/', IntakeSubmissionListView.as_view(), name='intake-submission-list'),
     path('instructor/', SubmissionByStudentAssignmentView.as_view(), name='submission-by-student-assignment'),
     path('assignments/<int:assignment_id>/details/', AssignmentDetailView.as_view(), name='assignment-detail'),
     path('assignments/<int:assignment_id>/students/<int:student_id>/', 

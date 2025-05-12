@@ -3,6 +3,7 @@ import logging
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from apps.student.models import Intake
 
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -442,3 +443,17 @@ class InstructorAssignmentsView(APIView):
             return Response({"error": "Instructor not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class IntakeAssignmentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, intake_id):
+        try:
+            intake = Intake.objects.get(id=intake_id)
+            assignments = Assignment.objects.filter(assignment_students__intake=intake).distinct()
+
+            serializer = AssignmentSerializer(assignments, many=True)
+            return Response(serializer.data)
+        except Intake.DoesNotExist:
+            return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)

@@ -34,9 +34,12 @@ const Submissions = () => {
     initial: true,
     assignments: false,
     submissions: false,
+    intakes: false,
   });
   const [error, setError] = useState(null);
-  const [data, setData] = useState({ tracks: [], courses: [] });
+  const [data, setData] = useState({ tracks: [], courses: [], trackCourses: [] });
+  const [intakes, setIntakes] = useState([]);
+  const [intakeCourses, setIntakeCourses] = useState({});
   const [selectedTrack, setSelectedTrack] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState("");
@@ -58,7 +61,7 @@ const Submissions = () => {
     severity: "success",
   });
 
-  // Fetch tracks and courses on mount
+  // Fetch tracks, courses, and intakes on mount
   useEffect(() => {
     const fetchTracksAndCourses = async () => {
       try {
@@ -66,16 +69,63 @@ const Submissions = () => {
         const response = await apiClient.get(
           `staff/track-and-courses/${instructorId}/`
         );
+
+        // Fetch intakes
+        setLoading((prev) => ({ ...prev, intakes: true }));
+        const intakeResponse = await apiClient.get('/student/intakes/');
+        const fetchedIntakes = Array.isArray(intakeResponse.data.intakes)
+          ? intakeResponse.data.intakes
+          : [];
+        setIntakes(fetchedIntakes);
+
+        // Fetch courses for each intake
+        const fetchedIntakeCourses = {};
+        await Promise.all(
+          fetchedIntakes.map(async (intake) => {
+            try {
+              const intakeCoursesResponse = await apiClient.get(
+                `/courses/intakes/${intake.id}/courses/`
+              );
+              fetchedIntakeCourses[intake.id] = Array.isArray(intakeCoursesResponse.data)
+                ? intakeCoursesResponse.data
+                : [];
+            } catch (error) {
+              console.warn(`Failed to fetch courses for intake ${intake.id}:`, error);
+              fetchedIntakeCourses[intake.id] = [];
+            }
+          })
+        );
+        setIntakeCourses(fetchedIntakeCourses);
+
+        // Enrich courses with intake data
+        const courses = (response.data.courses || response.data.taught_courses || []).map((course) => {
+          let intake = null;
+          for (const intakeId in fetchedIntakeCourses) {
+            const coursesInIntake = fetchedIntakeCourses[intakeId];
+            if (coursesInIntake.some((c) => c.id === course.id)) {
+              const matchingIntake = fetchedIntakes.find((i) => i.id === parseInt(intakeId));
+              if (matchingIntake) {
+                intake = { id: matchingIntake.id, name: matchingIntake.name };
+                break;
+              }
+            }
+          }
+          return {
+            ...course,
+            intake,
+          };
+        });
+
         setData({
-            tracks: response.data.tracks || [] ,
-            courses: response?.data?.courses ||response?.data?.taught_courses ,
-            trackCourses:response?.data?.track_courses || []
+          tracks: response.data.tracks || [],
+          courses,
+          trackCourses: response.data.track_courses || [],
         });
         setError(null);
       } catch (err) {
-        setError("Failed to fetch tracks and courses");
+        setError("Failed to fetch tracks, courses, or intakes");
       } finally {
-        setLoading((prev) => ({ ...prev, initial: false }));
+        setLoading((prev) => ({ ...prev, initial: false, intakes: false }));
       }
     };
     fetchTracksAndCourses();
@@ -100,25 +150,23 @@ const Submissions = () => {
     };
     fetchAssignments();
   }, [selectedTrack, selectedCourse]);
+
   const fetchSubmissionStatus = async (assignmentId) => {
     try {
       setLoading((prev) => ({ ...prev, submissions: true }));
       const response = await apiClient.get(
         `assignments/${assignmentId}/track/${selectedTrack}/course/${selectedCourse}/submitters/`
       );
-  
+
       const dataWithGrades = await Promise.all(
         response.data.submitters.map(async (student) => {
           try {
-            // 1. Fetch submission with error handling
             let submission = {};
             try {
               const submissionRes = await apiClient.get(
                 `submission/assignments/${assignmentId}/students/${student.student_id}/`
               );
               submission = submissionRes.data.submission || {};
-              
-              // Fallback for submission ID using alternative endpoint
               if (!submission.id && submission.file_url) {
                 const altRes = await apiClient.get(
                   `submission/instructor/?student=${student.student_id}&assignment=${assignmentId}`
@@ -130,12 +178,10 @@ const Submissions = () => {
             } catch (submissionError) {
               console.error('Submission fetch error:', submissionError);
             }
-  
-            // 2. Validate submission existence
-            const hasValidSubmission = !!submission.file_url; // Use file presence as submission indicator
+
+            const hasValidSubmission = !!submission.file_url;
             const submissionId = submission.id || submission.submission_id || 1;
-  
-            // 3. Fetch existing grade
+
             let existingGrade = null;
             try {
               const gradeRes = await apiClient.get(
@@ -145,8 +191,7 @@ const Submissions = () => {
             } catch (gradeError) {
               console.error('Grade fetch error:', gradeError);
             }
-  
-            // 4. Return normalized data
+
             return {
               ...student,
               submitted: hasValidSubmission,
@@ -166,25 +211,22 @@ const Submissions = () => {
           }
         })
       );
-  
-      // Update state with normalized data
+
       const evaluations = {};
       const initialFeedback = {};
       const initialGrades = {};
-  
+
       dataWithGrades.forEach((student) => {
         if (student.existingGrade) {
           evaluations[student.student_id] = student.existingGrade;
           initialFeedback[student.student_id] = student.existingGrade.feedback;
           initialGrades[student.student_id] = student.existingGrade.score.toString();
-          
-          // Sync submission ID from grade if missing
           if (!student.submission_id && student.existingGrade.submission) {
             student.submission_id = student.existingGrade.submission;
           }
         }
       });
-  
+
       setExistingEvaluations(evaluations);
       setFeedback(initialFeedback);
       setGrades(initialGrades);
@@ -192,13 +234,13 @@ const Submissions = () => {
         ...response.data,
         submitters: dataWithGrades,
       });
-  
     } catch (err) {
       setError("Failed to fetch submission data");
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
     }
   };
+
   // Handlers
   const handleTrackChange = (event) => {
     setSelectedTrack(event.target.value);
@@ -228,37 +270,33 @@ const Submissions = () => {
 
   const handleGradeChange = (studentId) => (e) =>
     setGrades({ ...grades, [studentId]: e.target.value });
+
   const handleSubmitFeedback = async (studentId) => {
     try {
       setSubmitLoading((prev) => ({ ...prev, [studentId]: true }));
-  
-      // Validate context first
+
       if (!selectedTrack || !selectedCourse || !selectedAssignment) {
         throw new Error("Missing required context (track, course, or assignment)");
       }
-  
-      // Find student across all submission data
+
       const student = [...submissionData.submitters, ...(submissionData.non_submitters || [])]
         .find(s => s.student_id === studentId);
-  
+
       if (!student) {
         throw new Error("Student not found in submission records");
       }
-  
-      // Enhanced submission ID resolution
+
       let submissionId = student.submission_id;
-  
-      // 1. Check existing evaluation first
+
       if (!submissionId && student.existingEvaluation?.submission) {
         submissionId = student.existingEvaluation.submission;
       }
-  
-      // 2. Check file URL pattern (support multiple URL formats)
+
       if (!submissionId && student.file_url) {
         const urlPatterns = [
-          /\/d\/([a-zA-Z0-9-_]+)/, // Google Drive direct
-          /id=([a-zA-Z0-9-_]+)/, // Standard ID parameter
-          /\/file\/d\/([a-zA-Z0-9-_]+)/ // Alternative Google Drive pattern
+          /\/d\/([a-zA-Z0-9-_]+)/,
+          /id=([a-zA-Z0-9-_]+)/,
+          /\/file\/d\/([a-zA-Z0-9-_]+)/
         ];
         
         for (const pattern of urlPatterns) {
@@ -269,15 +307,12 @@ const Submissions = () => {
           }
         }
       }
-      //submissionId=1;
-      // 3. API fallback with better error handling
+
       if (!submissionId && student.submitted) {
         try {
           const submissionRes = await apiClient.get(
             `submission/instructor/?student=${studentId}&assignment=${selectedAssignment}`
           );
-          
-          // Handle different API response structures
           if (submissionRes.data?.results?.[0]?.id) {
             submissionId = submissionRes.data.results[0].id;
           } else if (submissionRes.data?.id) {
@@ -291,8 +326,7 @@ const Submissions = () => {
           });
         }
       }
-  
-      // Final validation with meaningful error
+
       if (!submissionId) {
         console.error("Submission resolution failed - technical details:", {
           studentId,
@@ -310,8 +344,7 @@ const Submissions = () => {
           2. The submission file is properly uploaded
           3. Refresh the page and try again`);
       }
-  
-      // Validate and parse grade
+
       const rawScore = grades[studentId];
       const numericScore = parseFloat(rawScore);
       
@@ -322,8 +355,7 @@ const Submissions = () => {
       if (numericScore < 0 || numericScore > 10) {
         throw new Error("Grade must be between 0 and 10");
       }
-  
-      // Prepare API payload
+
       const payload = {
         score: numericScore,
         feedback: feedback[studentId]?.trim() || "",
@@ -335,15 +367,13 @@ const Submissions = () => {
           track: selectedTrack
         })
       };
-  
-      // Execute API request
+
       const endpoint = existingEvaluations[studentId] 
         ? `grades/${existingEvaluations[studentId].id}/`
         : "grades/";
-  
+
       await apiClient[existingEvaluations[studentId] ? "put" : "post"](endpoint, payload);
-  
-      // Update state while preserving existing data
+
       await fetchSubmissionStatus(selectedAssignment);
       
       setSubmissionData(prev => ({
@@ -352,28 +382,27 @@ const Submissions = () => {
           s.student_id === studentId ? { ...s, ...student } : s
         )
       }));
-  
+
       if (!existingEvaluations[studentId]) {
         setFeedback(prev => ({ ...prev, [studentId]: "" }));
         setGrades(prev => ({ ...prev, [studentId]: "" }));
       }
-  
+
       setSnackbar({
         open: true,
         message: `Evaluation ${existingEvaluations[studentId] ? "updated" : "submitted"} successfully`,
         severity: "success",
       });
-  
     } catch (err) {
       console.error("Grade submission error:", {
         error: err.message,
         stack: err.stack,
         response: err.response?.data
       });
-  
+
       const userMessage = err.response?.data?.detail || 
         err.message.replace(/Error: /, '');
-  
+
       setSnackbar({
         open: true,
         message: userMessage,
@@ -382,8 +411,8 @@ const Submissions = () => {
     } finally {
       setSubmitLoading(prev => ({ ...prev, [studentId]: false }));
     }
-  };  
-  
+  };
+
   // Filter courses for selected track
   const filteredCourses = data?.courses?.filter((course) =>
     course.tracks.some((track) => track.id === Number(selectedTrack))
@@ -423,8 +452,9 @@ const Submissions = () => {
               value={selectedTrack}
               onChange={handleTrackChange}
               label="Select Track"
-              disabled={loading.initial}
+              disabled={loading.initial || loading.intakes}
             >
+              <MenuItem value=""><em>Select Track</em></MenuItem>
               {data.tracks.map((track) => (
                 <MenuItem key={track.id} value={track.id}>
                   {track.name}
@@ -441,13 +471,20 @@ const Submissions = () => {
               value={selectedCourse}
               onChange={handleCourseChange}
               label="Select Course"
-              disabled={!selectedTrack || loading.assignments}
+              disabled={!selectedTrack || loading.assignments || loading.intakes}
             >
-              {filteredCourses?.map((course) => (
-                <MenuItem key={course.id} value={course.id}>
-                  {course.name}
-                </MenuItem>
-              ))}
+              <MenuItem value=""><em>Select Course</em></MenuItem>
+              {loading.initial || loading.intakes ? (
+                <MenuItem disabled>Loading courses...</MenuItem>
+              ) : filteredCourses?.length === 0 ? (
+                <MenuItem disabled>No courses available</MenuItem>
+              ) : (
+                filteredCourses.map((course) => (
+                  <MenuItem key={course.id} value={course.id}>
+                    {course.name} Intake({course.intake?.name || 'No Intake'})
+                  </MenuItem>
+                ))
+              )}
             </Select>
           </FormControl>
         </Grid>
@@ -461,6 +498,7 @@ const Submissions = () => {
               label="Select Assignment"
               disabled={!selectedCourse || loading.assignments}
             >
+              <MenuItem value=""><em>Select Assignment</em></MenuItem>
               {assignments.map((assignment) => (
                 <MenuItem key={assignment.id} value={assignment.id}>
                   {assignment.title}
@@ -487,7 +525,7 @@ const Submissions = () => {
       </Grid>
 
       {/* Loading and Error States */}
-      {loading.initial && (
+      {(loading.initial || loading.intakes) && (
         <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
           <CircularProgress />
           <Typography sx={{ ml: 2 }}>Loading initial data...</Typography>

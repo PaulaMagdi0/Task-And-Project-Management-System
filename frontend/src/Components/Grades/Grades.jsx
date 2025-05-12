@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import {
@@ -51,9 +52,12 @@ const Grades = () => {
     initial: true,
     assignments: false,
     submissions: false,
+    intakes: false,
   });
   const [error, setError] = useState(null);
-  const [data, setData] = useState({ tracks: [], courses: [] });
+  const [data, setData] = useState({ tracks: [], courses: [], trackCourses: [] });
+  const [intakes, setIntakes] = useState([]);
+  const [intakeCourses, setIntakeCourses] = useState({});
   const [selectedTrack, setSelectedTrack] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState("");
@@ -79,16 +83,63 @@ const Grades = () => {
         const response = await apiClient.get(
           `staff/track-and-courses/${instructorId}/`
         );
+
+        // Fetch intakes
+        setLoading((prev) => ({ ...prev, intakes: true }));
+        const intakeResponse = await apiClient.get('/student/intakes/');
+        const fetchedIntakes = Array.isArray(intakeResponse.data.intakes)
+          ? intakeResponse.data.intakes
+          : [];
+        setIntakes(fetchedIntakes);
+
+        // Fetch courses for each intake
+        const fetchedIntakeCourses = {};
+        await Promise.all(
+          fetchedIntakes.map(async (intake) => {
+            try {
+              const intakeCoursesResponse = await apiClient.get(
+                `/courses/intakes/${intake.id}/courses/`
+              );
+              fetchedIntakeCourses[intake.id] = Array.isArray(intakeCoursesResponse.data)
+                ? intakeCoursesResponse.data
+                : [];
+            } catch (error) {
+              console.warn(`Failed to fetch courses for intake ${intake.id}:`, error);
+              fetchedIntakeCourses[intake.id] = [];
+            }
+          })
+        );
+        setIntakeCourses(fetchedIntakeCourses);
+
+        // Enrich courses with intake data
+        const courses = (response.data.courses || response.data.taught_courses || []).map((course) => {
+          let intake = null;
+          for (const intakeId in fetchedIntakeCourses) {
+            const coursesInIntake = fetchedIntakeCourses[intakeId];
+            if (coursesInIntake.some((c) => c.id === course.id)) {
+              const matchingIntake = fetchedIntakes.find((i) => i.id === parseInt(intakeId));
+              if (matchingIntake) {
+                intake = { id: matchingIntake.id, name: matchingIntake.name };
+                break;
+              }
+            }
+          }
+          return {
+            ...course,
+            intake,
+          };
+        });
+
         setData({
-          tracks: response.data.tracks || [] ,
-          courses: response?.data?.courses ||response.data.taught_courses ,
-          trackCourses:response?.data?.track_courses || []
+          tracks: response.data.tracks || [],
+          courses,
+          trackCourses: response.data.track_courses || [],
         });
         setError(null);
       } catch (err) {
-        setError("Failed to fetch tracks and courses");
+        setError("Failed to fetch tracks, courses, or intakes");
       } finally {
-        setLoading((prev) => ({ ...prev, initial: false }));
+        setLoading((prev) => ({ ...prev, initial: false, intakes: false }));
       }
     };
     fetchTracksAndCourses();
@@ -466,11 +517,10 @@ const Grades = () => {
       setGrades({ ...grades, [studentId]: value });
     }
   };
-  
+
   const filteredCourses = data?.courses?.filter((course) =>
     course.tracks.some((track) => track?.id === Number(selectedTrack))
-);
-console.log(data);
+  );
 
   const filteredStudents = submissionData
     ? submissionData?.submitters?.filter((student) => student.existingEvaluation)
@@ -496,8 +546,9 @@ console.log(data);
               value={selectedTrack}
               onChange={handleTrackChange}
               label="Select Track"
-              disabled={loading.initial}
+              disabled={loading.initial || loading.intakes}
             >
+              <MenuItem value=""><em>Select Track</em></MenuItem>
               {data?.tracks.map((track) => (
                 <MenuItem key={track.id} value={track.id}>
                   {track.name}
@@ -514,13 +565,20 @@ console.log(data);
               value={selectedCourse}
               onChange={handleCourseChange}
               label="Select Course"
-              disabled={!selectedTrack || loading.assignments}
+              disabled={!selectedTrack || loading.assignments || loading.intakes}
             >
-              {filteredCourses?.map((course) => (
-                <MenuItem key={course?.id} value={course?.id}>
-                  {course?.name}
-                </MenuItem>
-              ))}
+              <MenuItem value=""><em>Select Course</em></MenuItem>
+              {loading.initial || loading.intakes ? (
+                <MenuItem disabled>Loading courses...</MenuItem>
+              ) : filteredCourses?.length === 0 ? (
+                <MenuItem disabled>No courses available</MenuItem>
+              ) : (
+                filteredCourses.map((course) => (
+                  <MenuItem key={course?.id} value={course?.id}>
+                    {course?.name} Intake({course.intake?.name || 'No Intake'})
+                  </MenuItem>
+                ))
+              )}
             </Select>
           </FormControl>
         </Grid>
@@ -534,6 +592,7 @@ console.log(data);
               label="Select Assignment"
               disabled={!selectedCourse || loading.assignments}
             >
+              <MenuItem value=""><em>Select Assignment</em></MenuItem>
               {assignments.map((assignment) => (
                 <MenuItem key={assignment.id} value={assignment.id}>
                   {assignment.title}
@@ -544,7 +603,7 @@ console.log(data);
         </Grid>
       </Grid>
 
-      {loading.initial && (
+      {(loading.initial || loading.intakes) && (
         <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
           <CircularProgress />
           <Typography sx={{ ml: 2 }}>Loading initial data...</Typography>

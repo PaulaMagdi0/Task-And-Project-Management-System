@@ -84,8 +84,6 @@ const App = () => {
           <Route path="/chat/rooms" element={<ChatRoomList />} />
           <Route path="/chat/rooms/:roomId" element={<ChatRoomMessages />} />
 
-          <Route path="/verified" element={<VerifiedPage />} />
-          <Route path="/not-verified" element={<NotVerifiedPage />} />
           {/* Dashboard Routes */}
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route

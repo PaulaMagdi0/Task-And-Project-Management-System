@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     upload_excel,
     list_students,
+    list_intakes,
     verify_email,
     update_student,
     delete_student,
@@ -10,21 +11,26 @@ from .views import (
     create_student_from_form,
     student_courses,
     StudentsByTrackAndCourseView,
-    StudentsByStaffView
+    StudentsByStaffView,
+    create_intake,
+    IntakeDetailView,
+    IntakeStudentListView,
 )
 
 urlpatterns = [
-    path('create/', create_student_from_form, name='create_student_form'), #Single
-    path('upload/', upload_excel, name='upload_excel'),#File
-    path('list/', list_students, name='list_students'),#Listing
-    path('verify/<str:verification_code>/', verify_email, name='verify_email'),#Verifiy
+    path('create/', create_student_from_form, name='create_student_form'),
+    path('upload/', upload_excel, name='upload_excel'),
+    path('list/', list_students, name='list_students'),
+    path('intakes/', list_intakes, name='list_intakes'),
+    path('intakes/create/', create_intake, name='create_intake'),
+    path('intakes/<int:pk>/', IntakeDetailView.as_view(), name='intake-detail'),
+    path('verify/<str:verification_code>/', verify_email, name='verify_email'),
     path('<int:student_id>/update/', update_student, name='update_student'),
     path('<int:student_id>/delete/', delete_student, name='delete_student'),
     path('dashboard/', StudentDashboardAPI.as_view(), name='student_dashboard'),
     path('options/', show_options, name='show_options'),
-    path('<int:student_id>/courses/', student_courses, name='student_courses_by_id'), # By student ID
-    path('tracks/<int:track_id>/courses/<int:course_id>/students/', StudentsByTrackAndCourseView.as_view(), name='course_and_students_by_track'),
-    # returns Student For Tracks
+    path('<int:student_id>/courses/', student_courses, name='student_courses_by_id'),
+    path('tracks/<int:track_id>/courses/<int:course_id>/intakes/<int:intake_id>/students/', StudentsByTrackAndCourseView.as_view(), name='course_and_students_by_track'),
     path('by-staff/<int:staff_id>/', StudentsByStaffView.as_view(), name='students-by-staff'),
-
+    path('intakes/<int:intake_id>/students/', IntakeStudentListView.as_view(), name='intake-student-list'),
 ]

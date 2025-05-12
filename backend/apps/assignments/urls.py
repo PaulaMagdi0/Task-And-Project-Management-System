@@ -8,7 +8,9 @@ from .views import (
     AvailableTracksByInstructorIdView,
     InstructorTracksWithCoursesView,
     AssignmentCreateView,
-    AssignmentDetailView  # NEW: Import the detail view
+    AssignmentDetailView,  # NEW: Import the detail view
+    IntakeAssignmentListView,
+
 )
 
 urlpatterns = [
@@ -35,4 +37,5 @@ urlpatterns = [
     path("instructor/<int:instructor_id>/tracks/", AvailableTracksByInstructorIdView.as_view(), name="instructor-tracks"),
     path("instructor/<int:instructor_id>/tracks-courses/", InstructorTracksWithCoursesView.as_view(), name="instructor-tracks-courses"),
     path('instructor/<int:instructor_id>/assignments/', InstructorAssignmentsView.as_view(), name='instructor-assignments'),
+    path('intakes/<int:intake_id>/assignments/', IntakeAssignmentListView.as_view(), name='intake-assignment-list'),
 ]

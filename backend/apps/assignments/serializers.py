@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Assignment , AssignmentStudent
 from apps.student.models import Student  # Ensure correct import path
-from apps.student.serializers import MinimalStudentSerializer  # Ensure correct import path
+from apps.student.serializers import MinimalStudentSerializer,IntakeSerializer  # Ensure correct import path
 from apps.courses.serializers import MinimalCourseSerializer  # Ensure correct import path
 
 from rest_framework import serializers
@@ -116,11 +116,14 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
 class AssignmentStudentSerializer(serializers.ModelSerializer):
     student = MinimalStudentSerializer()
+    intake = IntakeSerializer(read_only=True)
+
     course = MinimalCourseSerializer()
+
     
     class Meta:
         model = AssignmentStudent
-        fields = ['student', 'course']
+        fields = ['student', 'course','intake']
 from rest_framework import serializers
 from .models import Assignment
 

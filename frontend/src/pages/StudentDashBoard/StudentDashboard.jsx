@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
@@ -14,8 +14,20 @@ import ChatWithAISection from "./ChatWithAISection";
 import { fetchStudentData } from "./api";
 import "./StudentDashboard.css";
 
+// Menu items from Sidebar for validation
+const menuItems = [
+  "courses",
+  "assignments",
+  "deadlines",
+  "averageGrade",
+  "bookHub",
+  "entertainment",
+  "library",
+  "chatWithAI",
+];
+
 // Error Boundary for the entire dashboard
-class DashboardErrorBoundary extends Component {
+class DashboardErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
 
   static getDerivedStateFromError(error) {
@@ -53,33 +65,40 @@ const StudentDashboard = () => {
   });
   const [submittedAssignments, setSubmittedAssignments] = useState({});
   const navigate = useNavigate();
-  const { username } = useSelector((state) => state.auth);
   const location = useLocation();
+  const { username, token } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // Parse query parameters
+    // Handle query parameter for section
     const queryParams = new URLSearchParams(location.search);
     const section = queryParams.get("section");
-
-    // Set selectedSection based on query parameter
-    if (section === "assignments") {
-      setSelectedSection("assignments");
-    } else if (section === "courses") {
-      setSelectedSection("courses");
+    if (section && menuItems.includes(section)) {
+      setSelectedSection(section);
     } else {
-      // Default to 'courses' if no section is specified
+      // Default to 'courses' if no valid section is provided
       setSelectedSection("courses");
+      navigate("/student/dashboard?section=courses", { replace: true });
     }
 
-    const savedSubmissions =
-      JSON.parse(localStorage.getItem("submittedAssignments")) || {};
-    setSubmittedAssignments(savedSubmissions);
+    // Reset state when username changes (new student logs in)
+    setData({
+      student: null,
+      courses: [],
+      assignments: [],
+      grades: [],
+      averageGrade: null,
+      loading: true,
+      error: null,
+    });
+    setSubmittedAssignments({});
+    localStorage.removeItem("submittedAssignments"); // Clear previous user's submissions
 
     const fetchData = async () => {
       try {
         setData((prev) => ({ ...prev, loading: true, error: null }));
+        console.log("StudentDashboard fetching data with token:", token ? "Present" : "Missing");
         const response = await fetchStudentData();
-        console.log("Fetched Data:", response);
+        console.log("Fetched Data:", JSON.stringify(response, null, 2));
         setData({
           student: response.student,
           courses: response.courses || [],
@@ -90,25 +109,27 @@ const StudentDashboard = () => {
           error: null,
         });
         setSubmittedAssignments((prev) => {
-          const updatedSubmissions = { ...prev, ...response.submissions };
-          localStorage.setItem(
-            "submittedAssignments",
-            JSON.stringify(updatedSubmissions)
-          );
+          const updatedSubmissions = { ...response.submissions };
+          localStorage.setItem("submittedAssignments", JSON.stringify(updatedSubmissions));
           return updatedSubmissions;
         });
       } catch (error) {
-        console.error("Fetch Error:", error);
+        console.error("Fetch Error:", JSON.stringify(error, null, 2));
         setData((prev) => ({ ...prev, loading: false, error: error.message }));
         if (error.response?.status === 401) {
-          localStorage.removeItem("authToken");
+          console.warn("Unauthorized access, redirecting to login");
           navigate("/login");
         }
       }
     };
 
-    fetchData();
-  }, [navigate, location.search]);
+    if (username && token) {
+      fetchData();
+    } else {
+      console.warn("No username or token, redirecting to login");
+      navigate("/login");
+    }
+  }, [username, token, navigate, location.search]);
 
   const renderSection = () => {
     console.log("Rendering Section:", selectedSection, "Grades:", data.grades);

@@ -7,7 +7,8 @@ from apps.branch_location.models import Branch
 
 class StaffMember(AbstractUser):
     email = models.EmailField(unique=True, verbose_name=_('email'))
-
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
     class Role(models.TextChoices):
         BRANCH_MANAGER = 'branch_manager', _('Branch Manager')
         SUPERVISOR = 'supervisor', _('Supervisor')
@@ -119,13 +120,11 @@ class StaffMember(AbstractUser):
 
     @property
     def managed_branch(self):
-        """Returns the branch this user manages, if any"""
         if self.is_branch_manager and hasattr(self, 'branch'):
             return self.branch
         return None
 
     def get_branch_location(self):
-        """Helper method to get branch location details"""
         if self.branch:
             return {
                 'id': self.branch.id,

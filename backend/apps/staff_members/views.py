@@ -94,14 +94,12 @@ class CreateInstructorView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CreateInstructorSerializer(data=request.data)
         if serializer.is_valid():
-            # Log the incoming request data for debugging
-            logger.debug(f"Received data: {request.data}")
-            # Save the new instructor
             instructor = serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({
+                "message": "Instructor created successfully.",
+                "data": CreateInstructorSerializer(instructor).data
+            }, status=status.HTTP_201_CREATED)
         else:
-            # Log the validation errors
-            logger.error(f"Validation errors: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class SupervisorBulkUploadView(APIView):
@@ -149,86 +147,75 @@ def supervisor_instructor_by_id_view(request, staff_id):
         # Supervisor logic
         if staff_member.is_supervisor:
             tracks = Track.objects.filter(supervisor=staff_member)
-            if tracks.exists():
-                track_data = []
-                track_courses_data = []
+            track_data = []
+            track_courses_data = []
 
-                for track in tracks:
-                    track_data.append({
-                        "id": track.id,
-                        "name": track.name,
-                        "description": track.description,
-                        "track_type": track.track_type,
-                        "supervisor": staff_member.get_full_name(),
-                        "supervisor_role": staff_member.get_role_display(),
-                        "created_at": track.created_at
-                    })
+            for track in tracks:
+                track_data.append({
+                    "id": track.id,
+                    "name": track.name,
+                    "description": track.description,
+                    "track_type": track.track_type,
+                    "supervisor": staff_member.get_full_name(),
+                    "supervisor_role": staff_member.get_role_display(),
+                    "created_at": track.created_at
+                })
 
-                    # Get courses in this track
-                    track_courses = Course.objects.filter(tracks=track)
-                    for course in track_courses:
-                        course_track_names = [
-                            {"id": t.id, "name": t.name} for t in course.tracks.all()
-                        ]
-                        instructor_info = {
-                            "id": course.instructor.id if course.instructor else None,
-                            "name": course.instructor.get_full_name() if course.instructor else 'No Instructor'
-                        }
+                track_courses = Course.objects.filter(tracks=track)
+                for course in track_courses:
+                    course_track_names = [
+                        {"id": t.id, "name": t.name} for t in course.tracks.all()
+                    ]
+                    instructor_info = {
+                        "id": course.instructor.id if course.instructor else None,
+                        "name": course.instructor.get_full_name() if course.instructor else 'No Instructor'
+                    }
 
-                        track_courses_data.append({
-                            "id": course.id,
-                            "name": course.name,
-                            "description": course.description,
-                            "created_at": course.created_at,
-                            "instructor": instructor_info,
-                            "tracks": course_track_names,
-                        })
-
-                taught_courses = Course.objects.filter(instructor=staff_member)
-                taught_courses_serialized = []
-                for course in taught_courses:
-                    taught_courses_serialized.append({
+                    track_courses_data.append({
                         "id": course.id,
                         "name": course.name,
                         "description": course.description,
                         "created_at": course.created_at,
-                        "tracks": [{"id": t.id, "name": t.name} for t in course.tracks.all()],
+                        "instructor": instructor_info,
+                        "tracks": course_track_names,
                     })
 
-                return Response({
-                    "status": "success",
-                    "tracks": track_data,
-                    "track_courses": track_courses_data,
-                    "taught_courses": taught_courses_serialized
-                }, status=status.HTTP_200_OK)
+            taught_courses = Course.objects.filter(instructor=staff_member)
+            taught_courses_serialized = []
+            for course in taught_courses:
+                taught_courses_serialized.append({
+                    "id": course.id,
+                    "name": course.name,
+                    "description": course.description,
+                    "created_at": course.created_at,
+                    "tracks": [{"id": t.id, "name": t.name} for t in course.tracks.all()],
+                })
 
-            else:
-                return Response({
-                    "status": "success",
-                    "message": "Supervisor has no tracks assigned.",
-                    "tracks": [],
-                    "track_courses": [],
-                    "taught_courses": []
-                }, status=status.HTTP_200_OK)
+            return Response({
+                "status": "success",
+                "tracks": track_data,
+                "track_courses": track_courses_data,
+                "taught_courses": taught_courses_serialized
+            }, status=status.HTTP_200_OK)
 
         # Instructor logic
         elif staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
-            if courses.exists():
-                course_data = []
-                track_data = []
+            course_data = []
+            track_data = []
 
+            if courses.exists():
                 for course in courses:
-                    # Append course info
                     course_data.append({
                         "id": course.id,
                         "name": course.name,
                         "description": course.description,
                         "created_at": course.created_at,
+                        "instructor": staff_member.get_full_name(),
+                        "instructor_role": staff_member.get_role_display(),
                         "tracks": [{"id": t.id, "name": t.name} for t in course.tracks.all()]
                     })
 
-                    # Collect associated track info (avoid duplicates)
                     for track in course.tracks.all():
                         track_data.append({
                             "id": track.id,
@@ -240,37 +227,19 @@ def supervisor_instructor_by_id_view(request, staff_id):
                             "created_at": track.created_at
                         })
 
-                # Remove duplicate tracks using dictionary keys
-                unique_tracks = list({t['id']: t for t in track_data}.values())
+            unique_tracks = list({t['id']: t for t in track_data}.values())
 
-                return Response({
-                    "status": "success",
-                    "tracks": unique_tracks,
-                    "courses": course_data
-                }, status=status.HTTP_200_OK)
-
-            else:
-                return Response({
-                    "status": "success",
-                    "message": "Instructor has no courses assigned.",
-                    "tracks": [],
-                    "courses": []
-                }, status=status.HTTP_200_OK)
-
-        # Fallback if neither supervisor nor instructor
-        return Response({
-            "status": "success",
-            "tracks": [],
-            "track_courses": [],
-            "taught_courses": []
-        }, status=status.HTTP_200_OK)
+            return Response({
+                "status": "success",
+                "tracks": unique_tracks,
+                "courses": course_data
+            }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response(
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 #Return All Instructosfrom django.http import JsonResponse
 
 class InstructorListView(View):

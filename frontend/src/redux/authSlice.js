@@ -21,35 +21,43 @@ function jwtDecode(token) {
 // Thunk: login
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
-  async ({ email, password }, thunkAPI) => {
+  async ({ email, password, intake_id }, thunkAPI) => {
     try {
-      // Use the correct login endpoint.
-      const response = await apiClient.post("/auth/login/", {
-        email: email.trim(),
+      const payload = {
+        email: email.trim().toLowerCase(),
         password,
-      });
-      const token = response.data.access;
-      if (!token) throw new Error("No token returned from server");
-      const decoded = jwtDecode(token);
-      return {
-        access: token,
-        role: decoded.role,
-        userType: decoded.userType,
-        username: decoded.username || decoded.email || "User",
-        user_id: decoded.user_id,
-        branch: decoded.branch || null,
+        ...(intake_id !== null && { intake_id }),
       };
+      console.log('authSlice login payload:', JSON.stringify(payload, null, 2));
+      const response = await apiClient.post("/auth/login/", payload);
+      console.log('authSlice response:', JSON.stringify(response.data, null, 2));
+      const { access, user } = response.data;
+      if (!access) throw new Error("No access token returned from server");
+      const decoded = jwtDecode(access);
+      const result = {
+        access,
+        role: user.role || decoded.role || 'unknown',
+        userType: user.userType || decoded.userType || 'unknown',
+        username: user.username || decoded.username || decoded.email || "User",
+        user_id: user.id || decoded.user_id || decoded.sub,
+        branch: user.branch || decoded.branch || null,
+        intake: user.intake || decoded.intake || null,
+        track: user.track || decoded.track || null,
+      };
+      console.log('authSlice result:', JSON.stringify(result, null, 2));
+      return result;
     } catch (error) {
       const data = error.response?.data;
       let msg = "Login failed";
       if (data) {
-        // DRF sends { detail: "..." }
         if (typeof data === "string") msg = data;
         else if (data.detail) msg = data.detail;
+        else if (data.error) msg = data.error;
         else if (Array.isArray(data)) msg = data[0];
       } else if (error.message) {
         msg = error.message;
       }
+      console.error('authSlice error:', JSON.stringify({ msg, data }, null, 2));
       return thunkAPI.rejectWithValue({ error: msg });
     }
   }
@@ -63,6 +71,12 @@ const initialState = {
   user_id: localStorage.getItem("user_id") || null,
   branch: localStorage.getItem("branch")
     ? JSON.parse(localStorage.getItem("branch"))
+    : null,
+  intake: localStorage.getItem("intake")
+    ? JSON.parse(localStorage.getItem("intake"))
+    : null,
+  track: localStorage.getItem("track")
+    ? JSON.parse(localStorage.getItem("track"))
     : null,
   loading: false,
   error: null,
@@ -79,12 +93,16 @@ const authSlice = createSlice({
       state.username = "";
       state.user_id = null;
       state.branch = null;
+      state.intake = null;
+      state.track = null;
       localStorage.removeItem("authToken");
       localStorage.removeItem("userType");
       localStorage.removeItem("role");
       localStorage.removeItem("username");
       localStorage.removeItem("user_id");
       localStorage.removeItem("branch");
+      localStorage.removeItem("intake");
+      localStorage.removeItem("track");
     },
   },
   extraReducers: (builder) => {
@@ -101,13 +119,27 @@ const authSlice = createSlice({
         state.username = action.payload.username;
         state.user_id = action.payload.user_id;
         state.branch = action.payload.branch;
-        // persist
+        state.intake = action.payload.intake;
+        state.track = action.payload.track;
+        // Persist to localStorage
         localStorage.setItem("authToken", action.payload.access);
         localStorage.setItem("userType", action.payload.userType);
         localStorage.setItem("role", action.payload.role || "");
         localStorage.setItem("username", action.payload.username);
         localStorage.setItem("user_id", action.payload.user_id);
         localStorage.setItem("branch", JSON.stringify(action.payload.branch));
+        localStorage.setItem("intake", JSON.stringify(action.payload.intake));
+        localStorage.setItem("track", JSON.stringify(action.payload.track));
+        console.log('authSlice stored in localStorage:', {
+          authToken: action.payload.access,
+          userType: action.payload.userType,
+          role: action.payload.role,
+          username: action.payload.username,
+          user_id: action.payload.user_id,
+          branch: action.payload.branch,
+          intake: action.payload.intake,
+          track: action.payload.track,
+        });
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;

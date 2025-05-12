@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Button, Card, Typography, TextField, Divider, Grid, CircularProgress,
   Snackbar, Alert, FormControl, Autocomplete, Tabs, Tab, Skeleton,
-  Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper, Chip
+  Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper,
+  Select, MenuItem, InputLabel
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { styled } from '@mui/material/styles';
 import { fetchInstructors } from '../../redux/supervisorsSlice';
-import { fetchCourses, fetchAllCourses, createCourse, assignCourseToTrack, clearCourseStatus } from '../../redux/coursesSlice';
+import { fetchCourses, fetchAllCourses, createCourse, assignCourseToTrack, fetchIntakes, fetchAvailableIntakes } from '../../redux/coursesSlice';
+import Chip from '@mui/material/Chip';
+import { styled } from '@mui/material/styles';
 
 // Styled components
 const StyledCard = styled(Card)(({ theme }) => ({
@@ -77,16 +79,21 @@ const AddCourses = () => {
   const {
     userCourses,
     allCourses,
+    intakes,
+    availableIntakes,
     status: {
       fetchCoursesLoading,
       fetchAllCoursesLoading,
       createCourseLoading,
       assignCourseToTrackLoading,
+      fetchIntakesLoading,
+      fetchAvailableIntakesLoading,
       fetchCoursesError,
       fetchAllCoursesError,
       createCourseError,
       assignCourseToTrackError,
-      success,
+      fetchIntakesError,
+      fetchAvailableIntakesError,
     },
   } = useSelector((state) => state.courses);
 
@@ -94,8 +101,9 @@ const AddCourses = () => {
   const [newCourseForm, setNewCourseForm] = useState({
     name: '',
     description: '',
-    instructor: null,
+    instructor: '', // Stores instructor ID (string or empty string)
     tracks: [],
+    intake: null,
   });
   const [assignCourseForm, setAssignCourseForm] = useState({
     selectedCourse: null,
@@ -109,23 +117,26 @@ const AddCourses = () => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [retryCount, setRetryCount] = useState(0);
+  const [instructorWarning, setInstructorWarning] = useState('');
 
-  // Fetch data with retry mechanism (max 3 attempts)
+  // Fetch data with retry mechanism
   useEffect(() => {
     const maxRetries = 3;
     const fetchData = async () => {
       try {
-        const [instructorsRes, coursesRes, allCoursesRes] = await Promise.all([
+        const [instructorsRes, coursesRes, allCoursesRes, intakesRes] = await Promise.all([
           dispatch(fetchInstructors()).unwrap(),
           dispatch(fetchCourses(user_id)).unwrap(),
           dispatch(fetchAllCourses()).unwrap(),
+          dispatch(fetchIntakes()).unwrap(),
         ]);
         console.log('Fetched data:', {
           instructors: instructorsRes,
           userCourses: coursesRes,
           allCourses: allCoursesRes,
+          intakes: intakesRes,
         });
-        setRetryCount(0); // Reset retry count on success
+        setRetryCount(0);
       } catch (error) {
         console.error('Data fetch failed:', error);
         if (retryCount < maxRetries) {
@@ -135,11 +146,11 @@ const AddCourses = () => {
             severity: 'warning',
           });
           setRetryCount((prev) => prev + 1);
-          setTimeout(fetchData, 3000); // Retry after 3 seconds
+          setTimeout(fetchData, 3000);
         } else {
           setSnackbar({
             open: true,
-            message: `Failed to load data after ${maxRetries} attempts: ${error}`,
+            message: 'Failed to load data after multiple attempts.',
             severity: 'error',
           });
         }
@@ -148,14 +159,73 @@ const AddCourses = () => {
     fetchData();
   }, [dispatch, user_id, retryCount]);
 
-  // Handle success messages
+  // Fetch available intakes when tracks are selected
   useEffect(() => {
-    if (success) {
-      setSnackbar({ open: true, message: success, severity: 'success' });
-      const timer = setTimeout(() => dispatch(clearCourseStatus()), 3000);
-      return () => clearTimeout(timer);
+    if (newCourseForm.tracks.length > 0) {
+      const trackIds = newCourseForm.tracks.map((track) => track.id);
+      dispatch(fetchAvailableIntakes(trackIds));
+    } else {
+      setNewCourseForm((prev) => ({ ...prev, intake: null }));
     }
-  }, [success, dispatch]);
+  }, [dispatch, newCourseForm.tracks]);
+
+  // Update instructor warning based on selected tracks
+  useEffect(() => {
+    const trackIds = newCourseForm.tracks.map((t) => t.id);
+    const trackInstructors = getTrackInstructors(trackIds);
+    setInstructorWarning(
+      trackIds.length > 0 && trackInstructors.length === 0
+        ? 'No instructors assigned to courses in all selected tracks.'
+        : ''
+    );
+  }, [newCourseForm.tracks]);
+
+  // Filter instructors by selected tracks (matching ReAssignCourses and AllCourseManagement)
+  const getTrackInstructors = useCallback((trackIds) => {
+    if (!trackIds.length || !userCourses.track_courses.length || !instructors.length) {
+      console.log('No trackIds, courses, or instructors, returning empty array', {
+        trackIds,
+        coursesLength: userCourses.track_courses.length,
+        instructorsLength: instructors.length,
+      });
+      return [];
+    }
+
+    // Get courses for each track and collect instructor IDs
+    const instructorIdsPerTrack = trackIds.map((trackId) => {
+      const trackCourses = userCourses.track_courses.filter((course) =>
+        course.tracks?.some((track) => track.id === trackId)
+      );
+      console.log(`Courses for trackId ${trackId}:`, trackCourses);
+
+      const instructorIds = [
+        ...new Set(
+          trackCourses
+            .filter((course) => course.instructor?.id)
+            .map((course) => {
+              console.log(`Course ${course.name} (ID: ${course.id}) has instructor:`, course.instructor);
+              return course.instructor.id;
+            })
+        ),
+      ];
+      console.log(`Unique instructor IDs for trackId ${trackId}:`, instructorIds);
+      return new Set(instructorIds);
+    });
+
+    // Find common instructor IDs across all tracks
+    const commonInstructorIds = instructorIdsPerTrack.reduce((common, current) => {
+      return new Set([...common].filter((id) => current.has(id)));
+    }, instructorIdsPerTrack[0] || new Set());
+    console.log('Common instructor IDs across tracks:', [...commonInstructorIds]);
+
+    // Get instructor objects for common IDs
+    const trackInstructors = instructors.filter((instructor) =>
+      commonInstructorIds.has(instructor.id)
+    );
+    console.log('Track instructors for trackIds', trackIds, ':', trackInstructors);
+
+    return trackInstructors;
+  }, [instructors, userCourses.track_courses]);
 
   // Form validation
   const validateForm = useCallback(() => {
@@ -177,12 +247,16 @@ const AddCourses = () => {
     }));
   }, []);
 
-  const handleInstructorSelect = useCallback((_, value) => {
-    setNewCourseForm((prev) => ({ ...prev, instructor: value }));
+  const handleInstructorSelect = useCallback((e) => {
+    setNewCourseForm((prev) => ({ ...prev, instructor: e.target.value }));
   }, []);
 
   const handleTracksSelect = useCallback((_, values) => {
-    setNewCourseForm((prev) => ({ ...prev, tracks: values }));
+    setNewCourseForm((prev) => ({ ...prev, tracks: values, intake: null, instructor: '' }));
+  }, []);
+
+  const handleIntakeSelect = useCallback((_, value) => {
+    setNewCourseForm((prev) => ({ ...prev, intake: value }));
   }, []);
 
   const handleTabChange = useCallback((event, newValue) => {
@@ -191,8 +265,9 @@ const AddCourses = () => {
 
   const handleResetForm = useCallback(() => {
     if (tabIndex === 0) {
-      setNewCourseForm({ name: '', description: '', instructor: null, tracks: [] });
+      setNewCourseForm({ name: '', description: '', instructor: '', tracks: [], intake: null });
       setFormErrors({ name: '', description: '' });
+      setInstructorWarning('');
     } else {
       setAssignCourseForm({ selectedCourse: null, selectedTrack: null, selectedOption: null });
     }
@@ -213,8 +288,9 @@ const AddCourses = () => {
       const payload = {
         name: newCourseForm.name,
         description: newCourseForm.description,
-        instructor: newCourseForm.instructor?.id || null,
+        instructor: newCourseForm.instructor || null,
         tracks: newCourseForm.tracks.map((track) => track.id),
+        intake: newCourseForm.intake?.id || null,
       };
       const response = await dispatch(createCourse(payload)).unwrap();
       console.log('Course created:', response);
@@ -259,13 +335,17 @@ const AddCourses = () => {
     }
   }, [assignCourseForm, dispatch, user_id, handleResetForm]);
 
-  // Memoized options with fallbacks
-  const instructorOptions = useMemo(() => instructors || [], [instructors]);
+  // Memoized options
   const trackOptions = useMemo(() => userCourses?.tracks || [], [userCourses]);
   const courseOptions = useMemo(() => allCourses || [], [allCourses]);
+  const intakeOptions = useMemo(() => availableIntakes || [], [availableIntakes]);
+  const instructorOptions = useMemo(() => {
+    const trackIds = newCourseForm.tracks.map((track) => track.id);
+    return getTrackInstructors(trackIds);
+  }, [newCourseForm.tracks, getTrackInstructors]);
   const CreateOptions = [
     { name: "As Existing", value: "notNull", id: 0 },
-    { name: "As Form", value: "Null", id: 1 }
+    { name: "As Form", value: "Null", id: 1 },
   ];
 
   // Log state for debugging
@@ -273,17 +353,17 @@ const AddCourses = () => {
     instructors: instructorOptions,
     tracks: trackOptions,
     courses: courseOptions,
+    intakes: intakeOptions,
     options: CreateOptions,
-    loading: { fetchCoursesLoading, fetchAllCoursesLoading, instructorsLoading },
-    errors: { fetchCoursesError, fetchAllCoursesError, createCourseError, assignCourseToTrackError },
-    success,
+    loading: { fetchCoursesLoading, fetchAllCoursesLoading, instructorsLoading, fetchIntakesLoading, fetchAvailableIntakesLoading },
+    errors: { fetchCoursesError, fetchAllCoursesError, instructorsError, fetchIntakesError, fetchAvailableIntakesError },
   });
 
   // Combined loading state
-  const isLoading = fetchCoursesLoading || fetchAllCoursesLoading || instructorsLoading;
+  const isLoading = fetchCoursesLoading || fetchAllCoursesLoading || instructorsLoading || fetchIntakesLoading;
 
   // Combined error state
-  const hasError = fetchCoursesError || fetchAllCoursesError || instructorsError;
+  const hasError = fetchCoursesError || fetchAllCoursesError || instructorsError || fetchIntakesError || fetchAvailableIntakesError;
 
   // Combined action loading state
   const isActionLoading = createCourseLoading || assignCourseToTrackLoading || loading;
@@ -294,7 +374,7 @@ const AddCourses = () => {
       <Box sx={{ p: 3, bgcolor: '#f4f6f8', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
         <StyledCard>
           <Typography variant="h6" color="error" sx={{ mb: 2, textAlign: 'center' }}>
-            Error: {fetchCoursesError || fetchAllCoursesError || instructorsError}
+            Error: {fetchCoursesError || fetchAllCoursesError || instructorsError || fetchIntakesError || fetchAvailableIntakesError}
           </Typography>
           <Button
             variant="contained"
@@ -302,7 +382,8 @@ const AddCourses = () => {
               if (instructorsError) dispatch(fetchInstructors());
               if (fetchCoursesError) dispatch(fetchCourses(user_id));
               if (fetchAllCoursesError) dispatch(fetchAllCourses());
-              setRetryCount(0); // Reset retry count
+              if (fetchIntakesError) dispatch(fetchIntakes());
+              setRetryCount(0);
             }}
             sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' }, borderRadius: 2, mx: 'auto', display: 'block' }}
           >
@@ -333,6 +414,9 @@ const AddCourses = () => {
             <Grid item xs={12}>
               <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
             </Grid>
+            <Grid item xs={12}>
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 2 }} />
+            </Grid>
           </Grid>
           <Skeleton variant="rectangular" height={56} sx={{ mt: 3, borderRadius: 2 }} />
         </StyledCard>
@@ -341,7 +425,7 @@ const AddCourses = () => {
   }
 
   // Empty data state
-  if (!instructorOptions.length && !trackOptions.length && !courseOptions.length) {
+  if (!instructorOptions.length && !trackOptions.length && !courseOptions.length && !intakeOptions.length) {
     return (
       <Box sx={{ p: 3, bgcolor: '#f4f6f8', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
         <StyledCard>
@@ -354,6 +438,7 @@ const AddCourses = () => {
               dispatch(fetchInstructors());
               dispatch(fetchCourses(user_id));
               dispatch(fetchAllCourses());
+              dispatch(fetchIntakes());
               setRetryCount(0);
             }}
             sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' }, borderRadius: 2, mx: 'auto', display: 'block' }}
@@ -394,6 +479,14 @@ const AddCourses = () => {
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#64748b', mb: 3 }}>
               Course Information
             </Typography>
+
+            {/* Instructor Warning */}
+            {instructorWarning && (
+              <Alert severity="warning" sx={{ mb: 2, maxWidth: '600px', mx: 'auto' }}>
+                {instructorWarning}
+              </Alert>
+            )}
+
             <Grid container spacing={3}>
               <Grid item xs={12}>
                 <StyledTextField
@@ -422,35 +515,13 @@ const AddCourses = () => {
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <Autocomplete
-                    options={instructorOptions}
-                    getOptionLabel={(option) => option.full_name || option.username || ''}
-                    value={newCourseForm.instructor}
-                    onChange={handleInstructorSelect}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Instructor (Optional)"
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: params.InputProps.endAdornment,
-                        }}
-                      />
-                    )}
-                    disabled={instructorsLoading}
-                    noOptionsText="No instructors available"
-                  />
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <Autocomplete
                     multiple
                     options={trackOptions}
                     getOptionLabel={(option) => option.name || ''}
                     value={newCourseForm.tracks}
                     onChange={handleTracksSelect}
                     renderInput={(params) => (
-                      <TextField {...params} label="Associated Tracks" placeholder="Select tracks" />
+                      <StyledTextField {...params} label="Associated Tracks" placeholder="Select tracks" />
                     )}
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
@@ -464,6 +535,52 @@ const AddCourses = () => {
                     }
                     disabled={fetchCoursesLoading}
                     noOptionsText="No tracks available"
+                  />
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+  <FormControl variant="outlined" fullWidth sx={{ mb: 2 }}>
+    <InputLabel id="instructor-select-label">Instructor (optional)</InputLabel>
+    <Select
+      labelId="instructor-select-label"
+      value={newCourseForm.instructor}
+      onChange={handleInstructorSelect}
+      label="Instructor (optional)"
+      sx={{ borderRadius: 2 }}
+      disabled={instructorsLoading || !instructorOptions.length}
+    >
+      <MenuItem value="">
+        <em>Not assigned</em>
+      </MenuItem>
+      {instructorOptions.map((instructor) => (
+        <MenuItem key={instructor.id} value={instructor.id}>
+          {instructor.full_name || instructor.username || `Instructor ${instructor.id}`}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+</Grid>
+
+              
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <Autocomplete
+                    options={intakeOptions}
+                    getOptionLabel={(option) => option.name || `Intake ${option.id}`}
+                    value={newCourseForm.intake}
+                    onChange={handleIntakeSelect}
+                    renderInput={(params) => (
+                      <StyledTextField
+                        {...params}
+                        label="Intake (Optional)"
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: params.InputProps.endAdornment,
+                        }}
+                      />
+                    )}
+                    disabled={fetchAvailableIntakesLoading || !newCourseForm.tracks.length}
+                    noOptionsText={newCourseForm.tracks.length ? "No intakes available for selected tracks" : "Select tracks first"}
                   />
                 </FormControl>
               </Grid>
@@ -500,12 +617,24 @@ const AddCourses = () => {
                 <FormControl fullWidth>
                   <Autocomplete
                     options={courseOptions}
-                    getOptionLabel={(option) => option.name || ''}
+                    getOptionLabel={(option) => {
+                      return `${option.name}${option.instructor_name ? ` - ${option.instructor_name}` : ''}`;
+                    }}
                     value={assignCourseForm.selectedCourse}
                     onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedCourse: value }))}
-                    renderInput={(params) => <TextField {...params} label="Select Course" />}
+                    renderInput={(params) => <StyledTextField {...params} label="Select Course" />}
                     disabled={fetchAllCoursesLoading}
                     noOptionsText="No courses available"
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>
+                        <Box>
+                          <Typography>{option.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.instructor_name || 'No instructor assigned'}
+                          </Typography>
+                        </Box>
+                      </li>
+                    )}
                   />
                 </FormControl>
               </Grid>
@@ -516,7 +645,7 @@ const AddCourses = () => {
                     getOptionLabel={(option) => option.name || ''}
                     value={assignCourseForm.selectedTrack}
                     onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedTrack: value }))}
-                    renderInput={(params) => <TextField {...params} label="Select Track" />}
+                    renderInput={(params) => <StyledTextField {...params} label="Select Track" />}
                     disabled={fetchCoursesLoading}
                     noOptionsText="No tracks available"
                   />
@@ -529,7 +658,7 @@ const AddCourses = () => {
                     getOptionLabel={(option) => option.name || ''}
                     value={assignCourseForm.selectedOption}
                     onChange={(_, value) => setAssignCourseForm((prev) => ({ ...prev, selectedOption: value }))}
-                    renderInput={(params) => <TextField {...params} label="Select Option" />}
+                    renderInput={(params) => <StyledTextField {...params} label="Select Option" />}
                     disabled={fetchAllCoursesLoading}
                     noOptionsText="No options available"
                   />
@@ -590,7 +719,7 @@ const AddCourses = () => {
                     ) : (
                       allCourses.map((course) => (
                         <StyledTableRow key={course.id}>
-                          <TableCell>{course.name || 'Unnamed'}</TableCell>
+                          <TableCell>{course.name}</TableCell>
                           <TableCell>{course.instructor_name || 'Not assigned'}</TableCell>
                         </StyledTableRow>
                       ))

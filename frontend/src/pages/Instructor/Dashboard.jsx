@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { Routes, Route, useLocation, Link } from "react-router-dom";
 import {
@@ -18,7 +18,7 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
-import Courses from "./Courses";
+import MyCourses from "../../Components/MyCourses/MyCourses";
 import Assignments from "./Assignments";
 import Submissions from "./Submissions";
 import Grades from "./Grades";
@@ -95,34 +95,28 @@ const InstructorDashboard = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const menuItems = [
-    {
-      text: "My Courses",
-      icon: <FiBook size={20} />,
-      path: "/instructor/dashboard/courses",
-    },
-    {
-      text: "Assignments",
-      icon: <FiCalendar size={20} />,
-      path: "/instructor/dashboard/assignments",
-    },
-    {
-      text: "Create Assignment",
-      icon: <FiClipboard size={20} />,
-      path: "/instructor/dashboard/create-assignment",
-    },
-    {
-      text: "Submissions",
-      icon: <FiUploadCloud size={20} />,
-      path: "/instructor/dashboard/submissions",
-    },
-    {
-      text: "Grades & Feedbacks",
-      icon: <FiAward size={20} />,
-      path: "/instructor/dashboard/grades",
-    },
-  ];
+  // Reset sidebar state when a new instructor logs in
+  useEffect(() => {
+    // Reset sidebar to open state for new user
+    setSidebarOpen(true);
+    // Optionally clear any instructor-specific localStorage
+    // localStorage.removeItem(`instructor_${username}_data`); // Example, if used
+  }, [username]);
 
+  // Close sidebar on mobile by default
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile]);
+
+  const menuItems = [
+    { text: "My Courses", icon: <FiBook size={20} />, path: "/instructor/dashboard/courses" },
+    { text: "Assignments", icon: <FiCalendar size={20} />, path: "/instructor/dashboard/assignments" },
+    { text: "Create Assignment", icon: <FiClipboard size={20} />, path: "/instructor/dashboard/create-assignment" },
+    { text: "Submissions", icon: <FiUploadCloud size={20} />, path: "/instructor/dashboard/submissions" },
+    { text: "Grades & Feedbacks", icon: <FiAward size={20} />, path: "/instructor/dashboard/grades" },
+  ];
   const displayName = username ? username.split("@")[0] : "Instructor";
 
   return (
@@ -164,7 +158,7 @@ const InstructorDashboard = () => {
 
         <Box py={1}>
           {menuItems.map((item) => {
-            const isActive = location.pathname.endsWith(item.path);
+            const isActive = location.pathname === item.path;
             return (
               <MenuItem
                 key={item.text}
@@ -186,7 +180,7 @@ const InstructorDashboard = () => {
         <ContentCard>
           <Routes>
             <Route index element={<OpeningPage />} />
-            <Route path="courses" element={<Courses />} />
+            <Route path="courses" element={<MyCourses />} />
             <Route path="assignments" element={<Assignments />} />
             <Route path="create-assignment" element={<CreateAssignment />} />
             <Route path="submissions" element={<Submissions />} />

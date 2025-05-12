@@ -134,7 +134,6 @@ const UploadInstructor = () => {
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailPattern.test(email);
   };
-
   const handleSubmitManualStaff = async () => {
     if (
       !staffData.username ||
@@ -175,6 +174,7 @@ const UploadInstructor = () => {
         }
       );
 
+      // If successful, handle success
       showSuccessModal("Instructor added successfully!");
       setStaffData({
         username: "",
@@ -203,6 +203,7 @@ const UploadInstructor = () => {
       return;
     }
 
+    // Validate file type
     const allowedTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
@@ -234,9 +235,6 @@ const UploadInstructor = () => {
       setLoading(false);
     }
   };
-
-  // Ensure courses is an array
-  const coursesList = Array.isArray(courses) ? courses : courses?.results || [];
 
   return (
     <Box sx={{ p: 3, background: "#f5f7fa", minHeight: "100vh" }}>
@@ -334,10 +332,8 @@ const UploadInstructor = () => {
                 >
                   {fetchingCourses ? (
                     <MenuItem disabled>Loading courses...</MenuItem>
-                  ) : coursesList.length === 0 ? (
-                    <MenuItem disabled>No courses available</MenuItem>
                   ) : (
-                    coursesList.map((course) => (
+                    courses.map((course) => (
                       <MenuItem key={course.id} value={course.id}>
                         {course.name}
                       </MenuItem>
