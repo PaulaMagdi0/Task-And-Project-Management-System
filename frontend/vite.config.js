@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import { splitVendorChunkPlugin } from "vite";
 
 export default defineConfig(({ mode }) => {
-  // Load all VITE_* environment variables
   const env = loadEnv(mode, process.cwd(), ["VITE_"]);
 
   return {
@@ -17,16 +16,20 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      port: 5173,
+      strictPort: true,
       proxy: {
         "/api": {
-          target: env.VITE_API_BASE_URL,
+          target: "http://127.0.0.1:8000", // Proxy to backend base URL
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ""),
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api/, "/api"), // Keep /api in path
         },
         "/ai": {
-          target: env.VITE_AI_API_BASE_URL,
+          target: "http://127.0.0.1:8000", // Proxy to backend base URL
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/ai/, ""),
+          secure: false,
+          rewrite: (path) => path.replace(/^\/ai/, "/ai"), // Keep /ai in path
         },
         "/ws": {
           target: env.VITE_WS_URL.replace("ws://", "http://"),

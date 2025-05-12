@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -20,38 +20,45 @@ import {
   InputLabel,
   Select,
   MenuItem,
-} from '@mui/material';
-import { useDispatch, useSelector } from 'react-redux';
+} from "@mui/material";
+import { useDispatch, useSelector } from "react-redux";
 import {
   fetchAllCourses,
   updateCourse,
   deleteCourse,
   clearCourseStatus,
-} from '../../redux/coursesSlice';
-import { fetchInstructors } from '../../redux/supervisorsSlice';
-import Assignments from './../../pages/Instructor/Assignments';
-import WarningIcon from '@mui/icons-material/Warning';
-import Submissions from './../Submissions/Submissions';
+} from "../../redux/coursesSlice";
+import { fetchInstructors } from "../../redux/supervisorsSlice";
+import Assignments from "./../../pages/Instructor/Assignments";
+import WarningIcon from "@mui/icons-material/Warning";
+import Submissions from "./../Submissions/Submissions";
 
 const AllCourseManagement = () => {
   const dispatch = useDispatch();
-  const { allCourses, status: { fetchAllCoursesLoading: loading, fetchAllCoursesError: error, success: message } } = useSelector((state) => state.courses);
+  const {
+    allCourses,
+    status: {
+      fetchAllCoursesLoading: loading,
+      fetchAllCoursesError: error,
+      success: message,
+    },
+  } = useSelector((state) => state.courses);
   const { instructors } = useSelector((state) => state.supervisors);
   const { user_id } = useSelector((state) => state.auth);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
     courseId: null,
-    name: '',
-    description: '',
-    instructor: '',
+    name: "",
+    description: "",
+    instructor: "",
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState(null);
-  const [localError, setLocalError] = useState('');
-  const [searchName, setSearchName] = useState('');
+  const [localError, setLocalError] = useState("");
+  const [searchName, setSearchName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmText, setConfirmText] = useState(''); // State for "I agree" input
+  const [confirmText, setConfirmText] = useState(""); // State for "I agree" input
 
   // Fetch courses and instructors on mount
   useEffect(() => {
@@ -62,7 +69,7 @@ const AllCourseManagement = () => {
   // Handle error state
   useEffect(() => {
     if (error) setLocalError(error);
-    else setLocalError('');
+    else setLocalError("");
   }, [error]);
 
   // Clear success message after 3 seconds
@@ -78,7 +85,7 @@ const AllCourseManagement = () => {
       courseId: course.id,
       name: course.name,
       description: course.description,
-      instructor: course.instructor || '',
+      instructor: course.instructor || "",
     });
     setEditDialogOpen(true);
   };
@@ -87,7 +94,7 @@ const AllCourseManagement = () => {
     const { courseId, name, description, instructor } = editData;
 
     if (!name) {
-      setLocalError('Course name is required.');
+      setLocalError("Course name is required.");
       return;
     }
 
@@ -99,27 +106,27 @@ const AllCourseManagement = () => {
       setEditDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      setLocalError(err.message || 'Failed to update course.');
+      setLocalError(err.message || "Failed to update course.");
     }
   };
 
   const openDeleteDialog = (id) => {
-    console.log('Opening delete dialog for course ID:', id);
+    console.log("Opening delete dialog for course ID:", id);
     setCourseToDelete(id);
-    setConfirmText(''); // Reset confirmation text
+    setConfirmText(""); // Reset confirmation text
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
-    console.log('Deleting course with ID:', courseToDelete);
+    console.log("Deleting course with ID:", courseToDelete);
     setIsDeleting(true);
     try {
       await dispatch(deleteCourse(courseToDelete)).unwrap();
       setDeleteDialogOpen(false);
       dispatch(fetchAllCourses());
     } catch (err) {
-      console.error('Delete error:', err);
-      setLocalError(err.message || 'Failed to delete course.');
+      console.error("Delete error:", err);
+      setLocalError(err.message || "Failed to delete course.");
     } finally {
       setIsDeleting(false);
     }
@@ -130,13 +137,16 @@ const AllCourseManagement = () => {
   };
 
   const handleResetFilters = () => {
-    setSearchName('');
+    setSearchName("");
   };
 
   // Filter courses
   const filteredCourses = useMemo(() => {
-    if (!allCourses) return [];
-    return allCourses.filter((course) =>
+    // Ensure courses is an array; use results if allCourses is an object
+    const courses = Array.isArray(allCourses)
+      ? allCourses
+      : allCourses?.results || [];
+    return courses.filter((course) =>
       searchName
         ? course.name.toLowerCase().includes(searchName.toLowerCase())
         : true
@@ -144,17 +154,28 @@ const AllCourseManagement = () => {
   }, [allCourses, searchName]);
 
   // Get course details for delete confirmation
-  const course = allCourses.find((c) => c.id === courseToDelete);
-  const isConfirmValid = confirmText.trim().toLowerCase() === 'i agree';
+  const courses = Array.isArray(allCourses)
+    ? allCourses
+    : allCourses?.results || [];
+  const course = courses.find((c) => c.id === courseToDelete);
+  const isConfirmValid = confirmText.trim().toLowerCase() === "i agree";
 
   return (
-    <Box sx={{ p: 4, bgcolor: '#f4f6f8' }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#1e3a8a', textAlign: 'center' }}>
+    <Box sx={{ p: 4, bgcolor: "#f4f6f8" }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: 700, color: "#1e3a8a", textAlign: "center" }}
+      >
         Manage Courses
       </Typography>
 
       {/* Filters and Search */}
-      <Grid container spacing={3} sx={{ mb: 3, maxWidth: '1200px', mx: 'auto' }}>
+      <Grid
+        container
+        spacing={3}
+        sx={{ mb: 3, maxWidth: "1200px", mx: "auto" }}
+      >
         <Grid item xs={12} sm={4}>
           <TextField
             label="Search by Course Name"
@@ -171,9 +192,9 @@ const AllCourseManagement = () => {
             variant="contained"
             onClick={handleResetFilters}
             sx={{
-              height: '56px',
-              bgcolor: '#3b82f6',
-              '&:hover': { bgcolor: '#2563eb' },
+              height: "56px",
+              bgcolor: "#3b82f6",
+              "&:hover": { bgcolor: "#2563eb" },
               borderRadius: 2,
             }}
           >
@@ -184,18 +205,29 @@ const AllCourseManagement = () => {
 
       {/* Error Alert */}
       {localError && (
-        <Alert severity="error" sx={{ mb: 2, maxWidth: '1200px', mx: 'auto' }}>
+        <Alert severity="error" sx={{ mb: 2, maxWidth: "1200px", mx: "auto" }}>
           {localError}
         </Alert>
       )}
       {/* Success Message Alert */}
       {message && (
-        <Alert severity="success" sx={{ mb: 2, maxWidth: '1200px', mx: 'auto' }}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2, maxWidth: "1200px", mx: "auto" }}
+        >
           {message}
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, maxWidth: '1200px', mx: 'auto', borderRadius: 2, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
+      <Paper
+        sx={{
+          p: 2,
+          maxWidth: "1200px",
+          mx: "auto",
+          borderRadius: 2,
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+        }}
+      >
         <Typography variant="h6" gutterBottom>
           Course List
         </Typography>
@@ -206,20 +238,35 @@ const AllCourseManagement = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Instructor</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 600, bgcolor: '#f1f5f9' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "#f1f5f9" }}>
+                  ID
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "#f1f5f9" }}>
+                  Name
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "#f1f5f9" }}>
+                  Instructor
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "#f1f5f9" }}>
+                  Description
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "#f1f5f9" }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredCourses.map((course) => (
-                <TableRow key={course.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                <TableRow
+                  key={course.id}
+                  sx={{ "&:hover": { bgcolor: "#f8fafc" } }}
+                >
                   <TableCell>{course.id}</TableCell>
                   <TableCell>{course.name}</TableCell>
-                  <TableCell>{course.instructor_name || 'Not assigned'}</TableCell>
-                  <TableCell>{course.description || '-'}</TableCell>
+                  <TableCell>
+                    {course.instructor_name || "Not assigned"}
+                  </TableCell>
+                  <TableCell>{course.description || "-"}</TableCell>
                   <TableCell>
                     <Button size="small" onClick={() => openEditDialog(course)}>
                       Edit
@@ -261,17 +308,23 @@ const AllCourseManagement = () => {
             multiline
             rows={4}
             value={editData.description}
-            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+            onChange={(e) =>
+              setEditData({ ...editData, description: e.target.value })
+            }
             sx={{ mb: 2 }}
           />
           <FormControl variant="outlined" fullWidth sx={{ mb: 2 }}>
             <InputLabel>Instructor</InputLabel>
             <Select
               value={editData.instructor}
-              onChange={(e) => setEditData({ ...editData, instructor: e.target.value })}
+              onChange={(e) =>
+                setEditData({ ...editData, instructor: e.target.value })
+              }
               label="Instructor"
             >
-              <MenuItem value=""><em>Not assigned</em></MenuItem>
+              <MenuItem value="">
+                <em>Not assigned</em>
+              </MenuItem>
               {instructors.map((instructor) => (
                 <MenuItem key={instructor.id} value={instructor.id}>
                   {instructor.full_name || instructor.username}
@@ -297,17 +350,24 @@ const AllCourseManagement = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ bgcolor: '#d32f2f', color: 'white', py: 2 }}>
+        <DialogTitle sx={{ bgcolor: "#d32f2f", color: "white", py: 2 }}>
           Confirm Course Deletion
         </DialogTitle>
-        
+
         <DialogContent sx={{ pt: 3 }}>
-          <Typography variant="body1" color="error" sx={{ mb: 2, fontWeight: 500 }}>
-            Warning: You are about to permanently delete the course <strong>{course?.name || 'Unknown'}</strong>{' '}
-            associated with your track from the database as well <strong>Assignments , Submissions</strong> attached to it.
+          <Typography
+            variant="body1"
+            color="error"
+            sx={{ mb: 2, fontWeight: 500 }}
+          >
+            Warning: You are about to permanently delete the course{" "}
+            <strong>{course?.name || "Unknown"}</strong> associated with your
+            track from the database as well{" "}
+            <strong>Assignments , Submissions</strong> attached to it.
           </Typography>
-          <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
-            This action cannot be undone. To confirm, please type <strong>"I agree"</strong> below.
+          <Typography variant="body2" sx={{ mb: 3, color: "text.secondary" }}>
+            This action cannot be undone. To confirm, please type{" "}
+            <strong>"I agree"</strong> below.
           </Typography>
           <TextField
             label="Type 'I agree' to confirm"
@@ -316,7 +376,11 @@ const AllCourseManagement = () => {
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             sx={{ mb: 2 }}
-            helperText={!isConfirmValid && confirmText ? 'Text must exactly match "I agree"' : ''}
+            helperText={
+              !isConfirmValid && confirmText
+                ? 'Text must exactly match "I agree"'
+                : ""
+            }
             error={!isConfirmValid && confirmText}
           />
         </DialogContent>
@@ -336,7 +400,7 @@ const AllCourseManagement = () => {
             disabled={!isConfirmValid || isDeleting}
             sx={{ minWidth: 100 }}
           >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
