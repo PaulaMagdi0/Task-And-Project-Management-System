@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { apiClient } from "../../services/api";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -18,25 +19,14 @@ const Contact = () => {
     e.preventDefault();
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/contact/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      const { data } = await apiClient.post("/contact/", formData);
 
-      if (response.ok) {
-        setStatus(
-          "Your message has been sent successfully. We'll get back to you shortly."
-        );
-        setFormData({ name: "", email: "", subject: "", message: "" });
-      } else {
-        const errorData = await response.json();
-        setStatus(`Error: ${errorData.error}`);
-      }
+      setStatus(
+        "Your message has been sent successfully. We'll get back to you shortly."
+      );
+      setFormData({ name: "", email: "", subject: "", message: "" });
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Error: ${error.response?.data?.error || error.message}`);
     }
   };
 

@@ -1,31 +1,56 @@
-// File: vite.config.js
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { splitVendorChunkPlugin } from "vite";
 
-export default defineConfig({
-  plugins: [react()],
-  css: {
-    postcss: "./postcss.config.js",
-  },
-  optimizeDeps: {
-    include: ['jwt-decode']
-  },
-  server: {
-    proxy: {
-      // proxy all /api requests to Django
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, '/api')
+export default defineConfig(({ mode }) => {
+  // Load all VITE_* environment variables
+  const env = loadEnv(mode, process.cwd(), ["VITE_"]);
+
+  return {
+    plugins: [react(), splitVendorChunkPlugin()],
+    base: env.VITE_BASE_PATH || "/",
+    define: {
+      "process.env": {
+        VITE_DEBUG: JSON.stringify(env.VITE_DEBUG),
+        VITE_APP_NAME: JSON.stringify(env.VITE_APP_NAME),
+        VITE_DEFAULT_THEME: JSON.stringify(env.VITE_DEFAULT_THEME),
       },
-      // proxy websocket traffic under /ws to Django/channels
-      '/ws': {
-        target: 'ws://127.0.0.1:8000',
-        ws: true,
-        changeOrigin: true,
-        secure: false,
+    },
+    server: {
+      proxy: {
+        "/api": {
+          target: env.VITE_API_BASE_URL,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ""),
+        },
+        "/ai": {
+          target: env.VITE_AI_API_BASE_URL,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ai/, ""),
+        },
+        "/ws": {
+          target: env.VITE_WS_URL.replace("ws://", "http://"),
+          ws: true,
+          changeOrigin: true,
+        },
       },
-    }
-  }
+    },
+    build: {
+      minify: "terser",
+      sourcemap: env.VITE_DEBUG === "true",
+      chunkSizeWarningLimit: 1600,
+      rollupOptions: {
+        output: {
+          assetFileNames: "assets/[name]-[hash][extname]",
+          chunkFileNames: "assets/[name]-[hash].js",
+          entryFileNames: "assets/[name]-[hash].js",
+        },
+      },
+      terserOptions: {
+        compress: {
+          drop_console: env.VITE_DEBUG !== "true",
+        },
+      },
+    },
+  };
 });

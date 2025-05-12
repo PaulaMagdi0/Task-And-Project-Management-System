@@ -2,15 +2,16 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 const footerInfo = {
-  logo: "Task Flow",
-  address: "456 Workflow Ave, Productivity City, PC 78910",
-  phone: "+1 (800) 123-4567",
-  email: "support@taskflowpro.com",
+  logo: "TaskManager",
+  address: "Egypt - Cairo, New Capital",
+  address2: "Knowledge City - ITI",
+  phone: "+20 17002",
+  website: "https://iti.gov.eg/home",
   socialLinks: {
-    twitter: "https://twitter.com/",
-    facebook: "https://www.facebook.com/",
-    instagram: "https://www.instagram.com/",
-    linkedin: "https://www.linkedin.com/",
+    facebook: "https://www.facebook.com/ITI.eg",
+    instagram: "https://www.instagram.com/itians_newcapital/",
+    linkedin:
+      "https://www.linkedin.com/school/information-technology-institute-iti-/posts/?feedView=all",
   },
   usefulLinks: [
     { name: "Home", url: "/" },
@@ -18,6 +19,7 @@ const footerInfo = {
     { name: "Services", url: "/services" },
     { name: "Terms of Service", url: "/terms" },
     { name: "Privacy Policy", url: "/privacy" },
+    { name: "Team", url: "/team" },
   ],
 };
 
@@ -27,7 +29,7 @@ const Footer = () => {
       id="footer"
       className="footer position-relative dark-background py-4"
     >
-      <div className="container footer-top">
+      <div className="container footer-top pt-4">
         <div className="row gy-4">
           {/* Contact Info */}
           <div className="col-lg-6 col-md-12">
@@ -36,22 +38,18 @@ const Footer = () => {
                 {footerInfo.logo}
               </Link>
               <div className="footer-contact pt-3">
-                <p className="mb-1">{footerInfo.address}</p>
-                <p className="mb-1">
-                  <strong>Phone:</strong> {footerInfo.phone}
-                </p>
-                <p className="mb-3">
-                  <strong>Email:</strong> {footerInfo.email}
-                </p>
+                <p className="mb-1"> {footerInfo.address}</p>
+                <p className="mb-1"> {footerInfo.address2}</p>
+                <p className="mb-1"> {footerInfo.phone}</p>
               </div>
               <div className="social-links d-flex justify-content-center justify-content-lg-start mt-3">
                 <Link
-                  to={footerInfo.socialLinks.twitter}
+                  to="https://iti.gov.eg/home"
                   className="me-3"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <i className="bi bi-twitter-x"></i>
+                  <i className="bi bi-globe"></i>
                 </Link>
                 <Link
                   to={footerInfo.socialLinks.facebook}

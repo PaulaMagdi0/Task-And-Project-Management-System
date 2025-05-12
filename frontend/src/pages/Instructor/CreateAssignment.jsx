@@ -255,34 +255,27 @@ const CreateAssignment = () => {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/api/chatAI/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: recommendationDialog.chatInput }),
+        const { data } = await apiClient.post("/chatAI/", {
+          message: recommendationDialog.chatInput,
         });
 
-        const data = await response.json();
-        if (response.ok) {
-          // Clean response: remove markdown and format
-          const cleanedResponse = data.response
-            .replace(/(\*\*|###|```|`|[-*+]\s)/g, "") // Remove markdown symbols and list markers
-            .replace(/\n+/g, "\n") // Normalize newlines
-            .trim();
-          setRecommendationDialog((prev) => ({
-            ...prev,
-            chatResponse: cleanedResponse,
-            recommendations: [
-              {
-                title: formData.title || "AI-Generated Assignment",
-                description: cleanedResponse,
-              },
-            ],
-            loading: false,
-            chatInput: "",
-          }));
-        } else {
-          throw new Error(data.error || "Failed to fetch AI response");
-        }
+        const cleanedResponse = data.response
+          .replace(/(\*\*|###|```|`|[-*+]\s)/g, "")
+          .replace(/\n+/g, "\n")
+          .trim();
+
+        setRecommendationDialog((prev) => ({
+          ...prev,
+          chatResponse: cleanedResponse,
+          recommendations: [
+            {
+              title: formData.title || "AI-Generated Assignment",
+              description: cleanedResponse,
+            },
+          ],
+          loading: false,
+          chatInput: "",
+        }));
       } catch (error) {
         setRecommendationDialog((prev) => ({
           ...prev,
@@ -293,41 +286,34 @@ const CreateAssignment = () => {
         setSubmitDialog({
           open: true,
           success: false,
-          message: "Error fetching AI chat response",
+          message: error.message || "Error fetching AI chat response",
         });
       }
       return;
     }
 
-    let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
-    if (recommendationDialog.methodChoice === "1") {
-      const courseName = courses.find((c) => c.id === formData.course)?.name || "";
-      url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
-    } else {
-      url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
-    }
-
     try {
-      const response = await fetch(url);
-      const data = await response.json();
-      if (response.ok) {
-        setRecommendationDialog((prev) => ({
-          ...prev,
-          recommendations: data.recommendations,
-          loading: false,
-        }));
+      let url = `/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
+
+      if (recommendationDialog.methodChoice === "1") {
+        const courseName =
+          courses.find((c) => c.id === formData.course)?.name || "";
+        url += `&course_name=${encodeURIComponent(
+          courseName
+        )}&difficulty=${encodeURIComponent(formData.difficulty)}`;
       } else {
-        setRecommendationDialog((prev) => ({
-          ...prev,
-          loading: false,
-          recommendations: [],
-        }));
-        setSubmitDialog({
-          open: true,
-          success: false,
-          message: data.error || "Failed to fetch recommendations",
-        });
+        url += `&brief_description=${encodeURIComponent(
+          recommendationDialog.briefDescription
+        )}`;
       }
+
+      const { data } = await apiClient.get(url);
+
+      setRecommendationDialog((prev) => ({
+        ...prev,
+        recommendations: data.recommendations,
+        loading: false,
+      }));
     } catch (error) {
       setRecommendationDialog((prev) => ({
         ...prev,
@@ -337,7 +323,7 @@ const CreateAssignment = () => {
       setSubmitDialog({
         open: true,
         success: false,
-        message: "Error fetching recommendations",
+        message: error.message || "Error fetching recommendations",
       });
     }
   };
@@ -494,9 +480,9 @@ const CreateAssignment = () => {
     }));
   };
 
-  const handleSubmit= async () => {
+  const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
-  
+
     if (formData.assignToAll && (!students || students.length === 0)) {
       setSubmitDialog({
         open: true,
@@ -505,7 +491,7 @@ const CreateAssignment = () => {
       });
       return;
     }
-  
+
     const assignmentData = {
       title: formData.title,
       description: formData.description,
@@ -520,7 +506,7 @@ const CreateAssignment = () => {
         ? students.map((s) => s.id)
         : formData.selectedStudents,
     };
-  
+
     try {
       const action = await dispatch(createAssignment(assignmentData));
       if (createAssignment.fulfilled.match(action)) {
@@ -588,7 +574,9 @@ const CreateAssignment = () => {
                         ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={validationErrors.due_date ? "error" : "action"}
+                            color={
+                              validationErrors.due_date ? "error" : "action"
+                            }
                             sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
@@ -618,7 +606,9 @@ const CreateAssignment = () => {
                         ...params.InputProps,
                         startAdornment: (
                           <CalendarIcon
-                            color={validationErrors.end_date ? "error" : "action"}
+                            color={
+                              validationErrors.end_date ? "error" : "action"
+                            }
                             sx={{ mr: 1, opacity: 0.6 }}
                           />
                         ),
@@ -707,7 +697,11 @@ const CreateAssignment = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required error={validationErrors.difficulty}>
+              <FormControl
+                fullWidth
+                required
+                error={validationErrors.difficulty}
+              >
                 <InputLabel sx={{ fontWeight: 500 }}>Difficulty</InputLabel>
                 <StyledSelect
                   value={formData.difficulty}
@@ -728,7 +722,9 @@ const CreateAssignment = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel sx={{ fontWeight: 500 }}>Assignment Type</InputLabel>
+                <InputLabel sx={{ fontWeight: 500 }}>
+                  Assignment Type
+                </InputLabel>
                 <StyledSelect
                   value={formData.assignment_type}
                   onChange={handleChange}
@@ -838,7 +834,10 @@ const CreateAssignment = () => {
                   <Box display="flex" alignItems="center">
                     <Typography
                       variant="body2"
-                      sx={{ fontWeight: 500, color: theme.palette.text.primary }}
+                      sx={{
+                        fontWeight: 500,
+                        color: theme.palette.text.primary,
+                      }}
                     >
                       Assign to all course students
                     </Typography>
@@ -874,7 +873,9 @@ const CreateAssignment = () => {
                               : "default"
                           }
                           avatar={
-                            <Avatar sx={{ bgcolor: theme.palette.primary.light }}>
+                            <Avatar
+                              sx={{ bgcolor: theme.palette.primary.light }}
+                            >
                               <PersonIcon sx={{ fontSize: 16 }} />
                             </Avatar>
                           }
@@ -1137,61 +1138,69 @@ const CreateAssignment = () => {
             border: `1px solid ${theme.palette.grey[200]}`,
           }}
         >
-          <form onSubmit={(e) => {
-  e.preventDefault();
-  if (activeStep === steps.length - 1) {
-    handleSubmit();
-  } else {
-    handleNext();
-  }
-}}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (activeStep === steps.length - 1) {
+                handleSubmit();
+              } else {
+                handleNext();
+              }
+            }}
+          >
             {getStepContent(activeStep)}
-            
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, gap: 2 }}>
-  <Button
-    disabled={activeStep === 0}
-    onClick={handleBack}
-    variant="outlined"
-    sx={{
-      borderRadius: "8px",
-      fontWeight: 500,
-      px: 3,
-      py: 1,
-      borderColor: theme.palette.grey[300],
-      color: theme.palette.text.primary,
-      textTransform: "none",
-      "&:hover": {
-        borderColor: theme.palette.primary.main,
-        bgcolor: theme.palette.grey[50],
-      },
-    }}
-  >
-    Back
-  </Button>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 4,
+                gap: 2,
+              }}
+            >
+              <Button
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                variant="outlined"
+                sx={{
+                  borderRadius: "8px",
+                  fontWeight: 500,
+                  px: 3,
+                  py: 1,
+                  borderColor: theme.palette.grey[300],
+                  color: theme.palette.text.primary,
+                  textTransform: "none",
+                  "&:hover": {
+                    borderColor: theme.palette.primary.main,
+                    bgcolor: theme.palette.grey[50],
+                  },
+                }}
+              >
+                Back
+              </Button>
 
-  {activeStep === steps.length - 1 ? (
-    <SimpleButton
-      type="submit"
-      variant="contained"
-      disabled={loading}
-      endIcon={<SendIcon />}
-    >
-      {loading ? (
-        <CircularProgress size={20} color="inherit" />
-      ) : (
-        "Submit Assignment"
-      )}
-    </SimpleButton>
-  ) : (
-    <SimpleButton
-      type="submit"  // Changed from onClick={handleNext}
-      variant="contained"
-    >
-      Next
-    </SimpleButton>
-  )}
-</Box>
+              {activeStep === steps.length - 1 ? (
+                <SimpleButton
+                  type="submit"
+                  variant="contained"
+                  disabled={loading}
+                  endIcon={<SendIcon />}
+                >
+                  {loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    "Submit Assignment"
+                  )}
+                </SimpleButton>
+              ) : (
+                <SimpleButton
+                  type="submit" // Changed from onClick={handleNext}
+                  variant="contained"
+                >
+                  Next
+                </SimpleButton>
+              )}
+            </Box>
           </form>
         </Paper>
 
@@ -1202,33 +1211,37 @@ const CreateAssignment = () => {
           transitionDuration={400}
         >
           <DialogTitle sx={{ textAlign: "center", pb: 2 }}>
-  {submitDialog.success ? (
-    <CheckCircleIcon
-      color="success"
-      sx={{ fontSize: 50, mb: 1, animation: "bounce 0.5s" }}
-    />
-  ) : (
-    <ErrorIcon
-      color="error"
-      sx={{ fontSize: 50, mb: 1, animation: "shake 0.5s" }}
-    />
-  )}
-  <Typography
-    component="div"  // Changed from variant="h6"
-    sx={{ 
-      fontWeight: 500, 
-      color: theme.palette.text.primary,
-      fontSize: '1.25rem' // Adjust size as needed
-    }}
-  >
-    {submitDialog.success
-      ? "Assignment Created"
-      : "Submission Failed"}
-  </Typography>
-</DialogTitle>
+            {submitDialog.success ? (
+              <CheckCircleIcon
+                color="success"
+                sx={{ fontSize: 50, mb: 1, animation: "bounce 0.5s" }}
+              />
+            ) : (
+              <ErrorIcon
+                color="error"
+                sx={{ fontSize: 50, mb: 1, animation: "shake 0.5s" }}
+              />
+            )}
+            <Typography
+              component="div" // Changed from variant="h6"
+              sx={{
+                fontWeight: 500,
+                color: theme.palette.text.primary,
+                fontSize: "1.25rem", // Adjust size as needed
+              }}
+            >
+              {submitDialog.success
+                ? "Assignment Created"
+                : "Submission Failed"}
+            </Typography>
+          </DialogTitle>
           <DialogContent sx={{ textAlign: "center" }}>
             <Typography
-              sx={{ mb: 2, fontSize: "0.875rem", color: theme.palette.text.secondary }}
+              sx={{
+                mb: 2,
+                fontSize: "0.875rem",
+                color: theme.palette.text.secondary,
+              }}
             >
               {submitDialog.message}
             </Typography>
@@ -1271,24 +1284,24 @@ const CreateAssignment = () => {
           fullWidth
         >
           <DialogTitle sx={{ display: "flex", alignItems: "center", pb: 2 }}>
-  <AutoAwesomeIcon
-    sx={{ mr: 1, color: theme.palette.primary.main, fontSize: 22 }}
-  />
-  <Typography
-    component="div"
-    sx={{ 
-      fontWeight: 500, 
-      color: theme.palette.text.primary,
-      fontSize: '1.25rem'
-    }}
-  >
-    AI Task Recommendations
-  </Typography>
-</DialogTitle>
+            <AutoAwesomeIcon
+              sx={{ mr: 1, color: theme.palette.primary.main, fontSize: 22 }}
+            />
+            <Typography
+              component="div"
+              sx={{
+                fontWeight: 500,
+                color: theme.palette.text.primary,
+                fontSize: "1.25rem",
+              }}
+            >
+              AI Task Recommendations
+            </Typography>
+          </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12}>
-                <FormControl fullWidth  sx={{ mt: 2 }}>
+                <FormControl fullWidth sx={{ mt: 2 }}>
                   <InputLabel sx={{ fontWeight: 500, fontSize: "0.875rem" }}>
                     Recommendation Method
                   </InputLabel>

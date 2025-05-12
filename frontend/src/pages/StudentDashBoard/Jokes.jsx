@@ -1,7 +1,17 @@
-import React, { useState, useEffect, useCallback, Component } from 'react';
-import { Box, Card, CardHeader, CardContent, Typography, Button, CircularProgress, Alert } from '@mui/material';
-import { FiSmile } from 'react-icons/fi';
-import './Jokes.css';
+import React, { useState, useEffect, useCallback, Component } from "react";
+import {
+  Box,
+  Card,
+  CardHeader,
+  CardContent,
+  Typography,
+  Button,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import { FiSmile } from "react-icons/fi";
+import "./Jokes.css";
+import { apiClient } from "../../services/api";
 
 // Error Boundary for Jokes
 class JokesErrorBoundary extends Component {
@@ -19,7 +29,7 @@ class JokesErrorBoundary extends Component {
             Failed to load jokes.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Error: {this.state.error?.message || 'Unknown error'}
+            Error: {this.state.error?.message || "Unknown error"}
           </Typography>
         </Box>
       );
@@ -42,17 +52,24 @@ const useDebounce = (callback, delay) => {
 };
 
 const Jokes = () => {
-  const [joke, setJoke] = useState('');
-  const [setup, setSetup] = useState('');
-  const [delivery, setDelivery] = useState('');
-  const [error, setError] = useState('');
+  const [joke, setJoke] = useState("");
+  const [setup, setSetup] = useState("");
+  const [delivery, setDelivery] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
 
-  console.log('Jokes Component Rendered'); // Debug log
+  console.log("Jokes Component Rendered"); // Debug log
 
-  const inappropriateWords = ['sex', 'porn', 'explicit', '18+', 'adult', 'nude'];
+  const inappropriateWords = [
+    "sex",
+    "porn",
+    "explicit",
+    "18+",
+    "adult",
+    "nude",
+  ];
 
   const containsInappropriateContent = (text) => {
     return inappropriateWords.some((word) => text.toLowerCase().includes(word));
@@ -60,55 +77,53 @@ const Jokes = () => {
 
   const fetchJoke = async (isRetry = false) => {
     if (retryCount >= maxRetries && !isRetry) {
-      setError('Maximum retry attempts reached');
+      setError("Maximum retry attempts reached");
       return;
     }
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      console.log('Fetching joke, Retry Count:', retryCount); // Debug log
-      const response = await fetch('http://localhost:8000/api/joke/');
-      const data = await response.json();
-      console.log('Joke API Response:', data); // Debug log
+      console.log("Fetching joke, Retry Count:", retryCount); // Debug log
+      const { data } = await apiClient.get("/joke/");
+      console.log("Joke API Response:", data); // Debug log
 
-      if (response.ok) {
-        if (data.setup && data.delivery) {
-          if (containsInappropriateContent(data.setup) || containsInappropriateContent(data.delivery)) {
-            if (retryCount < maxRetries) {
-              setRetryCount((prev) => prev + 1);
-              fetchJoke(true);
-            } else {
-              setError('Unable to fetch appropriate joke after retries');
-            }
+      if (data.setup && data.delivery) {
+        if (
+          containsInappropriateContent(data.setup) ||
+          containsInappropriateContent(data.delivery)
+        ) {
+          if (retryCount < maxRetries) {
+            setRetryCount((prev) => prev + 1);
+            fetchJoke(true);
           } else {
-            setSetup(data.setup);
-            setDelivery(data.delivery);
-            setJoke('');
-            setRetryCount(0);
-          }
-        } else if (data.joke) {
-          if (containsInappropriateContent(data.joke)) {
-            if (retryCount < maxRetries) {
-              setRetryCount((prev) => prev + 1);
-              fetchJoke(true);
-            } else {
-              setError('Unable to fetch appropriate joke after retries');
-            }
-          } else {
-            setJoke(data.joke);
-            setSetup('');
-            setDelivery('');
-            setRetryCount(0);
+            setError("Unable to fetch appropriate joke after retries");
           }
         } else {
-          setError('Unexpected data format');
+          setSetup(data.setup);
+          setDelivery(data.delivery);
+          setJoke("");
+          setRetryCount(0);
+        }
+      } else if (data.joke) {
+        if (containsInappropriateContent(data.joke)) {
+          if (retryCount < maxRetries) {
+            setRetryCount((prev) => prev + 1);
+            fetchJoke(true);
+          } else {
+            setError("Unable to fetch appropriate joke after retries");
+          }
+        } else {
+          setJoke(data.joke);
+          setSetup("");
+          setDelivery("");
+          setRetryCount(0);
         }
       } else {
-        setError(`Failed to fetch joke: ${response.statusText}`);
+        setError("Unexpected data format");
       }
     } catch (err) {
-      setError('Error fetching joke: ' + err.message);
+      setError("Error fetching joke: " + err.message);
       if (retryCount < maxRetries) {
         setTimeout(() => fetchJoke(true), 1000 * (retryCount + 1));
         setRetryCount((prev) => prev + 1);
@@ -126,17 +141,20 @@ const Jokes = () => {
 
   return (
     <JokesErrorBoundary>
-      <Card elevation={3} sx={{ borderTop: '4px solid #0288d1', maxWidth: 600, mx: 'auto' }}>
+      <Card
+        elevation={3}
+        sx={{ borderTop: "4px solid #0288d1", maxWidth: 600, mx: "auto" }}
+      >
         <CardHeader
           title="Programming Jokes"
-          avatar={<FiSmile style={{ color: '#0288d1' }} />}
+          avatar={<FiSmile style={{ color: "#0288d1" }} />}
           subheader="Take a break with a coding laugh!"
         />
         <CardContent>
           <Box textAlign="center">
             {loading ? (
               <Box display="flex" justifyContent="center" my={4}>
-                <CircularProgress sx={{ color: '#0288d1' }} />
+                <CircularProgress sx={{ color: "#0288d1" }} />
               </Box>
             ) : error ? (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -150,7 +168,11 @@ const Jokes = () => {
                   </Typography>
                 )}
                 {delivery && (
-                  <Typography variant="body1" className="delivery" sx={{ mb: 2 }}>
+                  <Typography
+                    variant="body1"
+                    className="delivery"
+                    sx={{ mb: 2 }}
+                  >
                     🤣 <strong>Delivery:</strong> {delivery}
                   </Typography>
                 )}
@@ -166,10 +188,14 @@ const Jokes = () => {
               onClick={debouncedFetchJoke}
               disabled={loading}
               startIcon={<FiSmile />}
-              sx={{ mt: 2, backgroundColor: '#0288d1', '&:hover': { backgroundColor: '#0277bd' } }}
+              sx={{
+                mt: 2,
+                backgroundColor: "#0288d1",
+                "&:hover": { backgroundColor: "#0277bd" },
+              }}
               aria-label="Get another programming joke"
             >
-              {loading ? 'Loading...' : 'Get Another Joke'}
+              {loading ? "Loading..." : "Get Another Joke"}
             </Button>
           </Box>
         </CardContent>
