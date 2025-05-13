@@ -1,4 +1,3 @@
-// File: src/components/AssignSupervisorToTrack.jsx
 import React, { useState, useEffect } from 'react';
 import { FiUserCheck } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
@@ -56,7 +55,6 @@ const styles = {
 };
 
 const AssignSupervisorToTrack = () => {
-  // Branch manager's branch ID
   const branchId = useSelector(state => state.auth.branch?.id);
 
   const [tracks, setTracks] = useState([]);
@@ -67,26 +65,39 @@ const AssignSupervisorToTrack = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Fetch tracks in manager's branch only
+    if (!branchId) return;
+
     apiClient.get('/tracks/')
       .then(res => {
-        const branchTracks = res.data
+        console.log('Tracks API response:', res.data);
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.results || res.data?.tracks || res.data?.data || [];
+        const branchTracks = data
           .filter(track => track.branch === branchId)
           .sort((a, b) => a.id - b.id);
         setTracks(branchTracks);
       })
-      .catch(err => console.error('Error fetching tracks:', err));
+      .catch(err => {
+        console.error('Error fetching tracks:', err);
+        setMessage('Error fetching tracks.');
+      });
 
-    // Fetch all supervisors (will filter by selected track's branch later)
     apiClient.get('/staff/')
       .then(res => {
-        const sups = res.data.filter(member => member.role === 'supervisor');
+        console.log('Supervisors API response:', res.data);
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.results || res.data?.staff || res.data?.data || [];
+        const sups = data.filter(member => ['supervisor'].includes(member.role));
         setAllSupervisors(sups);
       })
-      .catch(err => console.error('Error fetching supervisors:', err));
+      .catch(err => {
+        console.error('Error fetching supervisors:', err);
+        setMessage('Error fetching supervisors.');
+      });
   }, [branchId]);
 
-  // Compute supervisors belonging to the selected track's branch
   const supervisorsForTrack = (() => {
     if (!selectedTrack) return [];
     const track = tracks.find(t => t.id.toString() === selectedTrack);

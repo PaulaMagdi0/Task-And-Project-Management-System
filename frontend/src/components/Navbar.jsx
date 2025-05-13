@@ -108,21 +108,21 @@ const Navbar = () => {
       case "student":
         return (
           <>
-          <NavButton
-            component={Link}
-            to="/student/dashboard?section=courses" // Add query parameter
-            startIcon={<BookOpen size={18} />}
-          >
-            My Courses
-          </NavButton>
-          <NavButton
-            component={Link}
-            to="/student/dashboard?section=assignments"
-            startIcon={<FileText size={18} />}
-          >
-            Assignments
-          </NavButton>
-        </>
+            <NavButton
+              component={Link}
+              to="/student/dashboard?section=courses" // Add query parameter
+              startIcon={<BookOpen size={18} />}
+            >
+              My Courses
+            </NavButton>
+            <NavButton
+              component={Link}
+              to="/student/dashboard?section=assignments"
+              startIcon={<FileText size={18} />}
+            >
+              Assignments
+            </NavButton>
+          </>
         );
       case "branchmanager":
         return (
@@ -202,8 +202,8 @@ const Navbar = () => {
                   role === "instructor"
                     ? "/instructor/tasks/new"
                     : role === "student"
-                    ? "/student/assignments/new"
-                    : "/tasks/new"
+                      ? "/student/assignments/new"
+                      : "/tasks/new"
                 }
                 sx={{
                   backgroundColor: "#d32f2f", // Blood red

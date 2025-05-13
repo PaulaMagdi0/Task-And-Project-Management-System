@@ -1,4 +1,3 @@
-// File: src/components/TracksTable.jsx
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import apiClient from '../services/api';
@@ -80,8 +79,7 @@ const styles = {
 };
 
 const TracksTable = () => {
-  // Manager's branch ID
-  const branchId = useSelector(state => state.auth.branch.id);
+  const branchId = useSelector(state => state.auth.branch?.id);
 
   const [tracks, setTracks] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
@@ -91,23 +89,32 @@ const TracksTable = () => {
   const [editingTrackId, setEditingTrackId] = useState(null);
   const [newSupervisorId, setNewSupervisorId] = useState('');
 
-  // Load all supervisors (filter by role only)
   const fetchSupervisors = async () => {
     try {
       const response = await apiClient.get('/staff/');
-      const filtered = response.data.filter(member => member.role === 'supervisor');
+      console.log('Supervisors API response:', response.data);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data?.results || response.data?.staff || response.data?.data || [];
+      const filtered = data.filter(member =>
+        ['supervisor'].includes(member.role)
+      );
       setSupervisors(filtered);
     } catch (err) {
       console.error('Error fetching supervisors:', err);
+      setError('Error fetching supervisors.');
     }
   };
 
-  // Load tracks for this branch
   const fetchTracks = async () => {
     setLoading(true);
     try {
       const response = await apiClient.get('/tracks/');
-      const branchTracks = response.data
+      console.log('Tracks API response:', response.data);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data?.results || response.data?.tracks || response.data?.data || [];
+      const branchTracks = data
         .filter(track => track.branch === branchId)
         .sort((a, b) => a.id - b.id);
       setTracks(branchTracks);
@@ -121,8 +128,10 @@ const TracksTable = () => {
   };
 
   useEffect(() => {
-    fetchTracks();
-    fetchSupervisors();
+    if (branchId) {
+      fetchTracks();
+      fetchSupervisors();
+    }
   }, [branchId]);
 
   const toggleEditMode = track => {
@@ -180,7 +189,6 @@ const TracksTable = () => {
           </thead>
           <tbody>
             {tracks.map(track => {
-              // supervisors in same branch as this track
               const availableSup = supervisors.filter(sup => sup.branch?.id === track.branch);
               return (
                 <tr key={track.id}>
@@ -201,8 +209,8 @@ const TracksTable = () => {
                           ))}
                         </select>
                         <div>
-                          <button style={{...styles.button,...styles.btnPrimary}} onClick={() => saveSupervisor(track.id)}>Save</button>
-                          <button style={{...styles.button,...styles.btnSecondary}} onClick={cancelEdit}>Cancel</button>
+                          <button style={{ ...styles.button, ...styles.btnPrimary }} onClick={() => saveSupervisor(track.id)}>Save</button>
+                          <button style={{ ...styles.button, ...styles.btnSecondary }} onClick={cancelEdit}>Cancel</button>
                         </div>
                       </>
                     ) : (
@@ -211,7 +219,7 @@ const TracksTable = () => {
                           ? supervisors.find(s => s.id === track.supervisor && s.branch?.id === track.branch)?.username
                           : 'None'}
                         <button
-                          style={{...styles.button,...styles.btnOutlinePrimary,marginLeft:'0.5rem'}}
+                          style={{ ...styles.button, ...styles.btnOutlinePrimary, marginLeft: '0.5rem' }}
                           onClick={() => toggleEditMode(track)}
                         >
                           {track.supervisor ? 'Change' : 'Assign'}
@@ -220,7 +228,7 @@ const TracksTable = () => {
                     )}
                   </td>
                   <td style={styles.td}>
-                    <button style={{...styles.button,...styles.btnDanger}} onClick={() => handleDelete(track.id)}>Delete</button>
+                    <button style={{ ...styles.button, ...styles.btnDanger }} onClick={() => handleDelete(track.id)}>Delete</button>
                   </td>
                 </tr>
               );

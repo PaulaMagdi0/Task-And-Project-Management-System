@@ -66,7 +66,7 @@ const ProfilePage = () => {
         });
 
         const data = response.data;
-        const [firstName, lastName] = data.student.name?.split(" ") || [];
+        const [firstName, lastName] = data.student.full_name?.split(" ") || [];
         const dateJoined = data.student.date_joined?.split("T")[0] || "";
 
         setUserData({
@@ -211,7 +211,7 @@ const ProfilePage = () => {
               variant="h4"
               sx={{ color: "#eee", fontWeight: 700, mb: 0.5 }}
             >
-              {userData.fullName}
+              {userData.first_name} {userData.last_name}
             </Typography>
             <Typography variant="body1" sx={{ color: "#aaa", mb: 1 }}>
               {userData.role} At ITI

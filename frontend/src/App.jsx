@@ -1,4 +1,3 @@
-// File: src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -41,7 +40,7 @@ import Hello from "./pages/DashBoard/hello";
 import AdminDashboard from "./pages/AdminDashboard/Admin";
 import GitHubStat from "./Components/githubStat/githubStat";
 
-// ** Chat Components **
+// Chat Components
 import ChatRoomList from "./Components/Chat/ChatRoomList";
 import ChatRoomMessages from "./Components/Chat/ChatRoomMessages";
 
@@ -79,7 +78,8 @@ const App = () => {
           <Route path="/hello" element={<AddCourses />} />
 
           <Route path="/github-stat" element={<GitHubStat />} />
-
+          <Route path="/verified" element={<VerifiedPage />} />
+          <Route path="/not-verified" element={<NotVerifiedPage />} />
           {/* Chat Routes */}
           <Route path="/chat/rooms" element={<ChatRoomList />} />
           <Route path="/chat/rooms/:roomId" element={<ChatRoomMessages />} />
@@ -104,14 +104,7 @@ const App = () => {
           {/* Instructor Dashboard */}
           {userType === "staff" && role === "instructor" && (
             <Route
-              path="/instructor/dashboard"
-              element={<InstructorDashboard />}
-            />
-          )}
-          {/* Instructor-Specific Routes */}
-          {userType === "staff" && role === "instructor" && (
-            <Route
-              path="/instructor/dashboard"
+              path="/instructor/dashboard/*"
               element={<InstructorDashboard />}
             />
           )}

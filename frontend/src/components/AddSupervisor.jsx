@@ -1,4 +1,3 @@
-// File: src/components/StaffManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -36,6 +35,14 @@ const StaffManagement = () => {
   const { staff, loading, error: serverError, message } = useSelector(s => s.staff);
   const { branch } = useSelector(s => s.auth); // Branch manager's branch from token
 
+  // Log staff for debugging
+  console.log('Staff state:', staff);
+
+  // Normalize staff to ensure it's an array
+  const normalizedStaff = Array.isArray(staff)
+    ? staff
+    : staff?.results || [];
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -61,6 +68,7 @@ const StaffManagement = () => {
 
   useEffect(() => {
     dispatch(fetchStaff());
+    return () => dispatch(clearStaffState());
   }, [dispatch]);
 
   useEffect(() => {
@@ -91,8 +99,12 @@ const StaffManagement = () => {
       setLocalError('Username and email are required.');
       return;
     }
-    if (!['supervisor','instructor'].includes(formData.role)) {
+    if (!['supervisor', 'instructor'].includes(formData.role)) {
       setLocalError('Role must be Supervisor or Instructor.');
+      return;
+    }
+    if (!branch?.id) {
+      setLocalError('Branch ID is missing.');
       return;
     }
     // Prepare payload, include branch_id automatically
@@ -145,8 +157,8 @@ const StaffManagement = () => {
   };
 
   // Show only supervisors & instructors in manager's branch
-  const filteredStaff = staff.filter(m =>
-    ['supervisor','instructor'].includes(m.role) && m.branch?.id === branch.id
+  const filteredStaff = normalizedStaff.filter(m =>
+    ['supervisor', 'instructor'].includes(m.role) && m.branch?.id === branch?.id
   );
 
   return (
@@ -255,6 +267,8 @@ const StaffManagement = () => {
         </Typography>
         {loading ? (
           <Typography>Loading...</Typography>
+        ) : normalizedStaff.length === 0 ? (
+          <Typography>No staff available.</Typography>
         ) : (
           <Table>
             <TableHead>
@@ -267,27 +281,35 @@ const StaffManagement = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredStaff.map(member => (
-                <TableRow key={member.id}>
-                  <TableCell>{member.id}</TableCell>
-                  <TableCell>{member.username}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>{member.role}</TableCell>
-                  <TableCell>
-                    <Button size="small" onClick={() => handleEdit(member)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      sx={{ ml: 1 }}
-                      onClick={() => openDeleteDialog(member.id)}
-                    >
-                      Delete
-                    </Button>
+              {filteredStaff.length > 0 ? (
+                filteredStaff.map(member => (
+                  <TableRow key={member.id}>
+                    <TableCell>{member.id}</TableCell>
+                    <TableCell>{member.username}</TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>{member.role}</TableCell>
+                    <TableCell>
+                      <Button size="small" onClick={() => handleEdit(member)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        sx={{ ml: 1 }}
+                        onClick={() => openDeleteDialog(member.id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <Typography>No supervisors or instructors in this branch.</Typography>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         )}

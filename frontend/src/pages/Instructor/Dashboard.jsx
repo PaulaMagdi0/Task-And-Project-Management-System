@@ -88,22 +88,43 @@ const ContentCard = styled(Box)(({ theme }) => ({
   minHeight: "calc(100vh - 96px)",
 }));
 
+class ErrorBoundary extends React.Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error: error.message };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Error in component:', error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <Box sx={{ p: 2, color: 'error.main' }}>
+          <Typography variant="h6">Something went wrong</Typography>
+          <Typography>{this.state.error}</Typography>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const InstructorDashboard = () => {
-  const { username } = useSelector((state) => state.auth);
+  const { username, userType, role } = useSelector((state) => state.auth);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Reset sidebar state when a new instructor logs in
   useEffect(() => {
-    // Reset sidebar to open state for new user
+    console.log('InstructorDashboard: Current path:', location.pathname);
+    console.log('Auth state:', { username, userType, role });
     setSidebarOpen(true);
-    // Optionally clear any instructor-specific localStorage
-    // localStorage.removeItem(`instructor_${username}_data`); // Example, if used
-  }, [username]);
+  }, [username, location.pathname, userType, role]);
 
-  // Close sidebar on mobile by default
   useEffect(() => {
     if (isMobile) {
       setSidebarOpen(false);
@@ -178,14 +199,16 @@ const InstructorDashboard = () => {
 
       <MainContent>
         <ContentCard>
-          <Routes>
-            <Route index element={<OpeningPage />} />
-            <Route path="courses" element={<MyCourses />} />
-            <Route path="assignments" element={<Assignments />} />
-            <Route path="create-assignment" element={<CreateAssignment />} />
-            <Route path="submissions" element={<Submissions />} />
-            <Route path="grades" element={<Grades />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route index element={<OpeningPage />} />
+              <Route path="courses" element={<MyCourses />} />
+              <Route path="assignments" element={<Assignments />} />
+              <Route path="create-assignment" element={<CreateAssignment />} />
+              <Route path="submissions" element={<Submissions />} />
+              <Route path="grades" element={<Grades />} />
+            </Routes>
+          </ErrorBoundary>
         </ContentCard>
       </MainContent>
     </DashboardContainer>

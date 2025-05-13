@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import StaffMemberSerializer, CreateSupervisorSerializer, ExcelUploadSupervisorSerializer,StaffMemberSerializer
+from .serializers import StaffMemberSerializer, CreateSupervisorSerializer, ExcelUploadSupervisorSerializer, StaffMemberSerializer
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminOrBranchManager
 from rest_framework.exceptions import ValidationError
@@ -18,23 +18,22 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from .models import StaffMember
-from apps.courses.models import Course  # Import Course model
+from apps.courses.models import Course
 import logging
 logger = logging.getLogger(__name__)
-
 
 class StaffMemberDeleteView(generics.DestroyAPIView):
     queryset = StaffMember.objects.all()
     serializer_class = StaffMemberSerializer
-    permission_classes = [IsAdminOrBranchManager] 
+    permission_classes = [IsAdminOrBranchManager]
+
 class StaffMemberListCreateView(generics.ListCreateAPIView):
     queryset = StaffMember.objects.all()
-    serializer_class = StaffMemberSerializer  # Change to StaffMemberSerializer for detail view
+    serializer_class = StaffMemberSerializer
     permission_classes = []
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        # If creating a branch manager, handle branch assignment
         if instance.role == StaffMember.Role.BRANCH_MANAGER and instance.branch:
             if instance.branch.manager and instance.branch.manager != instance:
                 raise ValidationError("This branch already has a manager")
@@ -43,13 +42,11 @@ class StaffMemberListCreateView(generics.ListCreateAPIView):
 
 class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
     queryset = StaffMember.objects.all()
-    serializer_class = StaffMemberSerializer  # Change to StaffMemberSerializer for detail view
-    # permission_classes = [IsAuthenticated]
+    serializer_class = StaffMemberSerializer
     permission_classes = []
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        # Handle role changes and branch assignments
         if instance.role == StaffMember.Role.BRANCH_MANAGER and instance.branch:
             if instance.branch.manager and instance.branch.manager != instance:
                 raise ValidationError("This branch already has a manager")
@@ -59,36 +56,26 @@ class StaffMemberUpdateView(generics.RetrieveUpdateAPIView):
             if not instance.branch:
                 raise ValidationError("Supervisors must be assigned to a branch")
 
-# class CreateSupervisorView(generics.CreateAPIView):
-#     queryset = StaffMember.objects.filter(role="supervisor")
-#     serializer_class = CreateSupervisorSerializer
-#     # permission_classes = [IsAdminOrBranchManager]
-#     permission_classes = []
-
-#     def perform_create(self, serializer):
-#         instance = serializer.save(role=StaffMember.Role.SUPERVISOR)
-#         if not instance.branch:
-#             raise ValidationError("Supervisors must be assigned to a branch")
 class CreateStaffView(generics.CreateAPIView):
-    queryset = StaffMember.objects.all()  # Broaden queryset to include all roles
+    queryset = StaffMember.objects.all()
     serializer_class = CreateSupervisorSerializer
-    permission_classes = []  # Adjust as needed, e.g., [IsAdminOrBranchManager]
+    permission_classes = []
 
     def perform_create(self, serializer):
-        # Get the role from validated data
         role = serializer.validated_data.get('role')
+        # Allow SUPERVISOR, BRANCH_MANAGER, INSTRUCTOR
+        valid_roles = [
+            StaffMember.Role.SUPERVISOR,
+            StaffMember.Role.BRANCH_MANAGER,
+            StaffMember.Role.INSTRUCTOR
+        ]
+        if role not in valid_roles:
+            raise ValidationError(f"Role must be one of {[r.value for r in valid_roles]}.")
         
-        # Validate that role is either SUPERVISOR or BRANCH_MANAGER
-        if role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.BRANCH_MANAGER]:
-            raise ValidationError("This endpoint is only for creating Supervisors or Branch Managers.")
-        
-        # Save the instance without overriding the role
         instance = serializer.save()
-        
-        # Ensure a branch is assigned for SUPERVISOR or BRANCH_MANAGER
+        # Ensure a branch is assigned for SUPERVISOR, BRANCH_MANAGER, or INSTRUCTOR
         if not instance.branch:
             raise ValidationError(f"{role} must be assigned to a branch.")
-
 
 class CreateInstructorView(APIView):
     def post(self, request, *args, **kwargs):
@@ -110,13 +97,12 @@ class SupervisorBulkUploadView(APIView):
         if serializer.is_valid():
             try:
                 result = serializer.create(validated_data=serializer.validated_data)
-                # Validate that all created supervisors have branches
                 errors = []
                 created_supervisors = result.get('created', [])
                 for staff in created_supervisors:
                     if not staff.branch:
                         errors.append(f"Supervisor {staff.email} was not assigned to a branch")
-                        staff.delete()  # Optionally remove this supervisor from DB
+                        staff.delete()
                         created_supervisors.remove(staff)
                 
                 if errors:
@@ -130,13 +116,10 @@ class SupervisorBulkUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def supervisor_instructor_by_id_view(request, staff_id):
-    """Retrieve the tracks and courses assigned to a supervisor or instructor by staff member ID."""
-
     staff_member = get_object_or_404(StaffMember, id=staff_id)
 
     if staff_member.role not in [StaffMember.Role.SUPERVISOR, StaffMember.Role.INSTRUCTOR]:
@@ -144,7 +127,6 @@ def supervisor_instructor_by_id_view(request, staff_id):
                         status=status.HTTP_403_FORBIDDEN)
 
     try:
-        # Supervisor logic
         if staff_member.is_supervisor:
             tracks = Track.objects.filter(supervisor=staff_member)
             track_data = []
@@ -198,7 +180,6 @@ def supervisor_instructor_by_id_view(request, staff_id):
                 "taught_courses": taught_courses_serialized
             }, status=status.HTTP_200_OK)
 
-        # Instructor logic
         elif staff_member.is_instructor:
             courses = Course.objects.filter(instructor=staff_member)
             course_data = []
@@ -240,24 +221,18 @@ def supervisor_instructor_by_id_view(request, staff_id):
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-#Return All Instructosfrom django.http import JsonResponse
 
 class InstructorListView(View):
     def get(self, request, *args, **kwargs):
-        # Check if the request is for the current user's own data
         if request.GET.get('role') == 'me':
             staff_members = StaffMember.objects.filter(id=request.user.id)
         else:
-            # Get role parameter from the request to filter by instructor or supervisor
             role = request.GET.get('role', None)
-            
-            # Filter staff based on role if provided, else return all instructors and supervisors
             if role:
                 staff_members = StaffMember.objects.filter(role=role)
             else:
                 staff_members = StaffMember.objects.filter(role__in=[StaffMember.Role.INSTRUCTOR, StaffMember.Role.SUPERVISOR])
 
-        # Format the response data
         data = [
             {
                 "id": staff.id,
@@ -267,7 +242,7 @@ class InstructorListView(View):
                 "branch": staff.branch.name if staff.branch else None,
                 "phone": staff.phone,
                 "is_verified": staff.is_verified,
-                "role": staff.get_role_display()  # Display role name
+                "role": staff.get_role_display()
             }
             for staff in staff_members
         ]

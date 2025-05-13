@@ -73,10 +73,9 @@ export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
   async ({ roomId, text }, thunkAPI) => {
     try {
-      const resp = await apiClient.post(
-        `/chat/rooms/${roomId}/messages/`,
-        { text }
-      );
+      const resp = await apiClient.post(`/chat/rooms/${roomId}/messages/`, {
+        text,
+      });
       return { roomId, message: resp.data };
     } catch (err) {
       return thunkAPI.rejectWithValue(
@@ -100,7 +99,7 @@ const chatSlice = createSlice({
     searchLoading: false,
     searchError: null,
 
-    messages: {},         // { [roomId]: [ ...messages ] }
+    messages: {}, // { [roomId]: [ ...messages ] }
     messagesLoading: false,
     messagesError: null,
 
@@ -223,7 +222,7 @@ export const {
   receiveMessage,
   clearSearchResults,
   clearChatError,
-  clearMessages   // ← make sure you import this in your component
+  clearMessages, // ← make sure you import this in your component
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

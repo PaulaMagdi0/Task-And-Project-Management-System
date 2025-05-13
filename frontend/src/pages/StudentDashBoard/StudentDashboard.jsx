@@ -118,7 +118,7 @@ const StudentDashboard = () => {
         setData((prev) => ({ ...prev, loading: false, error: error.message }));
         if (error.response?.status === 401) {
           console.warn("Unauthorized access, redirecting to login");
-          navigate("/login");
+          navigate("/signin");
         }
       }
     };
@@ -127,7 +127,7 @@ const StudentDashboard = () => {
       fetchData();
     } else {
       console.warn("No username or token, redirecting to login");
-      navigate("/login");
+      navigate("/signin");
     }
   }, [username, token, navigate, location.search]);
 

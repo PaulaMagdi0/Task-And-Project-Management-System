@@ -1,4 +1,3 @@
-// File: src/pages/AdminDashboard/TracksManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -40,12 +39,32 @@ const TrackManagement = () => {
   const { staff: allStaff } = useSelector(state => state.staff);
   const { branch: managerBranch } = useSelector(state => state.auth);
 
+  // Log tracks, branches, and staff for debugging
+  console.log('Tracks state:', tracks);
+  console.log('Branches state:', allBranches);
+  console.log('Staff state:', allStaff);
+
+  // Normalize tracks to ensure it's an array
+  const normalizedTracks = Array.isArray(tracks)
+    ? tracks
+    : tracks?.results || [];
+
+  // Normalize branches to ensure it's an array
+  const normalizedBranches = Array.isArray(allBranches)
+    ? allBranches
+    : allBranches?.results || [];
+
+  // Normalize staff to ensure it's an array
+  const normalizedStaff = Array.isArray(allStaff)
+    ? allStaff
+    : allStaff?.results || [];
+
   // Only supervisors in this branch
-  const supervisors = allStaff.filter(s => s.role === 'supervisor' && s.branch?.id === managerBranch.id);
+  const supervisors = normalizedStaff.filter(s => s.role === 'supervisor' && s.branch?.id === managerBranch?.id);
   // Only show this branch
-  const branchOptions = allBranches.filter(b => b.id === managerBranch.id);
+  const branchOptions = normalizedBranches.filter(b => b.id === managerBranch?.id);
   // Only show tracks in this branch
-  const filteredTracks = tracks.filter(t => t.branch === managerBranch.id);
+  const filteredTracks = normalizedTracks.filter(t => t.branch === managerBranch?.id);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -53,7 +72,7 @@ const TrackManagement = () => {
     description: '',
     track_type: 'ICC',
     supervisor: '',
-    branch: managerBranch.id,
+    branch: managerBranch?.id || '',
   });
   const [editingId, setEditingId] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -88,7 +107,13 @@ const TrackManagement = () => {
   const toggleForm = () => {
     if (!formOpen) {
       setEditingId(null);
-      setFormData({ name: '', description: '', track_type: 'ICC', supervisor: '', branch: managerBranch.id });
+      setFormData({
+        name: '',
+        description: '',
+        track_type: 'ICC',
+        supervisor: '',
+        branch: managerBranch?.id || '',
+      });
       setLocalError('');
     }
     setFormOpen(o => !o);
@@ -104,8 +129,14 @@ const TrackManagement = () => {
       setLocalError('A track with this name and type already exists in your branch.');
       return;
     }
-    if (!trimmedName) { setLocalError('Name is required.'); return; }
-    if (!formData.description.trim()) { setLocalError('Description is required.'); return; }
+    if (!trimmedName) {
+      setLocalError('Name is required.');
+      return;
+    }
+    if (!formData.description.trim()) {
+      setLocalError('Description is required.');
+      return;
+    }
 
     const payload = { ...formData, name: trimmedName };
     let result;
@@ -131,7 +162,7 @@ const TrackManagement = () => {
       description: track.description,
       track_type: track.track_type,
       supervisor: track.supervisor || '',
-      branch: managerBranch.id,
+      branch: managerBranch?.id || '',
     });
     setFormOpen(true);
   };
@@ -152,47 +183,106 @@ const TrackManagement = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" gutterBottom>Track Management</Typography>
-      {localError && <Alert severity="error" sx={{ mb:2 }}>{localError}</Alert>}
-      {message && <Alert severity="success" sx={{ mb:2 }}>{message}</Alert>}
+      {localError && <Alert severity="error" sx={{ mb: 2 }}>{localError}</Alert>}
+      {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
 
-      <Box sx={{ mb:2 }}>
-        <Button variant="contained" onClick={toggleForm}>{formOpen ? 'Cancel' : 'Add Track'}</Button>
+      <Box sx={{ mb: 2 }}>
+        <Button variant="contained" onClick={toggleForm}>
+          {formOpen ? 'Cancel' : 'Add Track'}
+        </Button>
       </Box>
 
       <Collapse in={formOpen}>
-        <Paper sx={{ p:2, mb:3 }}>
-          <Typography variant="h6" gutterBottom>{editingId ? 'Edit Track' : 'Add New Track'}</Typography>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            {editingId ? 'Edit Track' : 'Add New Track'}
+          </Typography>
           <form onSubmit={handleSubmit}>
-            <TextField name="name" label="Track Name" value={formData.name} onChange={handleChange} fullWidth required sx={{ mb:2 }} />
-            <TextField name="description" label="Description" value={formData.description} onChange={handleChange} fullWidth required multiline rows={3} sx={{ mb:2 }} />
-            <FormControl fullWidth required sx={{ mb:2 }}>
+            <TextField
+              name="name"
+              label="Track Name"
+              value={formData.name}
+              onChange={handleChange}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              name="description"
+              label="Description"
+              value={formData.description}
+              onChange={handleChange}
+              fullWidth
+              required
+              multiline
+              rows={3}
+              sx={{ mb: 2 }}
+            />
+            <FormControl fullWidth required sx={{ mb: 2 }}>
               <InputLabel>Track Type</InputLabel>
-              <Select name="track_type" value={formData.track_type} onChange={handleChange} label="Track Type">
+              <Select
+                name="track_type"
+                value={formData.track_type}
+                onChange={handleChange}
+                label="Track Type"
+              >
                 <MenuItem value="ICC">ICC</MenuItem>
                 <MenuItem value="9month">9 Month</MenuItem>
               </Select>
             </FormControl>
-            <FormControl fullWidth sx={{ mb:2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Supervisor</InputLabel>
-              <Select name="supervisor" value={formData.supervisor} onChange={handleChange} label="Supervisor">
+              <Select
+                name="supervisor"
+                value={formData.supervisor}
+                onChange={handleChange}
+                label="Supervisor"
+              >
                 <MenuItem value=""><em>None</em></MenuItem>
-                {supervisors.map(s => <MenuItem key={s.id} value={s.id}>{s.username}</MenuItem>)}
+                {supervisors.length > 0 ? (
+                  supervisors.map(s => (
+                    <MenuItem key={s.id} value={s.id}>{s.username}</MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No supervisors available</MenuItem>
+                )}
               </Select>
             </FormControl>
-            <FormControl fullWidth required sx={{ mb:2 }}>
+            <FormControl fullWidth required sx={{ mb: 2 }}>
               <InputLabel>Branch</InputLabel>
-              <Select name="branch" value={formData.branch} label="Branch" disabled>
-                {branchOptions.map(b => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+              <Select
+                name="branch"
+                value={formData.branch}
+                label="Branch"
+                disabled
+              >
+                {branchOptions.length > 0 ? (
+                  branchOptions.map(b => (
+                    <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No branches available</MenuItem>
+                )}
               </Select>
             </FormControl>
-            <Button variant="contained" type="submit" disabled={loading}>{editingId ? 'Update Track' : 'Create Track'}</Button>
+            <Button
+              variant="contained"
+              type="submit"
+              disabled={loading}
+            >
+              {editingId ? 'Update Track' : 'Create Track'}
+            </Button>
           </form>
         </Paper>
       </Collapse>
 
-      <Paper sx={{ p:2 }}>
+      <Paper sx={{ p: 2 }}>
         <Typography variant="h6" gutterBottom>Tracks in Your Branch</Typography>
-        {loading ? <Typography>Loading...</Typography> : (
+        {loading ? (
+          <Typography>Loading...</Typography>
+        ) : normalizedTracks.length === 0 ? (
+          <Typography>No tracks available.</Typography>
+        ) : (
           <Table>
             <TableHead>
               <TableRow>
@@ -209,10 +299,19 @@ const TrackManagement = () => {
                   <TableCell>{t.id}</TableCell>
                   <TableCell>{t.name}</TableCell>
                   <TableCell>{t.track_type}</TableCell>
-                  <TableCell>{t.supervisor ? supervisors.find(s => s.id === t.supervisor)?.username : 'None'}</TableCell>
+                  <TableCell>
+                    {t.supervisor ? supervisors.find(s => s.id === t.supervisor)?.username : 'None'}
+                  </TableCell>
                   <TableCell>
                     <Button size="small" onClick={() => handleEdit(t)}>Edit</Button>
-                    <Button size="small" color="error" sx={{ ml:1 }} onClick={() => openDeleteDialog(t.id)}>Delete</Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      sx={{ ml: 1 }}
+                      onClick={() => openDeleteDialog(t.id)}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -223,10 +322,18 @@ const TrackManagement = () => {
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent><Typography>Are you sure you want to delete this track?</Typography></DialogContent>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this track?</Typography>
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleDelete} variant="contained" color="error">Delete</Button>
+          <Button
+            onClick={handleDelete}
+            variant="contained"
+            color="error"
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

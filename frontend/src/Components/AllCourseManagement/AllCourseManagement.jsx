@@ -30,9 +30,6 @@ import {
   clearCourseStatus,
 } from "../../redux/coursesSlice";
 import { fetchInstructors } from "../../redux/supervisorsSlice";
-import Assignments from "./../../pages/Instructor/Assignments";
-import WarningIcon from "@mui/icons-material/Warning";
-import Submissions from "./../Submissions/Submissions";
 
 const AllCourseManagement = () => {
   const dispatch = useDispatch();
@@ -54,31 +51,39 @@ const AllCourseManagement = () => {
     name: "",
     description: "",
     instructor: "",
+    intake: "",
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [localError, setLocalError] = useState("");
   const [searchName, setSearchName] = useState("");
+  const [selectedTrack, setSelectedTrack] = useState(""); // Added missing state
+  const [selectedIntake, setSelectedIntake] = useState(""); // Added missing state
+  const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmText, setConfirmText] = useState(""); // State for "I agree" input
+
+  // Placeholder for missing variables (replace with actual data)
+  const tracks = []; // Replace with actual tracks data
+  const intakes = []; // Replace with actual intakes data
+  const intakeCourses = {}; // Replace with actual intakeCourses data
+  const availableIntakes = []; // Replace with actual availableIntakes data
+  const instructorsTrackData = []; // Replace with actual instructorsTrackData
+  const intakeNames = intakes.map((intake) => intake.name); // Derived from intakes
+  const instructorsLoading = false; // Replace with actual loading state
+  const fetchAvailableIntakesLoading = false; // Replace with actual loading state
+  const updateCourseLoading = false; // Replace with actual loading state
 
   // Fetch courses and instructors on mount
   useEffect(() => {
-    console.log('Courses data:', courses);
-    console.log('Tracks data:', tracks);
-    console.log('Intakes data:', intakes);
-    console.log('IntakeCourses data:', intakeCourses);
-    console.log('AvailableIntakes data:', availableIntakes);
-    console.log('Instructors data:', instructors);
-    console.log('InstructorsTrackData:', instructorsTrackData);
-    courses?.forEach((course) => {
-      console.log(`Course ${course.name} (ID: ${course.id}) - Intake:`, course.intake, 'Tracks:', course.tracks, 'Instructor:', course.instructor);
-    });
-    const hasIntakeData = courses?.some((course) =>
-      course.intake || Object.values(intakeCourses).some((ic) => ic.some((c) => c.id === course.id))
-    );
-    setIntakeWarning(!hasIntakeData && courses?.length > 0 && intakes?.length > 0);
-  }, [courses, tracks, intakes, intakeCourses, availableIntakes, instructors, instructorsTrackData]);
+    dispatch(fetchCourses(user_id));
+    dispatch(fetchInstructors());
+  }, [dispatch, user_id]);
+
+  // Log data for debugging
+  useEffect(() => {
+    console.log("Courses data:", allCourses);
+    console.log("Instructors data:", instructors);
+  }, [allCourses, instructors]);
 
   // Handle error and success states
   useEffect(() => {
@@ -88,11 +93,11 @@ const AllCourseManagement = () => {
 
   // Clear success message after 3 seconds
   useEffect(() => {
-    if (success) {
+    if (message) {
       const timer = setTimeout(() => dispatch(clearCourseStatus()), 3000);
       return () => clearTimeout(timer);
     }
-  }, [success, dispatch]);
+  }, [message, dispatch]);
 
   // Map course IDs to intake names
   const getIntakeName = (courseId) => {
@@ -101,67 +106,43 @@ const AllCourseManagement = () => {
       const course = courses.find((c) => c.id === courseId);
       if (course) {
         const intake = intakes.find((i) => i.id === parseInt(intakeId));
-        return intake?.name || 'Not assigned';
+        return intake?.name || "Not assigned";
       }
     }
-    return 'Not assigned';
+    return "Not assigned";
   };
 
   // Filter instructors by track
   const getTrackInstructors = (trackId) => {
-    if (!trackId || !courses.length || !instructors.length) {
-      console.log('No trackId, courses, or instructors, returning empty array', {
-        trackId,
-        coursesLength: courses.length,
-        instructorsLength: instructors.length,
-      });
+    if (!trackId || !allCourses?.length || !instructors?.length) {
       return [];
     }
-
-    // Get all courses in the track
-    const trackCourses = courses.filter((course) =>
+    const trackCourses = allCourses.filter((course) =>
       course.tracks?.some((track) => track.id === trackId)
     );
-    console.log(`Courses for trackId ${trackId}:`, trackCourses);
-
-    // Collect unique instructor IDs from track courses
     const instructorIds = [
       ...new Set(
         trackCourses
           .filter((course) => course.instructor?.id)
-          .map((course) => {
-            console.log(`Course ${course.name} (ID: ${course.id}) has instructor:`, course.instructor);
-            return course.instructor.id;
-          })
+          .map((course) => course.instructor.id)
       ),
     ];
-    console.log(`Unique instructor IDs for trackId ${trackId}:`, instructorIds);
-
-    // Get instructor objects
-    const trackInstructors = instructors.filter((instructor) =>
+    return instructors.filter((instructor) =>
       instructorIds.includes(instructor.id)
     );
-    console.log(`Track instructors for trackId ${trackId}:`, trackInstructors);
-
-    return trackInstructors;
   };
 
   // Handlers
-  const openEditDialog = (course, trackId) => {
-    console.log('Opening edit dialog for course:', course, 'with trackId:', trackId);
-    const trackCourses = courses.filter((c) => c.tracks?.some((t) => t.id === trackId));
-    console.log(`Courses for trackId ${trackId}:`, trackCourses);
+  const openEditDialog = (course, trackId = null) => {
     setEditData({
       courseId: course.id,
       name: course.name,
-      description: course.description,
-      instructor: course.instructor || "",
+      description: course.description || "",
+      instructor: course.instructor?.id || "",
+      intake: course.intake || "",
+      trackId: trackId || "",
     });
     setEditDialogOpen(true);
-    // Fetch track-specific intakes
-    if (trackId) {
-      dispatch(fetchAvailableIntakes([trackId]));
-    }
   };
 
   const handleEditChange = async () => {
@@ -188,21 +169,18 @@ const AllCourseManagement = () => {
   };
 
   const openDeleteDialog = (id) => {
-    console.log("Opening delete dialog for course ID:", id);
     setCourseToDelete(id);
-    setConfirmText(""); // Reset confirmation text
+    setConfirmText("");
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
-    console.log("Deleting course with ID:", courseToDelete);
     setIsDeleting(true);
     try {
-      await dispatch(deleteCourse(courseToDelete.courseId)).unwrap();
+      await dispatch(deleteCourse(courseToDelete)).unwrap();
       setDeleteDialogOpen(false);
       dispatch(fetchCourses(user_id));
     } catch (err) {
-      console.error("Delete error:", err);
       setLocalError(err.message || "Failed to delete course.");
     } finally {
       setIsDeleting(false);
@@ -223,11 +201,12 @@ const AllCourseManagement = () => {
 
   const handleResetFilters = () => {
     setSearchName("");
+    setSelectedTrack("");
+    setSelectedIntake("");
   };
 
   // Filter courses
   const filteredCourses = useMemo(() => {
-    // Ensure courses is an array; use results if allCourses is an object
     const courses = Array.isArray(allCourses)
       ? allCourses
       : allCourses?.results || [];
@@ -271,7 +250,27 @@ const AllCourseManagement = () => {
             sx={{ borderRadius: 2 }}
           />
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} sm={4}>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel>Track</InputLabel>
+            <Select
+              value={selectedTrack}
+              onChange={handleTrackFilterChange}
+              label="Track"
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value="">
+                <em>All Tracks</em>
+              </MenuItem>
+              {tracks.map((track) => (
+                <MenuItem key={track.id} value={track.id}>
+                  {track.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={4}>
           <FormControl variant="outlined" fullWidth>
             <InputLabel>Intake</InputLabel>
             <Select
@@ -280,14 +279,18 @@ const AllCourseManagement = () => {
               label="Intake"
               sx={{ borderRadius: 2 }}
             >
-              <MenuItem value=""><em>All Intakes</em></MenuItem>
+              <MenuItem value="">
+                <em>All Intakes</em>
+              </MenuItem>
               {intakeNames.map((name) => (
-                <MenuItem key={name} value={name}>{name}</MenuItem>
+                <MenuItem key={name} value={name}>
+                  {name}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} sm={4}>
           <Button
             fullWidth
             variant="contained"
@@ -332,10 +335,7 @@ const AllCourseManagement = () => {
         <Typography variant="h6" gutterBottom>
           Course List
         </Typography>
-
-        {loading ? (
-          <Typography>Loading...</Typography>
-        ) : filteredCourses.length > 0 ? (
+        <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
@@ -357,39 +357,61 @@ const AllCourseManagement = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredCourses.map((course) => (
-                <TableRow
-                  key={course.id}
-                  sx={{ "&:hover": { bgcolor: "#f8fafc" } }}
-                >
-                  <TableCell>{course.id}</TableCell>
-                  <TableCell>{course.name}</TableCell>
-                  <TableCell>
-                    {course.instructor_name || "Not assigned"}
-                  </TableCell>
-                  <TableCell>{course.description || "-"}</TableCell>
-                  <TableCell>
-                    <Button size="small" onClick={() => openEditDialog(course)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      sx={{ ml: 1 }}
-                      onClick={() => openDeleteDialog(course.id)}
-                    >
-                      Delete
-                    </Button>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredCourses.length > 0 ? (
+                filteredCourses.map((course) => (
+                  <TableRow
+                    key={course.id}
+                    sx={{ "&:hover": { bgcolor: "#f8fafc" } }}
+                  >
+                    <TableCell>{course.id}</TableCell>
+                    <TableCell>{course.name}</TableCell>
+                    <TableCell>
+                      {course.instructor_name || "Not assigned"}
+                    </TableCell>
+                    <TableCell>{course.description || "-"}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        onClick={() => openEditDialog(course)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        sx={{ ml: 1 }}
+                        onClick={() => openDeleteDialog(course.id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    No courses found
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
-      </StyledPaper>
+      </Paper>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Edit Course: {editData.name}</DialogTitle>
         <DialogContent>
           <TextField
@@ -421,14 +443,16 @@ const AllCourseManagement = () => {
               }
               label="Instructor"
               sx={{ borderRadius: 2 }}
-              disabled={instructorsLoading || fetchAvailableIntakesLoading || !getTrackInstructors(editData.trackId).length}
+              disabled={instructorsLoading || !getTrackInstructors(editData.trackId).length}
             >
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
               {instructors.map((instructor) => (
                 <MenuItem key={instructor.id} value={instructor.id}>
-                  {instructor.full_name || instructor.username || `Instructor ${instructor.id}`}
+                  {instructor.full_name ||
+                    instructor.username ||
+                    `Instructor ${instructor.id}`}
                 </MenuItem>
               ))}
             </Select>
@@ -437,12 +461,16 @@ const AllCourseManagement = () => {
             <InputLabel>Intake</InputLabel>
             <Select
               value={editData.intake}
-              onChange={(e) => setEditData({ ...editData, intake: e.target.value })}
+              onChange={(e) =>
+                setEditData({ ...editData, intake: e.target.value })
+              }
               label="Intake"
               sx={{ borderRadius: 2 }}
               disabled={fetchAvailableIntakesLoading}
             >
-              <MenuItem value=""><em>Not assigned</em></MenuItem>
+              <MenuItem value="">
+                <em>Not assigned</em>
+              </MenuItem>
               {availableIntakes.map((intake) => (
                 <MenuItem key={intake.id} value={intake.id}>
                   {intake.name}
@@ -454,7 +482,7 @@ const AllCourseManagement = () => {
         <DialogActions>
           <Button
             onClick={() => setEditDialogOpen(false)}
-            sx={{ color: '#64748b', borderRadius: 2 }}
+            sx={{ color: "#64748b", borderRadius: 2 }}
             disabled={updateCourseLoading}
           >
             Cancel
@@ -464,12 +492,16 @@ const AllCourseManagement = () => {
             variant="contained"
             disabled={updateCourseLoading}
             sx={{
-              bgcolor: '#3b82f6',
-              '&:hover': { bgcolor: '#2563eb' },
+              bgcolor: "#3b82f6",
+              "&:hover": { bgcolor: "#2563eb" },
               borderRadius: 2,
             }}
           >
-            {updateCourseLoading ? <CircularProgress size={20} color="inherit" /> : 'Save'}
+            {updateCourseLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Save"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
@@ -484,7 +516,6 @@ const AllCourseManagement = () => {
         <DialogTitle sx={{ bgcolor: "#d32f2f", color: "white", py: 2 }}>
           Confirm Course Deletion
         </DialogTitle>
-
         <DialogContent sx={{ pt: 3 }}>
           <Typography
             variant="body1"
@@ -492,9 +523,7 @@ const AllCourseManagement = () => {
             sx={{ mb: 2, fontWeight: 500 }}
           >
             Warning: You are about to permanently delete the course{" "}
-            <strong>{course?.name || "Unknown"}</strong> associated with your
-            track from the database as well{" "}
-            <strong>Assignments , Submissions</strong> attached to it.
+            <strong>{course?.name || "Unknown"}</strong> from the database.
           </Typography>
           <Typography variant="body2" sx={{ mb: 3, color: "text.secondary" }}>
             This action cannot be undone. To confirm, please type{" "}
@@ -518,7 +547,7 @@ const AllCourseManagement = () => {
         <DialogActions>
           <Button
             onClick={() => setDeleteDialogOpen(false)}
-            sx={{ color: '#64748b', borderRadius: 2 }}
+            sx={{ color: "#64748b", borderRadius: 2 }}
           >
             Cancel
           </Button>
@@ -526,10 +555,10 @@ const AllCourseManagement = () => {
             onClick={handleDelete}
             variant="contained"
             color="error"
-            disabled={!isDeleteConfirmed || isDeleting}
+            disabled={!isConfirmValid || isDeleting}
             sx={{
-              bgcolor: '#ef4444',
-              '&:hover': { bgcolor: '#dc2626' },
+              bgcolor: "#ef4444",
+              "&:hover": { bgcolor: "#dc2626" },
               borderRadius: 2,
             }}
           >

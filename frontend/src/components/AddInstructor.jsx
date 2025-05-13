@@ -84,10 +84,22 @@ const UploadInstructor = () => {
             setFetchingCourses(true);
             try {
                 const response = await apiClient.get('/courses/');
-                setCourses(response.data);
+                // Log response to debug
+                console.log('Courses API response:', response.data);
+                // Handle various response structures
+                let courseData = [];
+                if (Array.isArray(response.data)) {
+                    courseData = response.data;
+                } else if (response.data && Array.isArray(response.data.results)) {
+                    courseData = response.data.results;
+                } else if (response.data && Array.isArray(response.data.courses)) {
+                    courseData = response.data.courses;
+                }
+                setCourses(courseData);
             } catch (error) {
                 console.error('Error fetching courses:', error);
                 showErrorModal('Failed to load courses');
+                setCourses([]);
             } finally {
                 setFetchingCourses(false);
             }
@@ -301,12 +313,14 @@ const UploadInstructor = () => {
                                 >
                                     {fetchingCourses ? (
                                         <MenuItem disabled>Loading courses...</MenuItem>
-                                    ) : (
+                                    ) : Array.isArray(courses) && courses.length > 0 ? (
                                         courses.map((course) => (
                                             <MenuItem key={course.id} value={course.id}>
                                                 {course.name}
                                             </MenuItem>
                                         ))
+                                    ) : (
+                                        <MenuItem disabled>No courses available</MenuItem>
                                     )}
                                 </Select>
                             </FormControl>

@@ -68,7 +68,6 @@ const UploadInstructor = () => {
     role: "instructor",
     course_id: "",
   });
-
   const [courses, setCourses] = useState([]);
   const [excelFile, setExcelFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -85,10 +84,28 @@ const UploadInstructor = () => {
       setFetchingCourses(true);
       try {
         const response = await apiClient.get("/courses/");
-        setCourses(response.data);
+        // Log response for debugging
+        console.log("Raw API response:", response);
+        console.log("Courses API response.data:", response.data);
+        // Handle various response structures
+        let courseData = [];
+        if (Array.isArray(response.data)) {
+          courseData = response.data;
+        } else if (response.data && Array.isArray(response.data.results)) {
+          courseData = response.data.results;
+        } else if (response.data && Array.isArray(response.data.courses)) {
+          courseData = response.data.courses;
+        } else if (response.data && Array.isArray(response.data.data)) {
+          courseData = response.data.data;
+        } else {
+          console.warn("Unexpected courses response format:", response.data);
+        }
+        setCourses(courseData);
+        console.log("Set courses:", courseData);
       } catch (error) {
         console.error("Error fetching courses:", error);
         showErrorModal("Failed to load courses");
+        setCourses([]);
       } finally {
         setFetchingCourses(false);
       }
@@ -134,6 +151,7 @@ const UploadInstructor = () => {
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailPattern.test(email);
   };
+
   const handleSubmitManualStaff = async () => {
     if (
       !staffData.username ||
@@ -174,7 +192,6 @@ const UploadInstructor = () => {
         }
       );
 
-      // If successful, handle success
       showSuccessModal("Instructor added successfully!");
       setStaffData({
         username: "",
@@ -203,7 +220,6 @@ const UploadInstructor = () => {
       return;
     }
 
-    // Validate file type
     const allowedTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
@@ -235,6 +251,9 @@ const UploadInstructor = () => {
       setLoading(false);
     }
   };
+
+  // Log courses state before rendering Select
+  console.log("Courses state before Select:", courses);
 
   return (
     <Box sx={{ p: 3, background: "#f5f7fa", minHeight: "100vh" }}>
@@ -332,12 +351,14 @@ const UploadInstructor = () => {
                 >
                   {fetchingCourses ? (
                     <MenuItem disabled>Loading courses...</MenuItem>
-                  ) : (
+                  ) : Array.isArray(courses) && courses.length > 0 ? (
                     courses.map((course) => (
                       <MenuItem key={course.id} value={course.id}>
                         {course.name}
                       </MenuItem>
                     ))
+                  ) : (
+                    <MenuItem disabled>No courses available</MenuItem>
                   )}
                 </Select>
               </FormControl>

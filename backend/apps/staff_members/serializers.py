@@ -7,11 +7,11 @@ from .models import StaffMember
 from apps.courses.models import Course
 from django.shortcuts import get_object_or_404
 from apps.branch_location.models import Branch
-import secrets       # Add this import
-import string        # And this import
+import secrets
+import string
 import logging
 from django.contrib.auth.hashers import make_password
-from apps.courses.models import Course
+import openpyxl
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,10 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def validate(self, data):
         role = data.get('role')
         branch = data.get('branch')
-        # Ensure branch is provided for branch managers and supervisors.
         if role in [StaffMember.Role.BRANCH_MANAGER, StaffMember.Role.SUPERVISOR] and not branch:
             raise serializers.ValidationError({
                 'branch': _('Branch managers and supervisors must be assigned to a branch.')
             })
-        # For branch managers, ensure the branch doesn't already have a different manager.
         if role == StaffMember.Role.BRANCH_MANAGER and branch:
             if branch.manager and (not self.instance or branch.manager != self.instance):
                 raise serializers.ValidationError({
@@ -66,7 +64,6 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop('password')
         branch = validated_data.pop('branch', None)
-        # Create the staff member with branch already assigned.
         staff_member = StaffMember(branch=branch, **validated_data)
         try:
             validate_password(password, staff_member)
@@ -92,7 +89,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
             instance.branch = branch
         instance.save()
         return instance
-    
+
 class StaffMemberListSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField()
 
@@ -104,12 +101,9 @@ class StaffMemberListSerializer(serializers.ModelSerializer):
         ]
 
     def get_branch(self, obj):
-        """Safe method to get branch information"""
         if obj.branch is None:
             return None
         return obj.branch.name
-
-
 
 class CreateSupervisorSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
@@ -121,16 +115,19 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = StaffMember
-        fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id', 'role']  # Added 'role'
+        fields = ['username', 'email', 'password', 'phone', 'first_name', 'last_name', 'branch_id', 'role']
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
             'email': {'required': True},
-            'role': {'required': True}  # Ensure role is required
+            'role': {'required': True}
         }
 
     def validate_role(self, value):
-        # Validate that role is either SUPERVISOR or BRANCH_MANAGER
-        valid_roles = [StaffMember.Role.SUPERVISOR, StaffMember.Role.BRANCH_MANAGER]
+        valid_roles = [
+            StaffMember.Role.SUPERVISOR,
+            StaffMember.Role.BRANCH_MANAGER,
+            StaffMember.Role.INSTRUCTOR
+        ]
         if value not in valid_roles:
             raise serializers.ValidationError(
                 f"Role must be one of {[r.value for r in valid_roles]}."
@@ -138,7 +135,6 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        # Check email uniqueness
         if StaffMember.objects.filter(email=data['email']).exists():
             raise serializers.ValidationError({
                 'email': _('A user with this email already exists.')
@@ -147,24 +143,19 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        # Extract role from validated data
         role = validated_data.pop('role')
-        
-        # Extract password and branch
         password = validated_data.pop('password', None)
         branch = validated_data.pop('branch')
         
-        # Generate random password if none provided
         if not password:
             password = ''.join(
                 secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*()")
                 for _ in range(12)
             )
             
-        # Create staff member with the provided role
         staff = StaffMember(
             **validated_data,
-            role=role  # Use the role from validated data
+            role=role
         )
         
         try:
@@ -175,6 +166,7 @@ class CreateSupervisorSerializer(serializers.ModelSerializer):
             return staff
         except DjangoValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
+
 class CreateBranchManagerSerializer(serializers.ModelSerializer):
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
@@ -227,7 +219,6 @@ class CreateBranchManagerSerializer(serializers.ModelSerializer):
             manager.branch = branch
             manager.save()
             
-            # Update the branch with the new manager
             branch.manager = manager
             branch.save()
             
@@ -322,11 +313,6 @@ class ExcelUploadSupervisorSerializer(serializers.Serializer):
         except Exception as e:
             logger.error(f'Bulk create failed: {e}')
             raise serializers.ValidationError(_('Failed to create supervisors. Please try again.'))
-        
-from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
-from .models import StaffMember
-from apps.courses.models import Course  # adjust path as needed
 
 class CreateInstructorSerializer(serializers.ModelSerializer):
     course_id = serializers.IntegerField(required=False, write_only=True)
@@ -343,14 +329,9 @@ class CreateInstructorSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])
-
-        # Force the role to 'instructor'
         validated_data['role'] = StaffMember.Role.INSTRUCTOR
-
         course_id = validated_data.pop('course_id', None)
-
         staff_member = super().create(validated_data)
-
         if course_id:
             try:
                 course = Course.objects.get(id=course_id)
@@ -358,5 +339,4 @@ class CreateInstructorSerializer(serializers.ModelSerializer):
                 course.save()
             except Course.DoesNotExist:
                 raise serializers.ValidationError(f"Course with ID {course_id} does not exist.")
-
         return staff_member
