@@ -1,7 +1,3 @@
-"""
-Django settings for task-project-system project.
-"""
-
 import os
 import dj_database_url
 from dotenv import load_dotenv
@@ -23,13 +19,10 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     'task-and-project-management-system-production.up.railway.app',
-    '.railway.app',
-    '.vercel.app',
+    '*.railway.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
     'https://task-and-project-management-system-production.up.railway.app',
     'https://task-manager-nine-tau.vercel.app',
 ]
@@ -37,9 +30,6 @@ CSRF_TRUSTED_ORIGINS = [
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
     'https://task-manager-nine-tau.vercel.app',
 ]
 CORS_ALLOW_CREDENTIALS = True
@@ -53,8 +43,6 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'x-request-id',
-    'x-api-version',
 ]
 
 # Application definition
@@ -195,7 +183,7 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER', default='m.nasr266@gmail.com')
 
 # Site URL for verification emails
-SITE_URL = config('SITE_URL', default='http://localhost:8000')
+SITE_URL = config('SITE_URL', default='https://task-and-project-management-system-production.up.railway.app')
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -217,9 +205,21 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'debug.log',
+        },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO' if DEBUG else 'WARNING',
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': True,
+        },
+        'django.db.backends': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
     },
 }
