@@ -56,12 +56,23 @@ def get_cached_embeddings():
 
 # ========== Recommendation Logic ==========
 
-def recommend_using_course_and_difficulty(course_name, difficulty, top_n=3):
+def recommend_using_course_and_difficulty(course_name, difficulty, intake_name=None, top_n=3):
     try:
-        course = Course.objects.get(name__iexact=course_name.strip())
+        # Start with a query for the course name
+        query = Course.objects.filter(name__iexact=course_name.strip())
+        
+        # If intake_name is provided, filter by intake
+        if intake_name:
+            query = query.filter(intake__name__iexact=intake_name.strip())
+        
+        course = query.first()  # Get the first matching course
+        if not course:
+            logger.error(f"No course found with the name: {course_name} and intake: {intake_name or 'Any'}")
+            return f"❌ No course found with the name: {course_name} and intake: {intake_name or 'Any'}"
+    
     except Course.DoesNotExist:
-        logger.error(f"No course found with the name: {course_name}")
-        return f"❌ No course found with the name: {course_name}"
+        logger.error(f"No course found with the name: {course_name} and intake: {intake_name or 'Any'}")
+        return f"❌ No course found with the name: {course_name} and intake: {intake_name or 'Any'}"
 
     filtered_assignments = Assignment.objects.filter(
         course=course,
@@ -69,11 +80,10 @@ def recommend_using_course_and_difficulty(course_name, difficulty, top_n=3):
     ).order_by('-created_at')[:top_n]
 
     if not filtered_assignments.exists():
-        logger.warning(f"No assignments found for course '{course_name}' with difficulty '{difficulty}'")
-        return f"⚠️ No assignments found for course '{course_name}' with difficulty '{difficulty}'"
+        logger.warning(f"No assignments found for course '{course_name}' with difficulty '{difficulty}' and intake '{intake_name or 'Any'}'")
+        return f"⚠️ No assignments found for course '{course_name}' with difficulty '{difficulty}' and intake '{intake_name or 'Any'}'"
 
     return filtered_assignments
-
 def recommend_based_on_brief(brief_description, top_n=3):
     if not brief_description.strip():
         return f"⚠️ Brief description is empty."
@@ -110,7 +120,8 @@ def get_recommendations(request):
     if method_choice == "1":
         course_name = request.GET.get("course_name", "Java")
         difficulty = request.GET.get("difficulty", "Easy")
-        recommendations = recommend_using_course_and_difficulty(course_name, difficulty, top_n=top_n)
+        intake_name = request.GET.get("intake_name", None)  # Get intake_name, default to None
+        recommendations = recommend_using_course_and_difficulty(course_name, difficulty, intake_name, top_n=top_n)
     elif method_choice == "2":
         brief_description = request.GET.get("brief_description", "web app using django")
         recommendations = recommend_based_on_brief(brief_description, top_n=top_n)
@@ -128,6 +139,7 @@ def get_recommendations(request):
             "description": rec.description,
             "course_name": rec.course.name,
             "difficulty": rec.difficulty,
+            "intake_name": rec.course.intake.name if rec.course.intake else "No Intake",
         })
 
     return JsonResponse({"recommendations": recommended_list})

@@ -330,15 +330,18 @@ const CreateAssignment = () => {
       return;
     }
 
-    let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
-    if (recommendationDialog.methodChoice === "1") {
-      const course = courses.find((c) => c.id === formData.course);
-      const courseName = course ? `${course.name} Intake(${course.intake?.name || 'No Intake'})` : "";
-      url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
-    } else {
-      url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
-    }
-
+   let url = `http://127.0.0.1:8000/ai/recommendations/?method_choice=${recommendationDialog.methodChoice}`;
+if (recommendationDialog.methodChoice === "1") {
+  const course = courses.find((c) => c.id === formData.course);
+  const courseName = course ? course.name : "";
+  const intakeName = course && course.intake ? course.intake.name : "";
+  url += `&course_name=${encodeURIComponent(courseName)}&difficulty=${encodeURIComponent(formData.difficulty)}`;
+  if (intakeName) {
+    url += `&intake_name=${encodeURIComponent(intakeName)}`;
+  }
+} else {
+  url += `&brief_description=${encodeURIComponent(recommendationDialog.briefDescription)}`;
+}
     try {
       const response = await fetch(url);
       const data = await response.json();

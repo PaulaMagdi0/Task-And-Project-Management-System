@@ -1,12 +1,19 @@
-import openai
+import json
+import os
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
+from huggingface_hub import InferenceClient
+from dotenv import load_dotenv
 
-openai.api_key = "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"
+# Load environment variables
+load_dotenv()
+
+# Initialize Hugging Face Inference Client
+HF_API_KEY = os.getenv("HF_API_KEY")
+client = InferenceClient(api_key=HF_API_KEY)
 
 @csrf_exempt
-def chat_with_openai(request):
+def chat_with_hf(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -15,18 +22,30 @@ def chat_with_openai(request):
             if not user_message:
                 return JsonResponse({"error": "Message is required"}, status=400)
 
-            # Sending the request to OpenAI API
-            completion = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
+            # Validate parameters
+            top_p = 0.9  # Must be > 0.0 and < 1.0
+            temperature = 0.7  # Standard value for coherent responses
+            max_tokens = 500
+
+            if not (0.0 < top_p < 1.0):
+                return JsonResponse({"error": "Invalid top_p: must be > 0.0 and < 1.0"}, status=400)
+            if not (0.1 <= temperature <= 2.0):
+                return JsonResponse({"error": "Invalid temperature: must be between 0.1 and 2.0"}, status=400)
+
+            # Send request to Hugging Face Inference API
+            response = client.chat_completion(
+                model="mistralai/Mixtral-8x7B-Instruct-v0.1",
                 messages=[{"role": "user", "content": user_message}],
-                store=True
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p
             )
 
-            # Get the response message
-            response_message = completion.choices[0].message['content']
+            # Extract the response message
+            response_message = response.choices[0].message.content
             return JsonResponse({"response": response_message}, status=200)
 
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+            return JsonResponse({"error": f"API error: {str(e)}"}, status=500)
 
     return JsonResponse({"error": "Invalid method"}, status=405)
