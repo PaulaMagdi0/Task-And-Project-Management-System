@@ -6,53 +6,84 @@ import "swiper/css/autoplay";
 import { Autoplay } from "swiper/modules";
 
 // Import team images
-import team1Image from "../../assets/img/team/team-1.jpg";
-import team2Image from "../../assets/img/team/team-2.jpg";
-import team3Image from "../../assets/img/team/team-3.jpg";
+import zalabany from "../../assets/img/team/zalabany.jpg"; // 7ot sortk hna ya zalabany
+import mano from "../../assets/img/team/mano.png";
+import hossam from "../../assets/img/team/hossam.jpg";
+import khaled from "../../assets/img/team/khaled.jpg";
+import pola from "../../assets/img/team/pola.jpg";
 
 const teamMembers = [
   {
-    id: "walter-white",
-    name: "Walter White",
-    role: "Lead Web Developer",
+    portfolio: "1",
+    name: "Mahmoud Nasr",
+    role: "Full Stack Developer",
     description:
-      "Walter is the backbone of our platform, ensuring that all the front-end and back-end functionalities work seamlessly. He has extensive experience in building scalable systems.",
-    image: team1Image,
-    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
+      "Mahmoud is the backbone of our platform, ensuring that all the front-end and back-end functionalities work seamlessly. He has extensive experience in building scalable systems.",
+    image: zalabany,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/mahmoud-nasr-82aa822a9/",
+      github: "https://github.com/MahmoudNasrZ",
+      facebook: "https://www.facebook.com/mahmoud.nasr.9803",
+    },
   },
   {
-    id: "sarah-jhinson",
-    name: "Sarah Jhinson",
-    role: "Project Manager",
+    portfolio: "2",
+    name: "Hossam Zakaria",
+    role: "Full Stack Developer",
     description:
-      "Sarah manages the flow of tasks and ensures that deadlines are met. With a strong background in project management, she keeps everything organized and on track.",
-    image: team2Image,
-    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
+      "Hossam manages the flow of tasks and ensures that deadlines are met. With a strong background in project management, he keeps everything organized and on track.",
+    image: hossam,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/hossam-zakaria-s/",
+      github: "https://github.com/HossamZakariaSannad",
+      facebook: "https://www.facebook.com/hosam.zico.9",
+    },
   },
   {
-    id: "william-anderson",
-    name: "William Anderson",
-    role: "Content Strategist",
+    portfolio: "3",
+    name: "Khaled Sherif",
+    role: "Full Stack Developer",
     description:
-      "William works closely with the development team to ensure our content is clear, concise, and accessible. He drives the content strategy and ensures its alignment with project goals.",
-    image: team3Image,
-    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
+      "Khaled works closely with the development team to ensure our content is clear, concise, and accessible. He drives the content strategy and ensures its alignment with project goals.",
+    image: khaled,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/khaled-sherif1/",
+      github: "https://github.com/khaled-101",
+      facebook: "https://www.facebook.com/khaled7451",
+    },
   },
   {
-    id: "jane-doe",
-    name: "Jane Doe",
-    role: "UI/UX Designer",
+    portfolio: "https://abdelrahmanebeid.framer.website/",
+    name: "Abdelrahman Ebeid",
+    role: "Full Stack Developer",
     description:
-      "Jane is in charge of creating intuitive, user-friendly designs that make our platform easy to use. She focuses on creating beautiful, functional interfaces.",
-    image: team3Image,
-    socialLinks: { twitter: "#", facebook: "#", instagram: "#", linkedin: "#" },
+      "Abdelrahman is in charge of creating intuitive, user-friendly designs that make our platform easy to use. He focuses on creating beautiful, functional interfaces.",
+    image: mano,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/abdelrahman-ebied22/",
+      github: "https://github.com/MaNn0",
+      facebook: "https://www.facebook.com/abdelrahman.ramadann",
+    },
+  },
+  {
+    portfolio: "5",
+    name: "Paula Magdy",
+    role: "Full Stack Developer",
+    description:
+      "Paula leads the development of unit testing and modern UI/UX, ensuring our platform is cutting-edge and user-friendly.",
+    image: pola,
+    socialLinks: {
+      linkedin: "https://www.linkedin.com/in/paula-magdy/",
+      github: "https://github.com/PaulaMagdi0",
+      facebook: "https://www.facebook.com/elneamer.pop",
+    },
   },
 ];
 
 const Team = () => {
   return (
     <section id="team" className="team section">
-      <div className="container section-title" data-aos="fade-up">
+      <div className="container section-title d-flex flex-column" data-aos="fade-up">
         <span>Our Team</span>
         <h2>Meet the Team</h2>
         <p>
@@ -76,34 +107,41 @@ const Team = () => {
           loop={true}
         >
           {teamMembers.map((member) => (
-            <SwiperSlide key={member.id}>
+            <SwiperSlide key={member.portfolio}>
               <div className="member" data-aos="fade-up" data-aos-delay="100">
                 <img
                   src={member.image}
                   className="img-fluid"
                   alt={member.name}
+                  style={{
+                    width: "100%",
+                    minHeight: "300px",
+                    maxHeight: "300px",
+                  }}
                 />
                 <div className="member-content">
                   <h4>{member.name}</h4>
                   <span>{member.role}</span>
                   <p>{member.description}</p>
                   <div className="social">
-                    <Link to={member.socialLinks.twitter}>
-                      <i className="bi bi-twitter"></i>
+                    <Link to={member.socialLinks.linkedin}>
+                      <i className="bi bi-linkedin"></i>
+                    </Link>
+                    <Link to={member.socialLinks.github}>
+                      <i className="bi bi-github"></i>
                     </Link>
                     <Link to={member.socialLinks.facebook}>
                       <i className="bi bi-facebook"></i>
                     </Link>
-                    <Link to={member.socialLinks.instagram}>
-                      <i className="bi bi-instagram"></i>
-                    </Link>
-                    <Link to={member.socialLinks.linkedin}>
-                      <i className="bi bi-linkedin"></i>
-                    </Link>
                   </div>
-                  <Link to={`/team/${member.id}`} className="details-link">
-                    <i className="bi bi-link-45deg"></i> View Profile
-                  </Link>
+                  <a
+                    href={member.portfolio}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="details-link mt-1"
+                  >
+                    <i className="bi bi-link-45deg"></i> View Portfolio
+                  </a>
                 </div>
               </div>
             </SwiperSlide>

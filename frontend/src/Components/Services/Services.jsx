@@ -1,86 +1,70 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import about from "/src/assets/img/about2.png";
 
-const servicesData = [
-  {
-    id: 1,
-    icon: "bi-kanban",
-    title: "Task Management",
-    description:
-      "Streamline task creation, assignment, and tracking to ensure projects are completed efficiently. Organize tasks with due dates, priorities, and deadlines.",
-  },
-  {
-    id: 2,
-    icon: "bi-calendar-check",
-    title: "Project Scheduling",
-    description:
-      "Easily create and manage project timelines with Gantt charts, calendars, and task dependencies to stay on track with deadlines.",
-  },
-  {
-    id: 3,
-    icon: "bi-person-circle",
-    title: "Team Collaboration",
-    description:
-      "Facilitate seamless communication between team members through real-time chat, notifications, and file sharing.",
-  },
-  {
-    id: 4,
-    icon: "bi-clipboard-data",
-    title: "Performance Tracking",
-    description:
-      "Monitor progress with detailed reports and analytics to track project milestones, completed tasks, and team performance.",
-  },
-  {
-    id: 5,
-    icon: "bi-file-earmark-text",
-    title: "Document Management",
-    description:
-      "Store and share important project files and documents securely with easy access for your team members.",
-  },
-  {
-    id: 6,
-    icon: "bi-chat-left-text",
-    title: "Communication Tools",
-    description:
-      "Engage with your team and clients using integrated messaging, comments, and notifications to ensure everyone stays aligned.",
-  },
-];
+const About = () => {
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
 
-const Services = () => {
+  const aboutData = {
+    title: "About Task Flow",
+    subtitle: "Empowering teams to achieve more",
+    description:
+      "Task Flow is a powerful task and project management platform designed to streamline workflows, boost productivity, and simplify collaboration for teams of any size.",
+    listItems: [
+      "Create, assign, and track tasks across multiple projects effortlessly.",
+      "Collaborate with team members in real time through integrated chat and comments.",
+      "Visualize progress with Kanban boards, calendar views, and smart dashboards.",
+    ],
+  };
+
+  const visibleItems = isHomePage
+    ? aboutData.listItems.slice(0, 2)
+    : aboutData.listItems;
+
   return (
-    <section className="services section">
-      <div className="container section-title" data-aos="fade-up">
-        <span>Our Services</span>
-        <h2>Project & Task Management Solutions</h2>
-        <p>
-          Discover a comprehensive suite of tools designed to streamline your
-          task and project management workflows.
-        </p>
+    <section className="about section">
+      <div className="container section-title d-flex flex-column" data-aos="fade-up">
+        <span>{aboutData.title}</span>
+        <h2>{aboutData.title}</h2>
+        <p>{aboutData.description}</p>
       </div>
       <div className="container">
         <div className="row gy-4">
-          {servicesData.map((service, index) => (
-            <div
-              className="col-lg-4 col-md-6"
-              data-aos="fade-up"
-              data-aos-delay={`${(index + 1) * 100}`}
-              key={service.id}
-            >
-              <div className="service-item position-relative">
-                <div className="icon">
-                  <i className={`bi ${service.icon}`}></i>
-                </div>
-                <div className="stretched-link">
-                  <h3>{service.title}</h3>
-                </div>
-                <p>{service.description}</p>
-              </div>
-            </div>
-          ))}
+          <div
+            className="col-lg-6 order-1 order-lg-2"
+            data-aos="fade-up"
+            data-aos-delay="100"
+          >
+            <img src={about} className="img-fluid" alt="About Us" />
+          </div>
+          <div
+            className="col-lg-6 order-2 order-lg-1 content"
+            data-aos="fade-up"
+            data-aos-delay="200"
+          >
+            <h3>{aboutData.subtitle}</h3>
+            <p className="fst-italic">{aboutData.description}</p>
+            <ul>
+              {visibleItems.map((item, index) => (
+                <li key={index}>
+                  <i className="bi bi-check-circle"></i>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            {isHomePage && (
+              <Link to="/about" className="read-more">
+                <span>Read More</span>
+                <i className="bi bi-arrow-right"></i>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </section>
   );
 };
 
-export default Services;
+export default About;

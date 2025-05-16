@@ -28,6 +28,8 @@ import {
   BookOpen,
   BarChart2,
   ClipboardList,
+  Briefcase,
+  Info,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -108,21 +110,21 @@ const Navbar = () => {
       case "student":
         return (
           <>
-          <NavButton
-            component={Link}
-            to="/student/dashboard?section=courses" // Add query parameter
-            startIcon={<BookOpen size={18} />}
-          >
-            My Courses
-          </NavButton>
-          <NavButton
-            component={Link}
-            to="/student/dashboard?section=assignments"
-            startIcon={<FileText size={18} />}
-          >
-            Assignments
-          </NavButton>
-        </>
+            <NavButton
+              component={Link}
+              to="/student/dashboard?section=courses" // Add query parameter
+              startIcon={<BookOpen size={18} />}
+            >
+              My Courses
+            </NavButton>
+            <NavButton
+              component={Link}
+              to="/student/dashboard?section=assignments"
+              startIcon={<FileText size={18} />}
+            >
+              Assignments
+            </NavButton>
+          </>
         );
       case "branchmanager":
         return (
@@ -182,11 +184,17 @@ const Navbar = () => {
               },
             }}
           >
-            TaskManager
+            TaskPilot AI
           </Typography>
 
           <NavButton component={Link} to="/" startIcon={<Home size={18} />}>
             Home
+          </NavButton>
+          <NavButton component={Link} to="/services" startIcon={<Briefcase size={18} />}>
+            Services
+          </NavButton>
+          <NavButton component={Link} to="/about" startIcon={<Info size={18} />}>
+            AboutUs
           </NavButton>
 
           {token && renderRoleSpecificLinks()}
@@ -196,32 +204,6 @@ const Navbar = () => {
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           {token && (
             <>
-              <IconButton
-                component={Link}
-                to={
-                  role === "instructor"
-                    ? "/instructor/tasks/new"
-                    : role === "student"
-                    ? "/student/assignments/new"
-                    : "/tasks/new"
-                }
-                sx={{
-                  backgroundColor: "#d32f2f", // Blood red
-                  color: "white",
-                  "&:hover": {
-                    backgroundColor: "#b71c1c", // Darker blood red on hover
-                  },
-                }}
-              >
-                <Plus size={20} />
-              </IconButton>
-
-              <IconButton size="medium" sx={{ color: "common.white" }}>
-                <Badge badgeContent={4} color="error">
-                  <Bell size={20} />
-                </Badge>
-              </IconButton>
-
               {/* User profile dropdown */}
               <IconButton
                 onClick={handleClick}

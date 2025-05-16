@@ -170,34 +170,54 @@ const Grades = () => {
         `assignments/${assignmentId}/track/${selectedTrack}/course/${selectedCourse}/submitters/`
       );
 
-      const dataWithGrades = await Promise.all(
-        response.data.submitters.map(async (student) => {
+      // Process all students (both submitters and non-submitters)
+      const allStudents = [
+        ...(response.data.submitters || []),
+        ...(response.data.non_submitters || []).map(s => ({ ...s, submitted: false }))
+      ];
+
+      const processedStudents = await Promise.all(
+        allStudents.map(async (student) => {
           try {
-            // Fetch submission
             let submission = {};
+            let submissionId = null;
+            let fileUrl = null;
+            let submissionDate = null;
+
+            // Try to get submission data
             try {
               const submissionRes = await apiClient.get(
                 `submission/assignments/${assignmentId}/students/${student.student_id}/`
               );
-              submission = submissionRes.data.submission || {};
-              // Fallback for submission ID
-              if (!submission.id && submission.file_url) {
+              if (submissionRes.data?.submission) {
+                submission = submissionRes.data.submission;
+                submissionId = submission.id;
+                fileUrl = submission.file_url;
+                submissionDate = submission.submission_time;
+              }
+            } catch (submissionError) {
+              console.log('Primary submission fetch failed, trying alternative endpoint');
+              try {
                 const altRes = await apiClient.get(
                   `submission/instructor/?student=${student.student_id}&assignment=${assignmentId}`
                 );
-                if (altRes.data.results?.length > 0) {
+                if (altRes.data?.results?.[0]) {
                   submission = altRes.data.results[0];
+                  submissionId = submission.id;
+                  fileUrl = submission.file_url;
+                  submissionDate = submission.submission_time;
                 }
+              } catch (altError) {
+                console.log('Alternative submission fetch failed');
               }
-            } catch (submissionError) {
-              console.error('Submission fetch error:', submissionError);
             }
 
-            // Validate submission
-            const hasValidSubmission = !!submission.file_url;
-            const submissionId = submission.id || submission.submission_id || null;
+            // Check if the student is marked as submitted in the original response
+            const isSubmitted = response.data.submitters.some(
+              s => s.student_id === student.student_id
+            );
 
-            // Fetch existing grade
+            // Get existing grade if any
             let existingEvaluation = null;
             try {
               const gradeRes = await apiClient.get(
@@ -210,34 +230,40 @@ const Grades = () => {
 
             return {
               ...student,
-              submitted: hasValidSubmission,
+              submitted: isSubmitted || !!fileUrl,
               submission_id: submissionId,
-              submission_date: submission.submission_time,
-              file_url: submission.file_url,
+              submission_date: submissionDate,
+              file_url: fileUrl,
               existingEvaluation,
             };
           } catch (err) {
+            console.error('Error processing student:', student.student_id, err);
             return {
               ...student,
               submitted: false,
               submission_id: null,
-              submission_date: null,
               file_url: null,
-              existingEvaluation: null,
+              submission_date: null,
+              existingEvaluation: null
             };
           }
         })
       );
 
+      // Separate back into submitters and non-submitters based on actual submission status
+      const submitters = processedStudents.filter(s => s.submitted);
+      const non_submitters = processedStudents.filter(s => !s.submitted);
+
+      // Prepare feedback and grades from existing evaluations
       const evaluations = {};
       const initialFeedback = {};
       const initialGrades = {};
 
-      dataWithGrades.forEach((student) => {
+      processedStudents.forEach((student) => {
         if (student.existingEvaluation) {
           evaluations[student.student_id] = student.existingEvaluation;
-          initialFeedback[student.student_id] = student.existingEvaluation.feedback;
-          initialGrades[student.student_id] = student.existingEvaluation.score.toString();
+          initialFeedback[student.student_id] = student.existingEvaluation.feedback || '';
+          initialGrades[student.student_id] = student.existingEvaluation.score?.toString() || '';
         }
       });
 
@@ -245,10 +271,13 @@ const Grades = () => {
       setFeedback(initialFeedback);
       setGrades(initialGrades);
       setSubmissionData({
-        ...response.data,
-        submitters: dataWithGrades,
+        submitters,
+        non_submitters,
+        submitted_count: submitters.length,
+        not_submitted_count: non_submitters.length
       });
     } catch (err) {
+      console.error('Error fetching submission status:', err);
       setError("Failed to fetch submission data");
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
@@ -523,7 +552,10 @@ const Grades = () => {
   );
 
   const filteredStudents = submissionData
-    ? submissionData?.submitters?.filter((student) => student.existingEvaluation)
+    ? [
+      ...submissionData.submitters,
+      ...(submissionData.non_submitters || [])
+    ].filter(student => student.submitted)
     : [];
 
   const getBorderColor = (student) => {
@@ -619,7 +651,9 @@ const Grades = () => {
       {submissionData && (
         <Box>
           <Typography variant="subtitle1" sx={{ mb: 2 }}>
-            Showing {filteredStudents.length} evaluated submissions
+            Showing {filteredStudents.length} students (
+            {submissionData.submitted_count} submitted,{" "}
+            {submissionData.not_submitted_count} not submitted)
           </Typography>
 
           <Grid container spacing={2}>
@@ -694,9 +728,9 @@ const Grades = () => {
                                     Submitted:{" "}
                                     {student.submission_date
                                       ? format(
-                                          new Date(student.submission_date),
-                                          "PPpp"
-                                        )
+                                        new Date(student.submission_date),
+                                        "PPpp"
+                                      )
                                       : "N/A"}
                                   </Typography>
                                 </Box>
@@ -958,11 +992,11 @@ const Grades = () => {
                                             <Typography variant="h6" sx={{ mt: 1 }}>
                                               {student.existingEvaluation.submission_time
                                                 ? format(
-                                                    new Date(
-                                                      student.existingEvaluation.submission_time
-                                                    ),
-                                                    "PPpp"
-                                                  )
+                                                  new Date(
+                                                    student.existingEvaluation.submission_time
+                                                  ),
+                                                  "PPpp"
+                                                )
                                                 : "N/A"}
                                             </Typography>
                                           </Card>

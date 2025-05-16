@@ -158,30 +158,54 @@ const Submissions = () => {
         `assignments/${assignmentId}/track/${selectedTrack}/course/${selectedCourse}/submitters/`
       );
 
-      const dataWithGrades = await Promise.all(
-        response.data.submitters.map(async (student) => {
+      // Process all students (both submitters and non-submitters)
+      const allStudents = [
+        ...(response.data.submitters || []),
+        ...(response.data.non_submitters || []).map(s => ({ ...s, submitted: false }))
+      ];
+
+      const processedStudents = await Promise.all(
+        allStudents.map(async (student) => {
           try {
             let submission = {};
+            let submissionId = null;
+            let fileUrl = null;
+            let submissionDate = null;
+
+            // Try to get submission data
             try {
               const submissionRes = await apiClient.get(
                 `submission/assignments/${assignmentId}/students/${student.student_id}/`
               );
-              submission = submissionRes.data.submission || {};
-              if (!submission.id && submission.file_url) {
+              if (submissionRes.data?.submission) {
+                submission = submissionRes.data.submission;
+                submissionId = submission.id;
+                fileUrl = submission.file_url;
+                submissionDate = submission.submission_time;
+              }
+            } catch (submissionError) {
+              console.log('Primary submission fetch failed, trying alternative endpoint');
+              try {
                 const altRes = await apiClient.get(
                   `submission/instructor/?student=${student.student_id}&assignment=${assignmentId}`
                 );
-                if (altRes.data.results?.length > 0) {
+                if (altRes.data?.results?.[0]) {
                   submission = altRes.data.results[0];
+                  submissionId = submission.id;
+                  fileUrl = submission.file_url;
+                  submissionDate = submission.submission_time;
                 }
+              } catch (altError) {
+                console.log('Alternative submission fetch failed');
               }
-            } catch (submissionError) {
-              console.error('Submission fetch error:', submissionError);
             }
 
-            const hasValidSubmission = !!submission.file_url;
-            const submissionId = submission.id || submission.submission_id || 1;
+            // Check if the student is marked as submitted in the original response
+            const isSubmitted = response.data.submitters.some(
+              s => s.student_id === student.student_id
+            );
 
+            // Get existing grade if any
             let existingGrade = null;
             try {
               const gradeRes = await apiClient.get(
@@ -194,36 +218,40 @@ const Submissions = () => {
 
             return {
               ...student,
-              submitted: hasValidSubmission,
+              submitted: isSubmitted || !!fileUrl,
               submission_id: submissionId,
-              submission_date: submission.submission_time,
-              file_url: submission.file_url,
+              submission_date: submissionDate,
+              file_url: fileUrl,
               existingGrade,
             };
           } catch (err) {
-            console.error('Student processing error:', err);
+            console.error('Error processing student:', student.student_id, err);
             return {
               ...student,
               submitted: false,
               submission_id: null,
-              existingGrade: null,
+              file_url: null,
+              submission_date: null,
+              existingGrade: null
             };
           }
         })
       );
 
+      // Separate back into submitters and non-submitters based on actual submission status
+      const submitters = processedStudents.filter(s => s.submitted);
+      const non_submitters = processedStudents.filter(s => !s.submitted);
+
+      // Prepare feedback and grades from existing evaluations
       const evaluations = {};
       const initialFeedback = {};
       const initialGrades = {};
 
-      dataWithGrades.forEach((student) => {
+      processedStudents.forEach((student) => {
         if (student.existingGrade) {
           evaluations[student.student_id] = student.existingGrade;
-          initialFeedback[student.student_id] = student.existingGrade.feedback;
-          initialGrades[student.student_id] = student.existingGrade.score.toString();
-          if (!student.submission_id && student.existingGrade.submission) {
-            student.submission_id = student.existingGrade.submission;
-          }
+          initialFeedback[student.student_id] = student.existingGrade.feedback || '';
+          initialGrades[student.student_id] = student.existingGrade.score?.toString() || '';
         }
       });
 
@@ -231,10 +259,13 @@ const Submissions = () => {
       setFeedback(initialFeedback);
       setGrades(initialGrades);
       setSubmissionData({
-        ...response.data,
-        submitters: dataWithGrades,
+        submitters,
+        non_submitters,
+        submitted_count: submitters.length,
+        not_submitted_count: non_submitters.length
       });
     } catch (err) {
+      console.error('Error fetching submission status:', err);
       setError("Failed to fetch submission data");
     } finally {
       setLoading((prev) => ({ ...prev, submissions: false }));
@@ -286,113 +317,79 @@ const Submissions = () => {
         throw new Error("Student not found in submission records");
       }
 
+      // Try to get submission ID through multiple methods
       let submissionId = student.submission_id;
 
-      if (!submissionId && student.existingEvaluation?.submission) {
-        submissionId = student.existingEvaluation.submission;
+      // Method 1: Check existing evaluation
+      if (!submissionId && existingEvaluations[studentId]?.submission) {
+        submissionId = existingEvaluations[studentId].submission;
       }
 
-      if (!submissionId && student.file_url) {
-        const urlPatterns = [
-          /\/d\/([a-zA-Z0-9-_]+)/,
-          /id=([a-zA-Z0-9-_]+)/,
-          /\/file\/d\/([a-zA-Z0-9-_]+)/
-        ];
-        
-        for (const pattern of urlPatterns) {
-          const match = student.file_url.match(pattern);
-          if (match) {
-            submissionId = match[1];
-            break;
-          }
-        }
-      }
-
+      // Method 2: Try to get from API directly
       if (!submissionId && student.submitted) {
         try {
           const submissionRes = await apiClient.get(
-            `submission/instructor/?student=${studentId}&assignment=${selectedAssignment}`
+            `submission/for-student/${studentId}/assignment/${selectedAssignment}/`
           );
-          if (submissionRes.data?.results?.[0]?.id) {
-            submissionId = submissionRes.data.results[0].id;
-          } else if (submissionRes.data?.id) {
-            submissionId = submissionRes.data.id;
-          }
+          submissionId = submissionRes.data.id;
         } catch (apiError) {
-          console.error('API fallback failed:', {
-            error: apiError.response?.data || apiError.message,
-            studentId,
-            assignment: selectedAssignment
-          });
+          console.log('Direct submission fetch failed, trying alternative');
         }
       }
 
-      if (!submissionId) {
-        console.error("Submission resolution failed - technical details:", {
-          studentId,
-          assignment: selectedAssignment,
-          studentData: {
-            submitted: student.submitted,
-            file_url: student.file_url,
-            submission_id: student.submission_id,
-            existing_evaluation: !!student.existingEvaluation
-          }
-        });
-        
-        throw new Error(`Could not verify submission for ${student.name}. Please ensure:
-          1. The student has submitted their work
-          2. The submission file is properly uploaded
-          3. Refresh the page and try again`);
+      // Method 3: If we have file URL but no ID, try to submit without submission ID
+      if (!submissionId && student.file_url) {
+        console.warn('Proceeding without submission ID but with file URL');
       }
 
+      // Validate grade input
       const rawScore = grades[studentId];
       const numericScore = parseFloat(rawScore);
-      
+
       if (isNaN(numericScore)) {
         throw new Error("Please enter a valid numerical grade");
       }
-      
+
       if (numericScore < 0 || numericScore > 10) {
         throw new Error("Grade must be between 0 and 10");
       }
 
+      // Prepare payload - make submission ID optional
       const payload = {
         score: numericScore,
         feedback: feedback[studentId]?.trim() || "",
-        submission: submissionId,
-        ...(!existingEvaluations[studentId] && {
-          student: studentId,
-          assignment: selectedAssignment,
-          course: selectedCourse,
-          track: selectedTrack
-        })
+        student: studentId,
+        assignment: selectedAssignment,
+        course: selectedCourse,
+        track: selectedTrack,
+        ...(submissionId && { submission: submissionId }),
+        ...(student.file_url && { file_url: student.file_url })
       };
 
-      const endpoint = existingEvaluations[studentId] 
+      // Determine endpoint and method
+      const endpoint = existingEvaluations[studentId]
         ? `grades/${existingEvaluations[studentId].id}/`
         : "grades/";
 
-      await apiClient[existingEvaluations[studentId] ? "put" : "post"](endpoint, payload);
+      const method = existingEvaluations[studentId] ? "put" : "post";
 
+      // Submit the evaluation
+      await apiClient[method](endpoint, payload);
+
+      // Refresh the submission data
       await fetchSubmissionStatus(selectedAssignment);
-      
-      setSubmissionData(prev => ({
-        ...prev,
-        submitters: prev.submitters.map(s => 
-          s.student_id === studentId ? { ...s, ...student } : s
-        )
-      }));
-
-      if (!existingEvaluations[studentId]) {
-        setFeedback(prev => ({ ...prev, [studentId]: "" }));
-        setGrades(prev => ({ ...prev, [studentId]: "" }));
-      }
 
       setSnackbar({
         open: true,
         message: `Evaluation ${existingEvaluations[studentId] ? "updated" : "submitted"} successfully`,
         severity: "success",
       });
+
+      if (!existingEvaluations[studentId]) {
+        setFeedback(prev => ({ ...prev, [studentId]: "" }));
+        setGrades(prev => ({ ...prev, [studentId]: "" }));
+      }
+
     } catch (err) {
       console.error("Grade submission error:", {
         error: err.message,
@@ -400,8 +397,12 @@ const Submissions = () => {
         response: err.response?.data
       });
 
-      const userMessage = err.response?.data?.detail || 
-        err.message.replace(/Error: /, '');
+      let userMessage = err.response?.data?.detail || err.message.replace(/Error: /, '');
+
+      // Special handling for submission creation errors
+      if (err.message.includes('submission record')) {
+        userMessage = `Could not verify submission for ${student.name}. The grade was saved but you may need to manually verify the submission later.`;
+      }
 
       setSnackbar({
         open: true,
@@ -429,12 +430,15 @@ const Submissions = () => {
     })),
   ];
 
-  const filteredStudents = mergedStudents.filter((student) =>
+  const filteredStudents = [
+    ...(submissionData.submitters || []),
+    ...(submissionData.non_submitters || [])
+  ].filter((student) =>
     statusFilter === "all"
       ? true
       : statusFilter === "submitted"
-      ? student.submitted
-      : !student.submitted
+        ? student.submitted
+        : !student.submitted
   );
 
   return (
@@ -574,7 +578,9 @@ const Submissions = () => {
                     {student.submitted ? (
                       <>
                         <Typography variant="body2">
-                          Submitted: {new Date(student.submission_date).toLocaleString()}
+                          Submitted: {student.submission_date
+                            ? new Date(student.submission_date).toLocaleString()
+                            : 'Date not available'}
                         </Typography>
                         {student.file_url && (
                           <Button

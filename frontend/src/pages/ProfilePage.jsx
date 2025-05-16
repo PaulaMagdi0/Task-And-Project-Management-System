@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
     Box,
     Typography,
@@ -10,8 +10,8 @@ import {
     Divider,
     Chip,
     InputAdornment,
-    IconButton
-} from '@mui/material';
+    IconButton,
+} from "@mui/material";
 import {
     User,
     Mail,
@@ -25,12 +25,13 @@ import {
     Eye,
     EyeOff,
     Lock,
-    Key
-} from 'lucide-react';
-import { useSelector } from 'react-redux';
-import { useSnackbar } from 'notistack';
-import { CircularProgress } from '@mui/material';
-import axios from 'axios';
+    Key,
+} from "lucide-react";
+import { useSelector } from "react-redux";
+import { useSnackbar } from "notistack";
+import { CircularProgress } from "@mui/material";
+import axios from "axios";
+import apiClient from "../services/api";
 
 const ProfilePage = () => {
     const { username, email, token } = useSelector((state) => state.auth);
@@ -40,16 +41,16 @@ const ProfilePage = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [isLoading, setIsLoading] = useState(false);
     const [userData, setUserData] = useState({
-        fullName: '',
-        email: '',
-        phone: '',
-        role: '',
-        department: '',
-        date_joined: '',
-        location: '',
-        languages: '',
-        currentPassword: '',
-        newPassword: ''
+        fullName: "",
+        email: "",
+        phone: "",
+        role: "",
+        department: "",
+        date_joined: "",
+        location: "",
+        languages: "",
+        currentPassword: "",
+        newPassword: "",
     });
 
     // Fetch user data on component mount
@@ -58,45 +59,43 @@ const ProfilePage = () => {
             const studentId = localStorage.getItem("user_id");
             const token = localStorage.getItem("authToken");
             try {
-                const response = await axios.get(`http://localhost:8000/api/student/${studentId}/courses`, {
+                const response = await apiClient.get(`/student/${studentId}/courses`, {
                     headers: {
-                        Authorization: `Bearer ${token}`
-                    }
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
 
                 const data = response.data;
-                // console.log('DATAAAAAAAAAAAA:', data);
-
-                const [firstName, lastName] = data.student.name?.split(' ') || [];
-                const dateJoined = data.student.date_joined?.split("T")[0] || '';
+                const [firstName, lastName] = data.student.full_name?.split(" ") || [];
+                const dateJoined = data.student.date_joined?.split("T")[0] || "";
 
                 setUserData({
-                    fullName: data.student.name || '',
-                    first_name: firstName || '',
-                    last_name: lastName || '',
-                    email: data.student.email || '',
-                    phone: data.student.phone || '',
-                    role: data.student.role || 'Student',
-                    department: data.student.department || 'Education',
-                    date_joined: dateJoined, // Use the split date here
-                    location: data.student.location || 'Cairo, Egypt',
-                    languages: data.student.languages || 'English, Arabic',
-                    newPassword: '' // Only allow setting a new password if required
+                    fullName: data.student.name || "",
+                    first_name: firstName || "",
+                    last_name: lastName || "",
+                    email: data.student.email || "",
+                    phone: data.student.phone || "",
+                    role: data.student.role || "Student",
+                    department: data.student.department || "Education",
+                    date_joined: dateJoined,
+                    location: data.student.location || "Cairo, Egypt",
+                    languages: data.student.languages || "English, Arabic",
+                    newPassword: "",
                 });
             } catch (error) {
-                console.error('Error fetching user data:', error);
+                console.error("Error fetching user data:", error);
                 setUserData({
                     fullName: username,
-                    first_name: username?.split(' ')[0] || '',
-                    last_name: username?.split(' ')[1] || '',
+                    first_name: username?.split(" ")[0] || "",
+                    last_name: username?.split(" ")[1] || "",
                     email: email,
-                    phone: '+20 123 456 7890',
-                    role: 'Senior Instructor',
-                    department: 'Education',
-                    date_joined: '2023-01-15', // Fallback date for error handling
-                    location: 'Cairo, Egypt',
-                    languages: 'English, Arabic',
-                    newPassword: ''
+                    phone: "+20 123 456 7890",
+                    role: "Senior Instructor",
+                    department: "Education",
+                    date_joined: "2023-01-15",
+                    location: "Cairo, Egypt",
+                    languages: "English, Arabic",
+                    newPassword: "",
                 });
             }
         };
@@ -104,18 +103,14 @@ const ProfilePage = () => {
         fetchUserData();
     }, [token, username, email]);
 
-
-
-    console.log('userData:', userData);
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setUserData(prev => ({ ...prev, [name]: value }));
+        setUserData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleEditToggle = () => {
         setIsEditing(!isEditing);
-        // Clear password fields when toggling edit mode
-        setUserData(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+        setUserData((prev) => ({ ...prev, currentPassword: "", newPassword: "" }));
     };
 
     const handleSave = async () => {
@@ -123,102 +118,119 @@ const ProfilePage = () => {
         const authToken = localStorage.getItem("authToken");
         const { currentPassword, newPassword } = userData;
 
-        // Client-side validation
         if (!currentPassword || !newPassword) {
-            enqueueSnackbar('Both fields are required', { variant: 'error' });
+            enqueueSnackbar("Both fields are required", { variant: "error" });
             return;
         }
 
         if (newPassword.length < 8) {
-            enqueueSnackbar('Password must be at least 8 characters', { variant: 'error' });
+            enqueueSnackbar("Password must be at least 8 characters", {
+                variant: "error",
+            });
             return;
         }
 
         setIsLoading(true);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/student/${studentId}/update/`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${authToken}`,
-                },
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword,
-                }),
+            const { data } = await apiClient.patch(
+                `/student/${studentId}/update/`,
+                { currentPassword, newPassword },
+                {
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            enqueueSnackbar(data.message || "Password updated successfully", {
+                variant: "success",
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                alert('Password updated successfully')
-                enqueueSnackbar(data.message || 'Password updated successfully', { variant: 'success' });
-                setIsEditing(false);
-                setUserData(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
-            } else {
-                alert('Current Password is Invalid')
-                throw new Error(data.error || "Failed to update password");
-            }
+            setIsEditing(false);
+            setUserData((prev) => ({
+                ...prev,
+                currentPassword: "",
+                newPassword: "",
+            }));
         } catch (error) {
-            enqueueSnackbar(error.message, { variant: 'error' });
+            const errorMessage =
+                error.response?.data?.error ||
+                error.message ||
+                "Failed to update password";
+            enqueueSnackbar(errorMessage, { variant: "error" });
         } finally {
             setIsLoading(false);
         }
     };
 
-
-
     return (
-        <Box sx={{
-            p: { xs: 2, md: 4 },
-            minHeight: '100vh',
-            bgcolor: '#121212',
-            color: 'white'
-        }}>
-            <Paper sx={{
+        <Box
+            sx={{
                 p: { xs: 2, md: 4 },
-                maxWidth: 800,
-                mx: 'auto',
-                bgcolor: '#1E1E1E',
-                borderRadius: '12px',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
+                minHeight: "100vh",
+                bgcolor: "#121212",
+                color: "white",
+            }}
+        >
+            <Paper
+                sx={{
+                    p: { xs: 2, md: 4 },
+                    maxWidth: 800,
+                    mx: "auto",
+                    bgcolor: "#1E1E1E",
+                    borderRadius: "12px",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+            >
                 {/* Header Section */}
-                <Box sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: 'center',
-                    mb: 4,
-                    gap: 3
-                }}>
-                    <Avatar sx={{
-                        width: 96,
-                        height: 96,
-                        bgcolor: '#d32f2f', // Blood red
-                        fontSize: '2.5rem',
-                        border: '3px solid rgba(255, 255, 255, 0.1)'
-                    }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", sm: "row" },
+                        alignItems: "center",
+                        mb: 4,
+                        gap: 3,
+                    }}
+                >
+                    <Avatar
+                        sx={{
+                            width: 96,
+                            height: 96,
+                            bgcolor: "#d32f2f", // Blood red
+                            fontSize: "2.5rem",
+                            border: "3px solid rgba(255, 255, 255, 0.1)",
+                        }}
+                    >
                         {username?.charAt(0)?.toUpperCase()}
                     </Avatar>
 
-                    <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
-                        <Typography variant="h4" sx={{ color: '#eee', fontWeight: 700, mb: 0.5 }}>
-                            {userData.fullName}
+                    <Box sx={{ textAlign: { xs: "center", sm: "left" } }}>
+                        <Typography
+                            variant="h4"
+                            sx={{ color: "#eee", fontWeight: 700, mb: 0.5 }}
+                        >
+                            {userData.first_name} {userData.last_name}
                         </Typography>
-                        <Typography variant="body1" sx={{ color: '#aaa', mb: 1 }}>
+                        <Typography variant="body1" sx={{ color: "#aaa", mb: 1 }}>
                             {userData.role} At ITI
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                gap: 1,
+                                justifyContent: { xs: "center", sm: "flex-start" },
+                            }}
+                        >
                             <Chip
                                 icon={<MapPin size={16} />}
                                 label={userData.location}
                                 size="small"
                                 sx={{
-                                    bgcolor: 'rgba(211, 47, 47, 0.1)', // Semi-transparent blood red
-                                    color: '#d32f2f', // Blood red text
-                                    border: '1px solid rgba(211, 47, 47, 0.3)'
+                                    bgcolor: "rgba(211, 47, 47, 0.1)", // Semi-transparent blood red
+                                    color: "#d32f2f", // Blood red text
+                                    border: "1px solid rgba(211, 47, 47, 0.3)",
                                 }}
                             />
                             <Chip
@@ -226,27 +238,30 @@ const ProfilePage = () => {
                                 label={userData.languages}
                                 size="small"
                                 sx={{
-                                    bgcolor: 'rgba(211, 47, 47, 0.1)', // Semi-transparent blood red
-                                    color: '#d32f2f', // Blood red text
-                                    border: '1px solid rgba(211, 47, 47, 0.3)'
+                                    bgcolor: "rgba(211, 47, 47, 0.1)", // Semi-transparent blood red
+                                    color: "#d32f2f", // Blood red text
+                                    border: "1px solid rgba(211, 47, 47, 0.3)",
                                 }}
                             />
                         </Box>
                     </Box>
                 </Box>
 
-                <Divider sx={{ my: 3, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+                <Divider sx={{ my: 3, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
 
                 {/* Personal Information Section */}
                 <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" sx={{
-                        mb: 2,
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        color: 'white'
-                    }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            mb: 2,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            color: "white",
+                        }}
+                    >
                         <User size={20} />
                         Personal Information
                     </Typography>
@@ -260,10 +275,10 @@ const ProfilePage = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <User size={20} style={{ color: '#777' }} />
+                                            <User size={20} style={{ color: "#777" }} />
                                         </InputAdornment>
                                     ),
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
@@ -277,16 +292,16 @@ const ProfilePage = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <Mail size={20} style={{ color: '#777' }} />
+                                            <Mail size={20} style={{ color: "#777" }} />
                                         </InputAdornment>
                                     ),
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
                         </Grid>
 
-                        <Grid item xs={12} md={6}>
+                        {/* <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
                                 label="Phone"
@@ -294,14 +309,14 @@ const ProfilePage = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <Phone size={20} style={{ color: '#777' }} />
+                                            <Phone size={20} style={{ color: "#777" }} />
                                         </InputAdornment>
                                     ),
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
-                        </Grid>
+                        </Grid> */}
 
                         <Grid item xs={12} md={6}>
                             <TextField
@@ -311,10 +326,10 @@ const ProfilePage = () => {
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <Calendar size={20} style={{ color: '#777' }} />
+                                            <Calendar size={20} style={{ color: "#777" }} />
                                         </InputAdornment>
                                     ),
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
@@ -324,14 +339,17 @@ const ProfilePage = () => {
 
                 {/* Professional Information Section */}
                 <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" sx={{
-                        mb: 2,
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        color: 'white'
-                    }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            mb: 2,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            color: "white",
+                        }}
+                    >
                         <Briefcase size={20} />
                         Professional Information
                     </Typography>
@@ -343,7 +361,7 @@ const ProfilePage = () => {
                                 label="Position"
                                 value={userData.role}
                                 InputProps={{
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
@@ -355,7 +373,7 @@ const ProfilePage = () => {
                                 label="Department"
                                 value={userData.department}
                                 InputProps={{
-                                    readOnly: true
+                                    readOnly: true,
                                 }}
                                 sx={textFieldStyles}
                             />
@@ -366,14 +384,17 @@ const ProfilePage = () => {
                 {/* Password Section - Only shown in edit mode */}
                 {isEditing && (
                     <Box sx={{ mb: 4 }}>
-                        <Typography variant="h6" sx={{
-                            mb: 2,
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            color: 'white'
-                        }}>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                mb: 2,
+                                fontWeight: 600,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                color: "white",
+                            }}
+                        >
                             <Key size={20} />
                             Change Password
                         </Typography>
@@ -383,27 +404,33 @@ const ProfilePage = () => {
                                 <TextField
                                     fullWidth
                                     name="currentPassword"
-                                    type={showCurrentPassword ? 'text' : 'password'}
+                                    type={showCurrentPassword ? "text" : "password"}
                                     label="Current Password"
                                     value={userData.currentPassword}
                                     onChange={handleChange}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <Lock size={20} style={{ color: '#777' }} />
+                                                <Lock size={20} style={{ color: "#777" }} />
                                             </InputAdornment>
                                         ),
                                         endAdornment: (
                                             <InputAdornment position="end">
                                                 <IconButton
-                                                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                                    onClick={() =>
+                                                        setShowCurrentPassword(!showCurrentPassword)
+                                                    }
                                                     edge="end"
-                                                    sx={{ color: '#777' }}
+                                                    sx={{ color: "#777" }}
                                                 >
-                                                    {showCurrentPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                                    {showCurrentPassword ? (
+                                                        <EyeOff size={20} />
+                                                    ) : (
+                                                        <Eye size={20} />
+                                                    )}
                                                 </IconButton>
                                             </InputAdornment>
-                                        )
+                                        ),
                                     }}
                                     sx={textFieldStyles}
                                 />
@@ -412,14 +439,14 @@ const ProfilePage = () => {
                                 <TextField
                                     fullWidth
                                     name="newPassword"
-                                    type={showNewPassword ? 'text' : 'password'}
+                                    type={showNewPassword ? "text" : "password"}
                                     label="New Password"
                                     value={userData.newPassword}
                                     onChange={handleChange}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <Lock size={20} style={{ color: '#777' }} />
+                                                <Lock size={20} style={{ color: "#777" }} />
                                             </InputAdornment>
                                         ),
                                         endAdornment: (
@@ -427,12 +454,16 @@ const ProfilePage = () => {
                                                 <IconButton
                                                     onClick={() => setShowNewPassword(!showNewPassword)}
                                                     edge="end"
-                                                    sx={{ color: '#777' }}
+                                                    sx={{ color: "#777" }}
                                                 >
-                                                    {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                                    {showNewPassword ? (
+                                                        <EyeOff size={20} />
+                                                    ) : (
+                                                        <Eye size={20} />
+                                                    )}
                                                 </IconButton>
                                             </InputAdornment>
-                                        )
+                                        ),
                                     }}
                                     sx={textFieldStyles}
                                 />
@@ -442,12 +473,14 @@ const ProfilePage = () => {
                 )}
 
                 {/* Action Buttons */}
-                <Box sx={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: 2,
-                    mt: 4
-                }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 2,
+                        mt: 4,
+                    }}
+                >
                     {!isEditing ? (
                         <Button
                             variant="outlined"
@@ -455,9 +488,9 @@ const ProfilePage = () => {
                             onClick={handleEditToggle}
                             sx={{
                                 ...outlinedButtonStyles,
-                                '&:hover': {
-                                    borderColor: '#d32f2f', // Blood red on hover
-                                }
+                                "&:hover": {
+                                    borderColor: "#d32f2f", // Blood red on hover
+                                },
                             }}
                         >
                             Change Password
@@ -469,32 +502,42 @@ const ProfilePage = () => {
                                 onClick={handleEditToggle}
                                 sx={{
                                     ...outlinedButtonStyles,
-                                    '&:hover': {
-                                        borderColor: '#d32f2f', // Blood red on hover
-                                    }
+                                    "&:hover": {
+                                        borderColor: "#d32f2f", // Blood red on hover
+                                    },
                                 }}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 variant="contained"
-                                startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <Save size={18} />}
+                                startIcon={
+                                    isLoading ? (
+                                        <CircularProgress size={20} color="inherit" />
+                                    ) : (
+                                        <Save size={18} />
+                                    )
+                                }
                                 onClick={handleSave}
-                                disabled={!userData.currentPassword || !userData.newPassword || isLoading}
+                                disabled={
+                                    !userData.currentPassword ||
+                                    !userData.newPassword ||
+                                    isLoading
+                                }
                                 sx={{
                                     ...containedButtonStyles,
-                                    backgroundColor: '#d32f2f',
-                                    color: 'white',
-                                    '&:hover': {
-                                        backgroundColor: '#b71c1c',
+                                    backgroundColor: "#d32f2f",
+                                    color: "white",
+                                    "&:hover": {
+                                        backgroundColor: "#b71c1c",
                                     },
-                                    '&.Mui-disabled': {
-                                        backgroundColor: 'rgba(211, 47, 47, 0.5)',
-                                        color: 'rgba(255, 255, 255, 0.5)'
-                                    }
+                                    "&.Mui-disabled": {
+                                        backgroundColor: "rgba(211, 47, 47, 0.5)",
+                                        color: "rgba(255, 255, 255, 0.5)",
+                                    },
                                 }}
                             >
-                                {isLoading ? 'Updating...' : 'Save Password'}
+                                {isLoading ? "Updating..." : "Save Password"}
                             </Button>
                         </>
                     )}
@@ -506,43 +549,43 @@ const ProfilePage = () => {
 
 // Reusable styles
 const textFieldStyles = {
-    '& .MuiOutlinedInput-root': {
-        color: 'white',
-        '& fieldset': {
-            borderColor: 'rgba(255, 255, 255, 0.2)',
+    "& .MuiOutlinedInput-root": {
+        color: "white",
+        "& fieldset": {
+            borderColor: "rgba(255, 255, 255, 0.2)",
         },
-        '&:hover fieldset': {
-            borderColor: '#d32f2f', // Blood red on hover
+        "&:hover fieldset": {
+            borderColor: "#d32f2f", // Blood red on hover
         },
-        '&.Mui-focused fieldset': {
-            borderColor: '#d32f2f', // Blood red when focused
+        "&.Mui-focused fieldset": {
+            borderColor: "#d32f2f", // Blood red when focused
         },
-        '& .MuiInputBase-input.Mui-readOnly': {
-            color: '#aaa',
-            WebkitTextFillColor: '#aaa !important'
-        }
+        "& .MuiInputBase-input.Mui-readOnly": {
+            color: "#aaa",
+            WebkitTextFillColor: "#aaa !important",
+        },
     },
-    '& .MuiInputLabel-root': {
-        color: '#aaa',
+    "& .MuiInputLabel-root": {
+        color: "#aaa",
     },
-    '& .MuiInputLabel-root.Mui-focused': {
-        color: '#d32f2f', // Blood red when focused
-    }
+    "& .MuiInputLabel-root.Mui-focused": {
+        color: "#d32f2f", // Blood red when focused
+    },
 };
 
 const outlinedButtonStyles = {
     px: 3,
     py: 1,
-    borderRadius: '8px',
-    borderColor: 'rgba(255,255,255,0.2)',
-    color: 'white',
+    borderRadius: "8px",
+    borderColor: "rgba(255,255,255,0.2)",
+    color: "white",
 };
 
 const containedButtonStyles = {
     px: 3,
     py: 1,
-    borderRadius: '8px',
-    textTransform: 'none',
+    borderRadius: "8px",
+    textTransform: "none",
 };
 
 export default ProfilePage;
