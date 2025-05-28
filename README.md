@@ -1,103 +1,106 @@
+# Task and Project Management System
 
-## Project Structure
+A modern, full-featured web application designed to streamline task and project management.
+Built with a robust tech stack, it offers intuitive features for users and administrators to manage tasks efficiently.
 
+## 🌐 Live Demo
+
+Experience the application in action:
+
+🔗 [https://tasks-managment-system.vercel.app/](https://tasks-managment-system.vercel.app/)
+
+## 🚀 Features
+
+- **User Authentication**: Secure login and registration system.
+- **Task Management**: Create, update, and delete tasks with attributes like title, description, due date, and priority.
+- **Project Overview**: Visual representation of tasks and projects for better tracking.
+- **Filtering & Sorting**: Organize tasks based on status, priority, or due date.
+- **Responsive Design**: Optimized for desktops, tablets, and mobile devices.
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React.js, Tailwind CSS, Vite
+- **Backend**: Python, Django, Django REST Framework
+- **Database**: PostgreSQL
+- **Authentication**: JWT (JSON Web Tokens)
+- **WebSockets**: Django Channels, Websocket (for real-time chat)
+- **Deployment**: Vercel (frontend), Railway (backend)
+
+## 🧑‍💻 Getting Started
+
+### Prerequisites
+
+- Python 3.9+ and pip
+- PostgreSQL
+- Websocket (for real-time features)
+
+### Installation
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/PaulaMagdi0/Task-And-Project-Management-System.git
+   cd Task-And-Project-Management-System
+   ```
+
+2. **Frontend Setup**:
+
+   ```bash
+   cd client
+   npm install
+   npm run dev
+   ```
+
+3. **Backend Setup**:
+
+   ```bash
+   cd server
+   pip install -r requirements.txt
+   ```
+
+   Create a `.env` file in the backend directory with the following:
+
+   ```env
+   SECRET_KEY=your_django_secret_key
+   DEBUG=True
+   ALLOWED_HOSTS=localhost,127.0.0.1
+   DATABASE_NAME=your_db_name
+   DATABASE_USER=your_db_user
+   DATABASE_PASSWORD=your_db_password
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   REDIS_URL=redis://localhost:6379
+   ```
+
+   Then apply migrations and run the server:
+
+   ```bash
+   python manage.py migrate
+   python manage.py runserver
+   ```
+
+## 📂 Project Structure
+
+```plaintext
+├── frontend/                 # React frontend
+├── backend/                 # Django backend
+└── README.md               # Project documentation
 ```
-tproject/
-├── backend/
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── project/                     # Main Django project folder
-│   │   ├── _init_.py
-│   │   ├── settings.py
-│   │   ├── urls.py
-│   │   ├── asgi.py
-│   │   └── wsgi.py
-│   ├── apps/
-│   │   ├── accounts/                # User models (Supervisor, Instructor, Student)
-│   │   │   ├── migrations/
-│   │   │   ├── _init_.py
-│   │   │   ├── models.py            # Base User and child models
-│   │   │   ├── serializers.py
-│   │   │   ├── views.py
-│   │   │   ├── urls.py
-│   │   │   └── tests.py
-│   │   ├── tracks/                  # Track management (includes supervisor linkage)
-│   │   │   ├── migrations/
-│   │   │   ├── _init_.py
-│   │   │   ├── models.py
-│   │   │   ├── serializers.py
-│   │   │   ├── views.py
-│   │   │   ├── urls.py
-│   │   │   └── tests.py
-│   │   ├── courses/                 # Course management (linking tracks and instructors)
-│   │   │   ├── migrations/
-│   │   │   ├── _init_.py
-│   │   │   ├── models.py
-│   │   │   ├── serializers.py
-│   │   │   ├── views.py
-│   │   │   ├── urls.py
-│   │   │   └── tests.py
-│   │   ├── assignments/             # Assignment creation and management
-│   │   │   ├── migrations/
-│   │   │   ├── _init_.py
-│   │   │   ├── models.py
-│   │   │   ├── serializers.py
-│   │   │   ├── views.py
-│   │   │   ├── urls.py
-│   │   │   └── tests.py
-│   │   └── grades/                  # Grading and feedback system
-│   │       ├── migrations/
-│   │       ├── _init_.py
-│   │       ├── models.py
-│   │       ├── serializers.py
-│   │       ├── views.py
-│   │       ├── urls.py
-│   │       └── tests.py
-│   ├── utils/                       # Helper functions, utilities, custom permissions, etc.
-│   │   └── helpers.py
-│   └── docs/                        # Project documentation (architecture, setup guides, etc.)
-│       └── architecture.md
-│
-├── frontend/
-│   ├── package.json
-│   ├── yarn.lock                    # (or package-lock.json if using npm)
-│   ├── public/
-│   │   ├── index.html
-│   │   ├── favicon.ico
-│   │   └── manifest.json
-│   └── src/
-│       ├── index.js                 # Entry point for React
-│       ├── App.js                   # Main App component
-│       ├── App.css                  # Global styles
-│       ├── components/              # Reusable UI components
-│       │   ├── common/
-│       │   │   └── LoadingSpinner.js
-│       │   └── layout/
-│       │       ├── Header.js
-│       │       └── Footer.js
-│       ├── pages/                   # Page-level components (views)
-│       │   ├── Login.js
-│       │   ├── Dashboard.js
-│       │   ├── TrackManagement.js
-│       │   ├── CourseManagement.js
-│       │   ├── AssignmentManagement.js
-│       │   └── GradeDashboard.js
-│       ├── redux/                   # Redux setup
-│       │   ├── actions/
-│       │   │   ├── authActions.js
-│       │   │   ├── trackActions.js
-│       │   │   ├── courseActions.js
-│       │   │   ├── assignmentActions.js
-│       │   │   └── gradeActions.js
-│       │   ├── reducers/
-│       │   │   ├── authReducer.js
-│       │   │   ├── trackReducer.js
-│       │   │   ├── courseReducer.js
-│       │   │   ├── assignmentReducer.js
-│       │   │   ├── gradeReducer.js
-│       │   │   └── rootReducer.js
-│       │   └── store.js
-│       ├── routes/                  # React Router configuration (including Private Routes)
-│       │   └── PrivateRoute.js
-│       └── utils/                   # API helpers, constants, etc.
-│           └── api.js
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository.
+2. Create a new branch: `git checkout -b feature/your-feature-name`.
+3. Commit your changes: `git commit -m 'Add your feature'`.
+4. Push to the branch: `git push origin feature/your-feature-name`.
+5. Open a pull request.
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 📧 Contact
+
+For any inquiries or feedback, please contact [Paula Magdi](mailto:paulamagdy665@gmail.com).
