@@ -62,14 +62,12 @@ Experience the application in action:
 
    ```env
    SECRET_KEY=your_django_secret_key
-   DEBUG=True
    ALLOWED_HOSTS=localhost,127.0.0.1
    DATABASE_NAME=your_db_name
    DATABASE_USER=your_db_user
    DATABASE_PASSWORD=your_db_password
    DATABASE_HOST=localhost
    DATABASE_PORT=5432
-   REDIS_URL=redis://localhost:6379
    ```
 
    Then apply migrations and run the server:
