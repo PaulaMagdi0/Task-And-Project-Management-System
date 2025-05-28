@@ -46,7 +46,7 @@ Experience the application in action:
 2. **Frontend Setup**:
 
    ```bash
-   cd client
+   cd frontend
    npm install
    npm run dev
    ```
@@ -54,7 +54,7 @@ Experience the application in action:
 3. **Backend Setup**:
 
    ```bash
-   cd server
+   cd backend
    pip install -r requirements.txt
    ```
 
