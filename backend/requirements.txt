@@ -5,7 +5,7 @@ asgiref==3.8.1
 async-timeout==5.0.1
 bcrypt==4.3.0
 billiard==4.2.1
-black==25.1.0
+black==26.3.1
 celery==5.4.0
 certifi==2025.1.31
 channels==4.2.2
