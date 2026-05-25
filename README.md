@@ -1,104 +1,125 @@
-# Task and Project Management System
+<div align="center">
 
-A modern, full-featured web application designed to streamline task and project management.
-Built with a robust tech stack, it offers intuitive features for users and administrators to manage tasks efficiently.
+# 📋 Task and Project Management System
 
-## 🌐 Live Demo
+### A modern full-stack productivity platform with real-time chat, task tracking, and project boards.
 
-Experience the application in action:
+<p>
+  <img src="https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+  <img src="https://img.shields.io/badge/WebSockets-010101?style=for-the-badge&logo=socket.io&logoColor=white" />
+  <img src="https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=json-web-tokens&logoColor=white" />
+</p>
 
-🔗 [https://tasks-managment-system.vercel.app/](https://tasks-managment-system.vercel.app/)
+<p>
+  <a href="https://tasks-managment-system.vercel.app/">
+    <img src="https://img.shields.io/badge/🌐_Live_Demo-2EA043?style=for-the-badge&labelColor=0D1117" alt="Live Demo" />
+  </a>
+</p>
+
+</div>
+
+---
+
+## 🎯 What It Does
+
+Streamlines team task and project management with real-time collaboration:
+
+- 📋 **Visual project boards** with task tracking
+- 💬 **Real-time chat** between team members (Django Channels + WebSockets)
+- 🔍 **Filtering & sorting** by status, priority, due date
+- 📱 **Responsive design** — desktop, tablet, mobile
+- 🔐 **Secure auth** with JWT-based registration and login
+
+<!-- Add a screenshot or GIF here:  ![Screenshot](docs/screenshot.png) -->
 
 ## 🚀 Features
 
-- **User Authentication**: Secure login and registration system.
-- **Task Management**: Create, update, and delete tasks with attributes like title, description, due date, and priority.
-- **Project Overview**: Visual representation of tasks and projects for better tracking.
-- **Filtering & Sorting**: Organize tasks based on status, priority, or due date.
-- **Responsive Design**: Optimized for desktops, tablets, and mobile devices.
+- **User Authentication** — Secure registration and login (JWT)
+- **Task Management** — Create, update, delete tasks with title, description, due date, priority
+- **Project Overview** — Visual representation of tasks and projects for tracking
+- **Real-time Chat** — Django Channels WebSocket messaging between team members
+- **Filtering & Sorting** — Organize tasks by status, priority, or due date
+- **Responsive UI** — Tailwind CSS-driven layouts optimized for every screen size
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, Tailwind CSS, Vite
-- **Backend**: Python, Django, Django REST Framework
-- **Database**: PostgreSQL
-- **Authentication**: JWT (JSON Web Tokens)
-- **WebSockets**: Django Channels, Websocket (for real-time chat)
-- **Deployment**: Vercel (frontend), Railway (backend)
+| Layer | Stack |
+|---|---|
+| **Frontend** | React 18 · Vite · Tailwind CSS |
+| **Backend** | Django · Django REST Framework · Django Channels |
+| **Database** | PostgreSQL |
+| **Auth** | JSON Web Tokens (JWT) |
+| **Real-time** | WebSockets via Django Channels |
+| **Deployment** | Vercel (frontend) · Railway (backend) |
+
+## 🧠 What I Learned
+
+Building this end-to-end taught me:
+
+- **Real-time architecture** — combining REST for CRUD with WebSockets for live chat (Django Channels) without conflict
+- **Multi-service deployment** — coordinating frontend (Vercel) and backend (Railway) with proper CORS, env vars, and SPA routing
+- **JWT authentication patterns** — token issuance, refresh strategy, and secure storage across SPA boundaries
+- **Database design for collaborative tools** — modeling many-to-many between users, projects, and tasks with proper indexing
+- **Frontend state for live updates** — merging WebSocket events into React state without race conditions
 
 ## 🧑‍💻 Getting Started
 
 ### Prerequisites
-
 - Python 3.9+ and pip
 - PostgreSQL
-- Websocket (for real-time features)
+- Node.js 18+ and npm
 
 ### Installation
 
-1. **Clone the repository**:
+```bash
+# Clone
+git clone https://github.com/PaulaMagdi0/Task-And-Project-Management-System.git
+cd Task-And-Project-Management-System
 
-   ```bash
-   git clone https://github.com/PaulaMagdi0/Task-And-Project-Management-System.git
-   cd Task-And-Project-Management-System
-   ```
+# Frontend
+cd frontend
+npm install
+npm run dev
 
-2. **Frontend Setup**:
+# Backend (new terminal)
+cd backend
+pip install -r requirements.txt
+```
 
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+Create a `.env` file in `backend/`:
 
-3. **Backend Setup**:
+```env
+SECRET_KEY=your_django_secret_key
+ALLOWED_HOSTS=localhost,127.0.0.1
+DATABASE_NAME=your_db_name
+DATABASE_USER=your_db_user
+DATABASE_PASSWORD=your_db_password
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+```
 
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
+Then:
 
-   Create a `.env` file in the backend directory with the following:
-
-   ```env
-   SECRET_KEY=your_django_secret_key
-   ALLOWED_HOSTS=localhost,127.0.0.1
-   DATABASE_NAME=your_db_name
-   DATABASE_USER=your_db_user
-   DATABASE_PASSWORD=your_db_password
-   DATABASE_HOST=localhost
-   DATABASE_PORT=5432
-   ```
-
-   Then apply migrations and run the server:
-
-   ```bash
-   python manage.py migrate
-   python manage.py runserver
-   ```
+```bash
+python manage.py migrate
+python manage.py runserver
+```
 
 ## 📂 Project Structure
 
-```plaintext
-├── frontend/                 # React frontend
-├── backend/                 # Django backend
-└── README.md               # Project documentation
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch: `git checkout -b feature/your-feature-name`.
-3. Commit your changes: `git commit -m 'Add your feature'`.
-4. Push to the branch: `git push origin feature/your-feature-name`.
-5. Open a pull request.
+├── frontend/    # React + Vite + Tailwind
+├── backend/     # Django + DRF + Channels
+└── README.md
+```
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
-## 📧 Contact
+## 📫 Contact
 
-For any inquiries or feedback, please contact [Paula Magdi](mailto:paulamagdy665@gmail.com).
+Built by **Paula Magdy** — [GitHub](https://github.com/PaulaMagdi0) · [LinkedIn](https://www.linkedin.com/in/paula-magdy/) · [Portfolio](https://paulamagdy.framer.website/)
