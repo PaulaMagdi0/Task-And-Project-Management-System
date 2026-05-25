@@ -18,7 +18,7 @@
     "@mui/x-date-pickers": "^7.29.1",
     "@reduxjs/toolkit": "^2.6.1",
     "aos": "^2.3.4",
-    "axios": "^1.8.4",
+    "axios": "^1.15.2",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "date-fns": "^2.30.0",
