@@ -71,7 +71,7 @@ psycopg2-binary==2.9.10
 pyasn1==0.4.8
 pydantic==2.10.6
 pydantic_core==2.27.2
-PyJWT==2.10.1
+PyJWT==2.13.0
 pytest==9.0.3
 pytest-asyncio==0.25.3
 pytest-cov==6.0.0
